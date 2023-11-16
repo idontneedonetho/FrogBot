@@ -1,3 +1,4 @@
+#FrogBot 1.2
 import os
 import sqlite3
 import discord
