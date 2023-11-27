@@ -29,7 +29,7 @@ async def on_message(message):
 
     elif message.content.lower().startswith('/frog help'):
         help_message = (
-            '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. All users may use this.\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/points help, /frog points help" - Display rules for points.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
+            '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (*add "help" after for points rules*)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
         await message.channel.send(help_message)
         
     elif message.content.lower().startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
