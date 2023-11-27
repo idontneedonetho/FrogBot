@@ -110,7 +110,7 @@ async def on_roles_added(user_id, added_roles):
     role_names = ', '.join([role.name for role in added_roles])
     
     # Replace '854956285953572864' with your desired channel ID
-    channel = client.get_channel(1137853400814465156)
+    channel = client.get_channel(1178764276157141093)
     
     if channel:
         await channel.send(f"Congratulations! {user.mention} has been granted the following role(s): {role_names}")
@@ -123,7 +123,7 @@ async def on_roles_removed(user_id, removed_roles):
     role_names = ', '.join([role.name for role in removed_roles])
     
     # Replace '854956285953572864' with your desired channel ID
-    channel = client.get_channel(1137853400814465156)
+    channel = client.get_channel(1178764276157141093)
     
     if channel:
         await channel.send(f"Sorry to see you go! {user.mention} no longer has the following role(s): {role_names}")
