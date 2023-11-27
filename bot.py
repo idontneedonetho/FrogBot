@@ -27,12 +27,12 @@ async def on_message(message):
     elif message.content.lower() in ("/uwu", "uwu"):
         await message.channel.send("OwO")
 
-    elif message.content.lower().startswith('/frog help'):
+    elif message.content.lower() == '/frog help':
         help_message = (
             '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (*add "help" after for points rules*)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
         await message.channel.send(help_message)
         
-    elif message.content.lower().startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
+    elif message.content.startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
         if 'help' in message.content.lower():
             help_message = ('```Points work at follows:\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Fat Frog\n\nBug report = 250 points\nError log included + 250 points\nVideo included + 500 points\n\nFeature request = 100 points\nDetailed/thought out + 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged 2500 points\n\nHelping someone with a question = 100 points\n```')
             await message.channel.send(help_message)
