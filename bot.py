@@ -1,4 +1,4 @@
-#FrogBot v1.3.7
+#FrogBot v1.3.8
 import asyncio
 import discord
 import os
@@ -203,11 +203,15 @@ async def process_role_changes(user_id, before_roles, after_roles):
 
 async def on_roles_added(user_id, added_roles):
   user = await client.fetch_user(user_id)
-  role_names = ', '.join([role.name for role in added_roles])
-  channel = client.get_channel(channel_id)
+  role_threshold_ids = set(role_thresholds.values())
+  relevant_roles = [role for role in added_roles if str(role.id) in role_threshold_ids]
 
-  if channel:
-    await channel.send(f"Congratulations! {user.mention} has been granted the following role: {role_names}!")
+  if relevant_roles:
+    role_names = ', '.join([role.name for role in relevant_roles])
+    channel = client.get_channel(channel_id)
+
+    if channel:
+      await channel.send(f"Congratulations! {user.mention} has been granted the following role: {role_names}!")
 
 async def on_roles_removed(user_id, removed_roles):
   user = await client.fetch_user(user_id)
