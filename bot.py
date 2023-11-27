@@ -1,4 +1,4 @@
-#FrogBot v1.3
+#FrogBot v1.3.3
 import os
 import sqlite3
 import discord
@@ -81,53 +81,40 @@ async def on_message(message):
 
 @client.event
 async def on_member_update(before, after):
-    # Check if roles have changed
     if before.roles != after.roles:
-        # Do something with the role changes
         await process_role_changes(after.id, before.roles, after.roles)
 
-# Function to process role changes
 async def process_role_changes(user_id, before_roles, after_roles):
-    # Check if roles have changed
     if before_roles != after_roles:
-        # Iterate through the roles to find added and removed roles
         added_roles = [role for role in after_roles if role not in before_roles]
         removed_roles = [role for role in before_roles if role not in after_roles]
 
-        # Check if any role has been added
         if added_roles:
             await on_roles_added(user_id, added_roles)
 
-        # Check if any role has been removed
         if removed_roles:
             await on_roles_removed(user_id, removed_roles)
 
-# Function to handle when roles are added
 async def on_roles_added(user_id, added_roles):
-    # Add your logic here when roles are added to a user
-    # For example, you may want to update the database or send a message
     user = await client.fetch_user(user_id)
     role_names = ', '.join([role.name for role in added_roles])
     
-    # Replace '854956285953572864' with your desired channel ID
-    channel = client.get_channel(1178764276157141093)
+    channel_id = os.getenv('CHANNEL_ID')
+
+    channel = client.get_channel(int(channel_id))
     
     if channel:
         await channel.send(f"Congratulations! {user.mention} has been granted the following role(s): {role_names}")
 
-# Function to handle when roles are removed
 async def on_roles_removed(user_id, removed_roles):
-    # Add your logic here when roles are removed from a user
-    # For example, you may want to update the database or send a message
     user = await client.fetch_user(user_id)
     role_names = ', '.join([role.name for role in removed_roles])
-    
-    # Replace '854956285953572864' with your desired channel ID
-    channel = client.get_channel(1178764276157141093)
+
+    channel_id = os.getenv('CHANNEL_ID')
+
+    channel = client.get_channel(int(channel_id))
     
     if channel:
         await channel.send(f"Sorry to see you go! {user.mention} no longer has the following role(s): {role_names}")
-
-
 
 client.run(TOKEN)
