@@ -1,4 +1,4 @@
-#FrogBot v1.2.1
+#FrogBot v1.3
 import os
 import sqlite3
 import discord
@@ -13,7 +13,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_points (user_id INTEGER PRIMARY KEY
 user_points = {user_id: points for user_id, points in c.execute('SELECT * FROM user_points')}
 
 intents = discord.Intents.default()
-intents.guilds = intents.guild_messages = intents.message_content = True
+intents.guilds = intents.guild_messages = intents.message_content = intents.members = True
 client = discord.Client(intents=intents)
 
 @client.event
@@ -29,15 +29,19 @@ async def on_message(message):
 
     elif message.content.lower().startswith('/frog help'):
         help_message = (
-            '```\n• "/myrank, /mypoints, /frog rank" - Check your points and rank. All users may use this.\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
+            '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. All users may use this.\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/points help, /frog points help" - Display rules for points.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
         await message.channel.send(help_message)
-
-    elif message.content.lower() in ('/myrank', '/mypoints', '/frog rank'):
-        user_id = message.author.id
-        user_points.setdefault(user_id, 0)
-        sorted_user_points = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
-        user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
-        await message.channel.send(f'Your rank is #{user_rank} with {user_points[user_id]} points!')
+        
+    elif message.content.lower().startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
+        if 'help' in message.content.lower():
+            help_message = ('```Points work at follows:\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Fat Frog\n\nBug report = 250 points\nError log included + 250 points\nVideo included + 500 points\n\nFeature request = 100 points\nDetailed/thought out + 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged 2500 points\n\nHelping someone with a question = 100 points\n```')
+            await message.channel.send(help_message)
+        else:
+            user_id = message.author.id
+            user_points.setdefault(user_id, 0)
+            sorted_user_points = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
+            user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
+            await message.channel.send(f'Your rank is #{user_rank} with {user_points[user_id]} points!')
 
     elif "PRIMARY MOD" in message.content:
         await message.channel.send(':eyes:')
@@ -74,5 +78,56 @@ async def on_message(message):
                 await message.channel.send(f'{mentioned_user.mention} has {user_points[user_id]} points!')
 
         conn.commit()
+
+@client.event
+async def on_member_update(before, after):
+    # Check if roles have changed
+    if before.roles != after.roles:
+        # Do something with the role changes
+        await process_role_changes(after.id, before.roles, after.roles)
+
+# Function to process role changes
+async def process_role_changes(user_id, before_roles, after_roles):
+    # Check if roles have changed
+    if before_roles != after_roles:
+        # Iterate through the roles to find added and removed roles
+        added_roles = [role for role in after_roles if role not in before_roles]
+        removed_roles = [role for role in before_roles if role not in after_roles]
+
+        # Check if any role has been added
+        if added_roles:
+            await on_roles_added(user_id, added_roles)
+
+        # Check if any role has been removed
+        if removed_roles:
+            await on_roles_removed(user_id, removed_roles)
+
+# Function to handle when roles are added
+async def on_roles_added(user_id, added_roles):
+    # Add your logic here when roles are added to a user
+    # For example, you may want to update the database or send a message
+    user = await client.fetch_user(user_id)
+    role_names = ', '.join([role.name for role in added_roles])
+    
+    # Replace '854956285953572864' with your desired channel ID
+    channel = client.get_channel(854956285953572864)
+    
+    if channel:
+        await channel.send(f"Congratulations! {user.mention} has been granted the following role(s): {role_names}")
+
+# Function to handle when roles are removed
+async def on_roles_removed(user_id, removed_roles):
+    # Add your logic here when roles are removed from a user
+    # For example, you may want to update the database or send a message
+    user = await client.fetch_user(user_id)
+    role_names = ', '.join([role.name for role in removed_roles])
+    
+    # Replace '854956285953572864' with your desired channel ID
+    channel = client.get_channel(854956285953572864)
+    
+    if channel:
+        await channel.send(f"Sorry to see you go! {user.mention} no longer has the following role(s): {role_names}")
+
+
 
 client.run(TOKEN)
