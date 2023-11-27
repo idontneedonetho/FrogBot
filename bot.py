@@ -1,4 +1,4 @@
-#FrogBot v1.2
+#FrogBot v1.2.1
 import os
 import sqlite3
 import discord
@@ -23,10 +23,13 @@ async def on_message(message):
         
     elif message.content.lower() == "/frog":
         await message.channel.send("🐸")
+        
+    elif message.content.lower() in ("/uwu", "uwu"):
+        await message.channel.send("OwO")
 
     elif message.content.lower().startswith('/frog help'):
         help_message = (
-            '```\n- "/myrank, /mypoints, /frog rank" - Check your points and rank. All users may use this.\n- "/Frog" - Ribbit.\n- "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n- "/add [amount] @user" - Add points to a user.\n- "/remove [amount] @user" - Remove points from a user.\n- "/points @user" - Check points for a user.\n```')
+            '```\n• "/myrank, /mypoints, /frog rank" - Check your points and rank. All users may use this.\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
         await message.channel.send(help_message)
 
     elif message.content.lower() in ('/myrank', '/mypoints', '/frog rank'):
@@ -35,7 +38,6 @@ async def on_message(message):
         sorted_user_points = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
         user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
         await message.channel.send(f'Your rank is #{user_rank} with {user_points[user_id]} points!')
-
 
     elif "PRIMARY MOD" in message.content:
         await message.channel.send(':eyes:')
