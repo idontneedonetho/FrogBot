@@ -1,4 +1,4 @@
-#FrogBot v1.3.4
+#FrogBot v1.3.6
 import os
 import sqlite3
 import discord
@@ -10,7 +10,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 conn = sqlite3.connect('user_points.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS user_points (user_id INTEGER PRIMARY KEY, points INTEGER)''')
-user_points = {user_id: points for user_id, points in c.execute('SELECT * FROM user_points')}
+user_points = {user_id: points if points is not None else 0 for user_id, points in c.execute('SELECT * FROM user_points')}
 
 intents = discord.Intents.default()
 intents.guilds = intents.guild_messages = intents.message_content = intents.members = True
@@ -28,14 +28,11 @@ async def on_message(message):
         await message.channel.send("OwO")
 
     elif message.content.lower() == '/frog help':
-        help_message = (
-            '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (*add "help" after for points rules*)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
-        await message.channel.send(help_message)
-        
-    elif message.content.startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
+        await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (*add "help" after for points rules*)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
+   
+    elif message.content.lower().startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
         if 'help' in message.content.lower():
-            help_message = ('```Points work at follows:\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Fat Frog\n\nBug report = 250 points\nError log included + 250 points\nVideo included + 500 points\n\nFeature request = 100 points\nDetailed/thought out + 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged 2500 points\n\nHelping someone with a question = 100 points\n```')
-            await message.channel.send(help_message)
+            await message.channel.send('```Points work at follows:\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Fat Frog\n\nBug report = 250 points\nError log included + 250 points\nVideo included + 500 points\n\nFeature request = 100 points\nDetailed/thought out + 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged 2500 points\n\nHelping someone with a question = 100 points\n```')
         else:
             user_id = message.author.id
             user_points.setdefault(user_id, 0)
@@ -43,7 +40,7 @@ async def on_message(message):
             user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
             await message.channel.send(f'Your rank is #{user_rank} with {user_points[user_id]} points!')
 
-    elif "PRIMARY MOD" in message.content:
+    elif message.content.lower() == "primary mod":
         await message.channel.send(':eyes:')
 
     frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
