@@ -1,4 +1,4 @@
-frog_version = "v1.4.2"
+frog_version = "v1.4.1"
 import asyncio
 import random
 import discord
