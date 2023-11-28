@@ -267,8 +267,9 @@ def git_pull():
         git_repo_path = os.path.dirname(script_path)
         subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
         print("Git pull successful.")
+        restart_bot()
     except subprocess.CalledProcessError as e:
-        print(f"Error during get pull: {e}")
+        print(f"Error during git pull: {e}")
     
 def restart_bot():
     print("Restarting bot...")
