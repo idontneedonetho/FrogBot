@@ -1,7 +1,12 @@
-#FrogBot v1.3.8
+frog_version = "v1.4"
 import asyncio
 import random
 import discord
+import schedule
+import time
+import sys
+import asyncio
+import subprocess
 import os
 import sqlite3
 from dotenv import load_dotenv
@@ -141,9 +146,11 @@ async def on_message(message):
       await message.channel.send('o3o')
     else:
       await message.channel.send("UwU")
+  elif message.content.lower() == '/frog version':
+        await message.channel.send(f"FrogBot {frog_version}")
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
+    await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/Frog version" - displays current FrogBot version"\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
 
   elif message.content.startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
     if 'help' in message.content.lower():
@@ -163,6 +170,14 @@ async def on_message(message):
   frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
   def permission_check():
     return frog_ai_user_role in message.author.roles
+    
+  if message.content.lower() == '/manualupdate':
+    if frog_ai_user_role in message.author.roles:
+        await message.channel.send("Manually triggering git pull and restarting...")
+        git_pull()
+        restart_bot()
+    else:
+        await message.channel.send("You don't have permission to use this command.")
 
   if message.content.startswith(('/add ', '/remove ', '/points ')) and not permission_check():
     await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
@@ -247,4 +262,36 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-client.run(TOKEN)
+def git_pull():
+    try:
+        script_path = os.path.abspath(__file__)
+        git_repo_path = os.path.dirname(script_path)
+        subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
+        print("Git pull successful.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during get pull: {e}")
+    
+def restart_bot():
+    print("Restarting bot...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+    
+schedule.every().day.at("02:00").do(git_pull)
+
+async def main():
+    await client.start(TOKEN)
+
+async def run_scheduled_tasks():
+    while True:
+        schedule.run_pending()
+        await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    tasks = asyncio.gather(main(), run_scheduled_tasks())
+    try:
+        loop.run_until_complete(tasks)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.run_until_complete(client.logout())
+        loop.close()
