@@ -1,5 +1,6 @@
 #FrogBot v1.3.8
 import asyncio
+import random
 import discord
 import os
 import sqlite3
@@ -126,10 +127,20 @@ async def on_message(message):
     await message.channel.send(":frog:")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
-    await message.channel.send("OwO")
+    random_number_1 = random.randint(1, 100)
+    random_number_2 = random.randint(1, 100)
+    if random_number_1 == random_number_2:
+      await message.channel.send('Wibbit X3 *nuzzles*')
+    else:
+      await message.channel.send("OwO")
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
-    await message.channel.send("UwU")
+    random_number_1 = random.randint(1, 100)
+    random_number_2 = random.randint(1, 100)
+    if random_number_1 == random_number_2:
+      await message.channel.send('o3o')
+    else:
+      await message.channel.send("UwU")
 
   elif message.content.lower() == '/frog help':
     await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
