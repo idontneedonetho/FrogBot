@@ -1,4 +1,4 @@
-frog_version = "v1.4"
+frog_version = "v1.4.2"
 import asyncio
 import random
 import discord
@@ -54,6 +54,7 @@ async def on_ready():
   print(f'{client.user} has connected to Discord!')
   for guild in client.guilds:
     await update_roles_on_startup(guild)
+  await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 async def update_roles_on_startup(guild):
   channel = client.get_channel(channel_id)
@@ -146,8 +147,6 @@ async def on_message(message):
       await message.channel.send('o3o')
     else:
       await message.channel.send("UwU")
-  elif message.content.lower() == '/frog version':
-        await message.channel.send(f"FrogBot {frog_version}")
 
   elif message.content.lower() == '/frog help':
     await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/Frog version" - displays current FrogBot version"\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
