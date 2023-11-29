@@ -138,7 +138,7 @@ async def on_message(message):
             await message.channel.send("No users found.")
         else:
             leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).mention} - {points} points" for i, (user_id, points) in enumerate(top_users)])
-            await message.channel.send(f"Top 10 Users:\n{leaderboard}")
+            await message.channel.send(f"```Top 10 Users:\n{leaderboard}```")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -190,10 +190,19 @@ async def on_message(message):
 
         else:
             await message.channel.send("You don't have permission to use this command.")
+  
+  if message.content.lower() == '/reboot':
+        if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+            await message.channel.send("Restarting...")
 
+            loop = asyncio.get_event_loop()
+            loop.create_task(restart_bot())
 
-  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check():
-    await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
+        else:
+            await message.channel.send("You don't have permission to use this command.")
+
+  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check() and not message.content.lower() == '/points help':
+    await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
     return
 
   if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
