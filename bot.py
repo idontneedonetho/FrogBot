@@ -1,4 +1,4 @@
-frog_version = "v1.4.2"
+frog_version = "v1.4.5"
 import asyncio
 import random
 import discord
@@ -132,13 +132,13 @@ async def on_message(message):
     await message.channel.send(":frog:")
     
   elif message.content.lower() == '/top10':
-        top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
+      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
 
-        if not top_users:
-            await message.channel.send("No users found.")
-        else:
-            leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).mention} - {points} points" for i, (user_id, points) in enumerate(top_users)])
-            await message.channel.send(f"Top 10 Users:\n{leaderboard}")
+      if not top_users:
+          await message.channel.send("No users found.")
+      else:
+          leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points} points" for i, (user_id, points) in enumerate(top_users)])
+          await message.channel.send(f">>> Top 10 Users:\n{leaderboard}")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -190,10 +190,19 @@ async def on_message(message):
 
         else:
             await message.channel.send("You don't have permission to use this command.")
+  
+  if message.content.lower() == '/reboot':
+        if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+            await message.channel.send("Restarting...")
 
+            loop = asyncio.get_event_loop()
+            loop.create_task(restart_bot())
 
-  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check():
-    await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
+        else:
+            await message.channel.send("You don't have permission to use this command.")
+
+  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check() and not message.content.lower() == '/points help':
+    await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
     return
 
   if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
@@ -274,17 +283,17 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-def git_pull():
+async def git_pull():
     try:
         script_path = os.path.abspath(__file__)
         git_repo_path = os.path.dirname(script_path)
         subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
         print("Git pull successful.")
-        restart_bot()
+
     except subprocess.CalledProcessError as e:
         print(f"Error during git pull: {e}")
-    
-def restart_bot():
+
+async def restart_bot():
     print("Restarting bot...")
     os.execv(sys.executable, [sys.executable] + sys.argv)
     
@@ -294,7 +303,7 @@ async def git_pull_and_restart():
     try:
         git_pull()
         await asyncio.sleep(2)
-        restart_bot()
+        subprocess.Popen([sys.executable, *sys.argv])
 
     except Exception as e:
         print(f"Error during manual update: {e}")
