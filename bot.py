@@ -284,7 +284,7 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-async def git_pull():
+def git_pull():
     try:
         script_path = os.path.abspath(__file__)
         git_repo_path = os.path.dirname(script_path)
