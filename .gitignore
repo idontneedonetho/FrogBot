@@ -1,3 +1,5 @@
 .env
+bot.bat
+prompt.bat
 testbot.py
 user_points.db
