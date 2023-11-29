@@ -132,13 +132,13 @@ async def on_message(message):
     await message.channel.send(":frog:")
     
   elif message.content.lower() == '/top10':
-        top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
+      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
 
-        if not top_users:
-            await message.channel.send("No users found.")
-        else:
-            leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).mention} - {points} points" for i, (user_id, points) in enumerate(top_users)])
-            await message.channel.send(f"```Top 10 Users:\n{leaderboard}```")
+      if not top_users:
+          await message.channel.send("No users found.")
+      else:
+          leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points} points" for i, (user_id, points) in enumerate(top_users)])
+          await message.channel.send(f">>> Top 10 Users:\n{leaderboard}")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
