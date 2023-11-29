@@ -1,11 +1,10 @@
-frog_version = "v1.4.1"
+frog_version = "v1.4.2"
 import asyncio
 import random
 import discord
 import schedule
 import time
 import sys
-import asyncio
 import subprocess
 import os
 import sqlite3
@@ -131,6 +130,15 @@ async def on_message(message):
 
   elif ':frog:' in message.content or message.content.lower() == "/frog":
     await message.channel.send(":frog:")
+    
+  elif message.content.lower() == '/top10':
+        top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        if not top_users:
+            await message.channel.send("No users found.")
+        else:
+            leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).mention} - {points} points" for i, (user_id, points) in enumerate(top_users)])
+            await message.channel.send(f"Top 10 Users:\n{leaderboard}")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -147,13 +155,16 @@ async def on_message(message):
       await message.channel.send('o3o')
     else:
       await message.channel.send("UwU")
+      
+  elif message.content.lower() == '/points help':
+    await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/Frog version" - displays current FrogBot version"\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
-  elif message.content.startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
+  elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
-      await message.channel.send('```Points work as follows:\n\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n```')
+      await message.channel.send('>>> Points work as follows:\n\n1,000 points - Tadpole Trekker\n2,500 points - Puddle Pioneer\n5,000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n')
 
     else:
       user_id = message.author.id
@@ -163,7 +174,7 @@ async def on_message(message):
       points_formatted = "{:,}".format(user_points[user_id])
       await message.channel.send(f'Your rank is #{user_rank} with {points_formatted} points!')
 
-  elif message.content.lower() in ('primary mod'):
+  elif any(keyword in message.content.lower() for keyword in ['primary mod']):
     await message.channel.send(':eyes:')
 
   frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
@@ -178,11 +189,11 @@ async def on_message(message):
     else:
         await message.channel.send("You don't have permission to use this command.")
 
-  if message.content.startswith(('/add ', '/remove ', '/points ')) and not permission_check():
+  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check():
     await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
     return
 
-  if message.content.startswith(('add ', 'remove ', '/points ')):
+  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
     command, mentioned_user = message.content.split()[0], message.mentions[0] if message.mentions else None
     if not mentioned_user:
       await message.channel.send(f'Please mention a user to {command.lower()} points for.')
