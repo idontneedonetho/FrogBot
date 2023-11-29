@@ -1,4 +1,4 @@
-frog_version = "v1.4.5"
+frog_version = "v1.4.6"
 import asyncio
 import random
 import discord
@@ -132,13 +132,14 @@ async def on_message(message):
     await message.channel.send(":frog:")
     
   elif message.content.lower() == '/top10':
-      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
 
-      if not top_users:
-          await message.channel.send("No users found.")
-      else:
-          leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points} points" for i, (user_id, points) in enumerate(top_users)])
-          await message.channel.send(f">>> Top 10 Users:\n{leaderboard}")
+    if not top_users:
+        await message.channel.send("No users found.")
+    else:
+        leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
+        await message.channel.send(f"Top 10 Users:\n{leaderboard}")
+
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -160,7 +161,7 @@ async def on_message(message):
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top10"** - Show the top 10 users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
   elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
