@@ -1,6 +1,12 @@
-#FrogBot v1.3.8
+frog_version = "v1.4.1"
 import asyncio
+import random
 import discord
+import schedule
+import time
+import sys
+import asyncio
+import subprocess
 import os
 import sqlite3
 from dotenv import load_dotenv
@@ -48,6 +54,7 @@ async def on_ready():
   print(f'{client.user} has connected to Discord!')
   for guild in client.guilds:
     await update_roles_on_startup(guild)
+  await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 async def update_roles_on_startup(guild):
   channel = client.get_channel(channel_id)
@@ -126,19 +133,27 @@ async def on_message(message):
     await message.channel.send(":frog:")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
-    await message.channel.send("OwO")
+    random_number_1 = random.randint(1, 100)
+    random_number_2 = random.randint(1, 100)
+    if random_number_1 == random_number_2:
+      await message.channel.send('Wibbit X3 *nuzzles*')
+    else:
+      await message.channel.send("OwO")
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
-    await message.channel.send("UwU")
+    random_number_1 = random.randint(1, 100)
+    random_number_2 = random.randint(1, 100)
+    if random_number_1 == random_number_2:
+      await message.channel.send('o3o')
+    else:
+      await message.channel.send("UwU")
 
   elif message.content.lower() == '/frog help':
-    help_message = '```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (*add "help" after for points rules*)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```'
-    await message.channel.send(help_message)
+    await message.channel.send('```\n• "/myrank, /mypoints, /frog rank, /frog points" - Check your points and rank. (add "help" after for points rules)\n• "/Frog" - Ribbit.\n• "/Frog help" - Display this help message.\n• "/Frog version" - displays current FrogBot version"\n\nFor commands below, the user must have the "FrogBotUser" rank.\n\n• "/add [amount] @user" - Add points to a user.\n• "/remove [amount] @user" - Remove points from a user.\n• "/points @user" - Check points for a user.\n```')
 
   elif message.content.startswith(('/myrank', '/mypoints', '/frog rank', '/frog points')):
     if 'help' in message.content.lower():
-      help_message = '```Points work as follows:\n\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n```'
-      await message.channel.send(help_message)
+      await message.channel.send('```Points work as follows:\n\n1000 points - Tadpole Trekker\n2500 points - Puddle Pioneer\n5000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n```')
 
     else:
       user_id = message.author.id
@@ -148,12 +163,20 @@ async def on_message(message):
       points_formatted = "{:,}".format(user_points[user_id])
       await message.channel.send(f'Your rank is #{user_rank} with {points_formatted} points!')
 
-  elif "PRIMARY MOD" in message.content:
+  elif message.content.lower() in ('primary mod'):
     await message.channel.send(':eyes:')
 
   frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
   def permission_check():
     return frog_ai_user_role in message.author.roles
+    
+  if message.content.lower() == '/manualupdate':
+    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+        await message.channel.send("Manually triggering git pull and restarting...")
+        git_pull()
+        restart_bot()
+    else:
+        await message.channel.send("You don't have permission to use this command.")
 
   if message.content.startswith(('/add ', '/remove ', '/points ')) and not permission_check():
     await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
@@ -238,4 +261,37 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-client.run(TOKEN)
+def git_pull():
+    try:
+        script_path = os.path.abspath(__file__)
+        git_repo_path = os.path.dirname(script_path)
+        subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
+        print("Git pull successful.")
+        restart_bot()
+    except subprocess.CalledProcessError as e:
+        print(f"Error during git pull: {e}")
+    
+def restart_bot():
+    print("Restarting bot...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+    
+schedule.every().day.at("02:00").do(git_pull)
+
+async def main():
+    await client.start(TOKEN)
+
+async def run_scheduled_tasks():
+    while True:
+        schedule.run_pending()
+        await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    tasks = asyncio.gather(main(), run_scheduled_tasks())
+    try:
+        loop.run_until_complete(tasks)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.run_until_complete(client.close())
+        loop.close()
