@@ -107,7 +107,7 @@ async def on_raw_reaction_add(payload):
   points_to_add = emoji_points[payload.emoji.name]
   user_points[user_id] = user_points.get(user_id, 0) + points_to_add
   c.execute('UPDATE user_points SET points = ? WHERE user_id = ?', (user_points[user_id], user_id))
-
+  conn.commit()
   message_custom = emoji_messages.get(payload.emoji.name, "")
   if message_custom:
     message_custom_formatted = message_custom.format(points=points_to_add)
@@ -182,12 +182,15 @@ async def on_message(message):
     return frog_ai_user_role in message.author.roles
     
   if message.content.lower() == '/manualupdate':
-    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-        await message.channel.send("Manually triggering git pull and restarting...")
-        git_pull()
-        restart_bot()
-    else:
-        await message.channel.send("You don't have permission to use this command.")
+        if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+            await message.channel.send("Manually triggering git pull and restarting...")
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(git_pull_and_restart())
+
+        else:
+            await message.channel.send("You don't have permission to use this command.")
+
 
   if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check():
     await message.channel.send('You do not have permission to use this command. Check "/FrogBot help" for further info.')
@@ -219,7 +222,6 @@ async def on_message(message):
         await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
 
       await update_roles(mentioned_user, user_points[user_id])
-
   conn.commit()
 
 @client.event
@@ -287,6 +289,15 @@ def restart_bot():
     os.execv(sys.executable, [sys.executable] + sys.argv)
     
 schedule.every().day.at("02:00").do(git_pull)
+
+async def git_pull_and_restart():
+    try:
+        git_pull()
+        await asyncio.sleep(2)
+        restart_bot()
+
+    except Exception as e:
+        print(f"Error during manual update: {e}")
 
 async def main():
     await client.start(TOKEN)
