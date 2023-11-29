@@ -182,7 +182,7 @@ async def on_message(message):
     return frog_ai_user_role in message.author.roles
     
   if message.content.lower() == '/manualupdate':
-    if frog_ai_user_role in message.author.roles:
+    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
         await message.channel.send("Manually triggering git pull and restarting...")
         git_pull()
         restart_bot()
