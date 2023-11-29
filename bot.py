@@ -283,17 +283,17 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-def git_pull():
+async def git_pull():
     try:
         script_path = os.path.abspath(__file__)
         git_repo_path = os.path.dirname(script_path)
         subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
         print("Git pull successful.")
-        restart_bot()
+
     except subprocess.CalledProcessError as e:
         print(f"Error during git pull: {e}")
-    
-def restart_bot():
+
+async def restart_bot():
     print("Restarting bot...")
     os.execv(sys.executable, [sys.executable] + sys.argv)
     
@@ -303,7 +303,7 @@ async def git_pull_and_restart():
     try:
         git_pull()
         await asyncio.sleep(2)
-        restart_bot()
+        subprocess.Popen([sys.executable, *sys.argv])
 
     except Exception as e:
         print(f"Error during manual update: {e}")
