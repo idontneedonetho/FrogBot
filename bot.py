@@ -1,4 +1,4 @@
-frog_version = "v1.4.12"
+frog_version = "v1.4.13"
 import asyncio
 import random
 import discord
@@ -137,6 +137,8 @@ async def on_message(message):
         if num <= 0:
             raise ValueError("Number should be greater than zero.")
 
+        num = min(num, 25)
+
         top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
 
         if not top_users:
@@ -146,7 +148,7 @@ async def on_message(message):
             await message.channel.send(f"Top {num} Users:\n{leaderboard}")
 
     except ValueError as e:
-        await message.channel.send(f"Invalid command. {str(e)}")
+        await message.channel.send("Must be a whole number greater than zero.")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -168,7 +170,7 @@ async def on_message(message):
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top#"** - Show the top # users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top #"** - Show the top # users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
   elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
@@ -215,7 +217,7 @@ async def on_message(message):
     await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
     return
 
-  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
+  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not lowercase_content == '/points help':
     command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
 
     if not mentioned_user:
@@ -224,19 +226,19 @@ async def on_message(message):
         user_id = mentioned_user.id
         user_points.setdefault(user_id, 0)
 
-        if command == 'add':
+        if command == 'add' or command == '/add':
             points_to_modify = int(message.content.split()[1])
             c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
             user_points[user_id] += points_to_modify
             points_formatted = "{:,}".format(user_points[user_id])
             await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
 
-        elif command == 'remove':
+        elif command == 'remove' or command == '/remove':
             points_to_modify = int(message.content.split()[1])
             c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
             user_points[user_id] -= points_to_modify
 
-        elif command == '/points':
+        elif command == 'points' or command == '/points':
             points_formatted = "{:,}".format(user_points[user_id])
             await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
 
