@@ -1,4 +1,4 @@
-frog_version = "v1.4.7"
+frog_version = "v1.4.8"
 import asyncio
 import random
 import discord
@@ -294,19 +294,20 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-async def git_pull():
+def git_pull():
+    repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
+    
     try:
-        script_path = os.path.abspath(__file__)
-        git_repo_path = os.path.dirname(script_path)
-        await asyncio.create_subprocess_exec("git", "pull", cwd=git_repo_path)
-        print("Git pull successful.")
-
-    except Exception as e:
-        print(f"Error during git pull: {e}")
+        subprocess.run(['git', 'pull', repo_url], check=True)
+        print('Check successful. Please restart the script.')
+    except subprocess.CalledProcessError as e:
+        print(f'Error updating the script: {e}')
 
 async def restart_bot():
     print("Restarting bot...")
-    await asyncio.create_subprocess_exec(sys.executable, *sys.argv)
+    subprocess.Popen([sys.executable, *sys.argv])
+    await asyncio.sleep(1)
+    sys.exit(0)
 
 schedule.every().day.at("02:00").do(git_pull)
 schedule.every().day.at("02:05").do(restart_bot)
