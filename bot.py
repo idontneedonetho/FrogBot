@@ -1,4 +1,4 @@
-frog_version = "v1.4.8"
+frog_version = "v1.4.9"
 import asyncio
 import random
 import discord
@@ -168,7 +168,7 @@ async def on_message(message):
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top10"** - Show the top 10 users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top#"** - Show the top # users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
   elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
@@ -191,7 +191,7 @@ async def on_message(message):
     
   if message.content.lower() == '/manualupdate':
         if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-            await message.channel.send("Manually triggering git pull and restarting...")
+            await message.channel.send("Manually triggering git pull...")
 
             loop = asyncio.get_event_loop()
             loop.create_task(git_pull())
@@ -305,7 +305,15 @@ def git_pull():
 
 async def restart_bot():
     print("Restarting bot...")
-    subprocess.Popen([sys.executable, *sys.argv])
+    try:
+        script_path = os.path.abspath(__file__)
+
+        os.execl(sys.executable, sys.executable, script_path, *sys.argv)
+
+    except Exception as e:
+        print(f"Error during bot restart: {e}")
+        sys.exit(1)
+
     await asyncio.sleep(1)
     sys.exit(0)
 
