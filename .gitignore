@@ -1,3 +1,4 @@
 .env
 testbot.py
 user_points.db
+botstart.bat

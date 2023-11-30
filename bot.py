@@ -1,4 +1,4 @@
-frog_version = "v1.4.10"
+frog_version = "v1.4.11"
 import asyncio
 import random
 import discord
@@ -189,7 +189,7 @@ async def on_message(message):
   def permission_check():
     return frog_ai_user_role in message.author.roles
     
-  if message.content.lower() == '/manualupdate':
+  if message.content.lower() == '/update':
         if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
             await message.channel.send("Manually triggering git pull...")
 
@@ -294,13 +294,21 @@ async def update_roles(member, user_points):
 
   return new_roles
 
+import subprocess
+
 def git_pull():
     repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
     
     try:
-        subprocess.run(['git', 'pull', repo_url], check=True)
-        print('Check successful. Please restart the script.')
-    except subprocess.CalledProcessError as e:
+        process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, error = process.communicate()
+
+        if process.returncode == 0:
+            print('Git pull successful. Please restart the script.')
+        else:
+            print(f'Error updating the script: {error.decode()}')
+
+    except Exception as e:
         print(f'Error updating the script: {e}')
 
 async def restart_bot():
