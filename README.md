@@ -7,7 +7,7 @@ So far features include:
 - Points tracking
 - Add points via reactions
 - Respond to different message
+- Automatic updates
 
 Things planned:
-- Score board, top 10
-- Reword "help"
+- Score board (currently /top#)
