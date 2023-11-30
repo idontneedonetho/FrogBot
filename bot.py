@@ -1,4 +1,4 @@
-frog_version = "v1.4.5"
+frog_version = "v1.4.8"
 import asyncio
 import random
 import discord
@@ -131,14 +131,22 @@ async def on_message(message):
   elif ':frog:' in message.content or message.content.lower() == "/frog":
     await message.channel.send(":frog:")
     
-  elif message.content.lower() == '/top10':
-      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:10]
+  elif message.content.lower().startswith('/top'):
+    try:
+        num = int(message.content[4:])
+        if num <= 0:
+            raise ValueError("Number should be greater than zero.")
 
-      if not top_users:
-          await message.channel.send("No users found.")
-      else:
-          leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points} points" for i, (user_id, points) in enumerate(top_users)])
-          await message.channel.send(f">>> Top 10 Users:\n{leaderboard}")
+        top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
+
+        if not top_users:
+            await message.channel.send(f"No users found.")
+        else:
+            leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
+            await message.channel.send(f"Top {num} Users:\n{leaderboard}")
+
+    except ValueError as e:
+        await message.channel.send(f"Invalid command. {str(e)}")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -160,7 +168,7 @@ async def on_message(message):
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top10"** - Show the top 10 users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
   elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
@@ -186,7 +194,7 @@ async def on_message(message):
             await message.channel.send("Manually triggering git pull and restarting...")
 
             loop = asyncio.get_event_loop()
-            loop.create_task(git_pull_and_restart())
+            loop.create_task(git_pull())
 
         else:
             await message.channel.send("You don't have permission to use this command.")
@@ -201,36 +209,39 @@ async def on_message(message):
         else:
             await message.channel.send("You don't have permission to use this command.")
 
-  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check() and not message.content.lower() == '/points help':
+  lowercase_content = message.content.lower()
+
+  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
     await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
     return
 
-  if message.content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
-    command, mentioned_user = message.content.split()[0], message.mentions[0] if message.mentions else None
+  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')):
+    command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
+
     if not mentioned_user:
-      await message.channel.send(f'Please mention a user to {command.lower()} points for.')
-
+        await message.channel.send(f'Please mention a user to {command} points for.')
     else:
-      user_id = mentioned_user.id
-      user_points.setdefault(user_id, 0)
+        user_id = mentioned_user.id
+        user_points.setdefault(user_id, 0)
 
-      if command == 'add':
-        points_to_modify = int(message.content.split()[1])
-        c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
-        user_points[user_id] += points_to_modify
-        points_formatted = "{:,}".format(user_points[user_id])
-        await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
+        if command == 'add':
+            points_to_modify = int(message.content.split()[1])
+            c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
+            user_points[user_id] += points_to_modify
+            points_formatted = "{:,}".format(user_points[user_id])
+            await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
 
-      elif command == 'remove':
-        points_to_modify = int(message.content.split()[1])
-        c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
-        user_points[user_id] -= points_to_modify
+        elif command == 'remove':
+            points_to_modify = int(message.content.split()[1])
+            c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
+            user_points[user_id] -= points_to_modify
 
-      elif command == '/points':
-        points_formatted = "{:,}".format(user_points[user_id])
-        await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
+        elif command == '/points':
+            points_formatted = "{:,}".format(user_points[user_id])
+            await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
 
-      await update_roles(mentioned_user, user_points[user_id])
+        await update_roles(mentioned_user, user_points[user_id])
+
   conn.commit()
 
 @client.event
@@ -283,30 +294,23 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-async def git_pull():
+def git_pull():
+    repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
+    
     try:
-        script_path = os.path.abspath(__file__)
-        git_repo_path = os.path.dirname(script_path)
-        subprocess.run(["git", "pull"], cwd=git_repo_path, check=True)
-        print("Git pull successful.")
-
+        subprocess.run(['git', 'pull', repo_url], check=True)
+        print('Check successful. Please restart the script.')
     except subprocess.CalledProcessError as e:
-        print(f"Error during git pull: {e}")
+        print(f'Error updating the script: {e}')
 
 async def restart_bot():
     print("Restarting bot...")
-    os.execv(sys.executable, [sys.executable] + sys.argv)
-    
+    subprocess.Popen([sys.executable, *sys.argv])
+    await asyncio.sleep(1)
+    sys.exit(0)
+
 schedule.every().day.at("02:00").do(git_pull)
-
-async def git_pull_and_restart():
-    try:
-        git_pull()
-        await asyncio.sleep(2)
-        subprocess.Popen([sys.executable, *sys.argv])
-
-    except Exception as e:
-        print(f"Error during manual update: {e}")
+schedule.every().day.at("02:05").do(restart_bot)
 
 async def main():
     await client.start(TOKEN)
