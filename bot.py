@@ -1,4 +1,4 @@
-frog_version = "v1.4.8"
+frog_version = "v1.4.9"
 import asyncio
 import random
 import discord
@@ -168,7 +168,7 @@ async def on_message(message):
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
   elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top10"** - Show the top 10 users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top#"** - Show the top # of users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
 
   elif message.content.startswith(('/mypoints')):
     if 'help' in message.content.lower():
