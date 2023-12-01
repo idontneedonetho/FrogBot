@@ -1,4 +1,4 @@
-frog_version = "v1.4.15"
+frog_version = "v1.4.16"
 import asyncio
 import random
 import discord
@@ -315,15 +315,12 @@ def git_pull():
 
 async def restart_bot():
     print("Restarting bot...")
-    try:
-        script_path = os.path.abspath(__file__)
-        script_directory = os.path.dirname(script_path)
-        if platform.system() == "Windows":
-          bat_path = os.path.join(script_directory, 'startbot.bat')
-        else:
-          bat_path = os.path.join(script_directory, './startbot.sh')
+    if platform.system() == "Windows":
+        subprocess.Popen(["startbot.bat"])
+    else:
+        subprocess.run(["chmod", "+x", "./startbot.sh"])
+        subprocess.Popen(["./startbot.sh"])
 
-        subprocess.Popen([bat_path])
         await asyncio.sleep(1)
         sys.exit(0)
 
