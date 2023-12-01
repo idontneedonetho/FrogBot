@@ -3,6 +3,7 @@ import asyncio
 import random
 import discord
 import schedule
+import platforms
 import time
 import sys
 import subprocess
