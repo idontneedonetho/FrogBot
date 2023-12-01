@@ -1,4 +1,4 @@
-frog_version = "v1.4.13"
+frog_version = "v1.4.14"
 import asyncio
 import random
 import discord
@@ -317,15 +317,15 @@ async def restart_bot():
     print("Restarting bot...")
     try:
         script_path = os.path.abspath(__file__)
+        script_directory = os.path.dirname(script_path)
+        bat_path = os.path.join(script_directory, 'startbot.bat')
 
-        os.execl(sys.executable, sys.executable, script_path, *sys.argv)
+        subprocess.Popen([bat_path])
+        await asyncio.sleep(1)
+        sys.exit(0)
 
     except Exception as e:
-        print(f"Error during bot restart: {e}")
-        sys.exit(1)
-
-    await asyncio.sleep(1)
-    sys.exit(0)
+        print(f"Error during restart: {e}")
 
 schedule.every().day.at("02:00").do(git_pull)
 schedule.every().day.at("02:05").do(restart_bot)
