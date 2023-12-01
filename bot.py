@@ -1,4 +1,4 @@
-frog_version = "v1.4.14"
+frog_version = "v1.4.15"
 import asyncio
 import random
 import discord
@@ -318,7 +318,10 @@ async def restart_bot():
     try:
         script_path = os.path.abspath(__file__)
         script_directory = os.path.dirname(script_path)
-        bat_path = os.path.join(script_directory, 'startbot.bat')
+        if platform.system() == "Windows":
+          bat_path = os.path.join(script_directory, 'startbot.bat')
+        else:
+          bat_path = os.path.join(script_directory, './startbot.sh')
 
         subprocess.Popen([bat_path])
         await asyncio.sleep(1)
