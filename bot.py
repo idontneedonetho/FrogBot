@@ -1,7 +1,6 @@
 frog_version = "v1.4.17"
 import asyncio
 import discord
-import time
 import os
 import platform
 import random
@@ -141,22 +140,22 @@ async def on_message(message):
     
   elif message.content.lower().startswith('/top'):
     try:
-        num = int(message.content[4:])
-        if num <= 0:
-            raise ValueError("Number should be greater than zero.")
+      num = int(message.content[4:])
+      if num <= 0:
+        raise ValueError("Number should be greater than zero.")
 
-        num = min(num, 25)
+      num = min(num, 25)
 
-        top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
+      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
 
-        if not top_users:
-            await message.channel.send(f"No users found.")
-        else:
-            leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
-            await message.channel.send(f"Top {num} Users:\n{leaderboard}")
+      if not top_users:
+        await message.channel.send(f"No users found.")
+      else:
+        leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
+        await message.channel.send(f"Top {num} Users:\n{leaderboard}")
 
     except ValueError as e:
-        await message.channel.send("Must be a whole number greater than zero.")
+      await message.channel.send("Must be a whole number greater than zero.")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     random_number_1 = random.randint(1, 100)
@@ -322,15 +321,16 @@ def git_pull():
     print(f'Error updating the script: {e}')
 
 async def restart_bot():
+  try:
     print("Restarting bot...")
     if platform.system() == "Windows":
-        subprocess.Popen(["startbot.bat"])
+      subprocess.Popen(["startbot.bat"])
     else:
-        subprocess.run(["chmod", "+x", "./startbot.sh"])
-        subprocess.Popen(["./startbot.sh"])
+      subprocess.run(["chmod", "+x", "./startbot.sh"])
+      subprocess.Popen(["./startbot.sh"])
 
-        await asyncio.sleep(1)
-        sys.exit(0)
+    await asyncio.sleep(1)
+    sys.exit(0)
 
   except Exception as e:
     print(f"Error during restart: {e}")
