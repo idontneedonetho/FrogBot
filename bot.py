@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 channel_id = int(os.getenv('CHANNEL_ID'))
-
+weeb_user_id = '263565721336807424'
 conn = sqlite3.connect('user_points.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS user_points (user_id INTEGER PRIMARY KEY, points INTEGER)''')
@@ -158,20 +158,16 @@ async def on_message(message):
       await message.channel.send("Must be a whole number greater than zero.")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
-    random_number_1 = random.randint(1, 100)
-    random_number_2 = random.randint(1, 100)
-    if random_number_1 == random_number_2:
-      await message.channel.send('Wibbit X3 *nuzzles*')
+    if str(message.author.id) == weeb_user_id and random.choice([True, False]):
+        await message.channel.send('weeb')
     else:
-      await message.channel.send("OwO")
+        await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO']))
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
-    random_number_1 = random.randint(1, 100)
-    random_number_2 = random.randint(1, 100)
-    if random_number_1 == random_number_2:
-      await message.channel.send('o3o')
+    if str(message.author.id) == weeb_user_id and random.choice([True, False]):
+        await message.channel.send('weeb')
     else:
-      await message.channel.send("UwU")
+        await message.channel.send(random.choice(['o3o', 'UwU']))
       
   elif message.content.lower() == '/points help':
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
