@@ -1,14 +1,13 @@
-frog_version = "v1.4.16"
+frog_version = "v1.4.17"
 import asyncio
-import random
 import discord
-import schedule
-import platform
-import time
-import sys
-import subprocess
 import os
+import platform
+import random
+import schedule
 import sqlite3
+import subprocess
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,12 +23,12 @@ intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 
 emoji_points = {
-  "🐞": 250, 
-  "📜": 250, 
-  "📹": 500, 
-  "💡": 100, 
-  "🧠": 250, 
-  "❤️": 100,
+  "🐞": 250,
+  "📜": 250,
+  "📹": 500,
+  "💡": 100,
+  "🧠": 250,
+  "❤️": 100
 }
 
 emoji_messages = {
@@ -38,7 +37,7 @@ emoji_messages = {
   "📹": " has been awarded {points} points for including footage in their bug report!",
   "💡": " has been awarded {points} points for their feature request!",
   "🧠": " has been awarded {points} points for their well thought out feature request!",
-  "❤️": " has been awarded {points} points for being a good frog!",
+  "❤️": " has been awarded {points} points for being a good frog!"
 }
 
 role_thresholds = {
@@ -110,6 +109,7 @@ async def on_raw_reaction_add(payload):
   c.execute('UPDATE user_points SET points = ? WHERE user_id = ?', (user_points[user_id], user_id))
   conn.commit()
   message_custom = emoji_messages.get(payload.emoji.name, "")
+ 
   if message_custom:
     message_custom_formatted = message_custom.format(points=points_to_add)
     await channel.send(f'{message.author.mention}{message_custom_formatted}')
@@ -125,6 +125,12 @@ async def on_raw_reaction_add(payload):
 async def on_message(message):
   if message.author == client.user:
     return
+
+  ios_fleet_manager_role = discord.utils.get(message.guild.roles, name="iOS Fleet Manager")
+  if ios_fleet_manager_role and ios_fleet_manager_role.mention in message.content:
+    if str(message.author.id) != "391783950005305344":
+      await message.delete()
+      return
 
   elif ':coolfrog:' in message.content:
     await message.channel.send('<:coolfrog:1168605051779031060>')
@@ -193,24 +199,24 @@ async def on_message(message):
     return frog_ai_user_role in message.author.roles
     
   if message.content.lower() == '/update':
-        if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-            await message.channel.send("Manually triggering git pull...")
+    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+      await message.channel.send("Manually triggering git pull...")
 
-            loop = asyncio.get_event_loop()
-            loop.create_task(git_pull())
+      loop = asyncio.get_event_loop()
+      loop.create_task(git_pull())
 
-        else:
-            await message.channel.send("You don't have permission to use this command.")
+    else:
+      await message.channel.send("You don't have permission to use this command.")
   
   if message.content.lower() == '/reboot':
-        if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-            await message.channel.send("Restarting...")
+    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+      await message.channel.send("Restarting...")
 
-            loop = asyncio.get_event_loop()
-            loop.create_task(restart_bot())
+      loop = asyncio.get_event_loop()
+      loop.create_task(restart_bot())
 
-        else:
-            await message.channel.send("You don't have permission to use this command.")
+    else:
+      await message.channel.send("You don't have permission to use this command.")
 
   lowercase_content = message.content.lower()
 
@@ -222,28 +228,28 @@ async def on_message(message):
     command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
 
     if not mentioned_user:
-        await message.channel.send(f'Please mention a user to {command} points for.')
+      await message.channel.send(f'Please mention a user to {command} points for.')
     else:
-        user_id = mentioned_user.id
-        user_points.setdefault(user_id, 0)
+      user_id = mentioned_user.id
+      user_points.setdefault(user_id, 0)
 
-        if command == 'add' or command == '/add':
-            points_to_modify = int(message.content.split()[1])
-            c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
-            user_points[user_id] += points_to_modify
-            points_formatted = "{:,}".format(user_points[user_id])
-            await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
+      if command == 'add' or command == '/add':
+        points_to_modify = int(message.content.split()[1])
+        c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
+        user_points[user_id] += points_to_modify
+        points_formatted = "{:,}".format(user_points[user_id])
+        await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
 
-        elif command == 'remove' or command == '/remove':
-            points_to_modify = int(message.content.split()[1])
-            c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
-            user_points[user_id] -= points_to_modify
+      elif command == 'remove' or command == '/remove':
+        points_to_modify = int(message.content.split()[1])
+        c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
+        user_points[user_id] -= points_to_modify
 
-        elif command == 'points' or command == '/points':
-            points_formatted = "{:,}".format(user_points[user_id])
-            await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
+      elif command == 'points' or command == '/points':
+        points_formatted = "{:,}".format(user_points[user_id])
+        await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
 
-        await update_roles(mentioned_user, user_points[user_id])
+      await update_roles(mentioned_user, user_points[user_id])
 
   conn.commit()
 
@@ -300,52 +306,56 @@ async def update_roles(member, user_points):
 import subprocess
 
 def git_pull():
-    repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
-    
-    try:
-        process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, error = process.communicate()
+  repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
+  
+  try:
+    process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
 
-        if process.returncode == 0:
-            print('Git pull successful. Please restart the script.')
-        else:
-            print(f'Error updating the script: {error.decode()}')
+    if process.returncode == 0:
+      print('Git pull successful. Please restart the script.')
+    else:
+      print(f'Error updating the script: {error.decode()}')
 
-    except Exception as e:
-        print(f'Error updating the script: {e}')
+  except Exception as e:
+    print(f'Error updating the script: {e}')
 
 async def restart_bot():
-    print("Restarting bot...")
+  print("Restarting bot...")
+  try:
     if platform.system() == "Windows":
-        subprocess.Popen(["startbot.bat"])
+      subprocess.Popen(["startbot.bat"])
     else:
-        subprocess.run(["chmod", "+x", "./startbot.sh"])
-        subprocess.Popen(["./startbot.sh"])
+      subprocess.run(["chmod", "+x", "./startbot.sh"])
+      subprocess.Popen(["./startbot.sh"])
 
-        await asyncio.sleep(1)
-        sys.exit(0)
+    await asyncio.sleep(1)
+    sys.exit(0)
 
-    except Exception as e:
-        print(f"Error during restart: {e}")
+  except Exception as e:
+    print(f"Error during restart: {e}")
 
 schedule.every().day.at("02:00").do(git_pull)
 schedule.every().day.at("02:05").do(restart_bot)
 
 async def main():
-    await client.start(TOKEN)
+  await client.start(TOKEN)
 
 async def run_scheduled_tasks():
-    while True:
-        schedule.run_pending()
-        await asyncio.sleep(1)
+  while True:
+    schedule.run_pending()
+    await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    tasks = asyncio.gather(main(), run_scheduled_tasks())
-    try:
-        loop.run_until_complete(tasks)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        loop.run_until_complete(client.close())
-        loop.close()
+  loop = asyncio.get_event_loop()
+  tasks = asyncio.gather(main(), run_scheduled_tasks())
+
+  try:
+    loop.run_until_complete(tasks)
+
+  except KeyboardInterrupt:
+    pass
+
+  finally:
+    loop.run_until_complete(client.close())
+    loop.close()
