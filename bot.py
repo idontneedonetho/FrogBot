@@ -1,6 +1,7 @@
 frog_version = "v1.4.17"
 import asyncio
 import discord
+import time
 import os
 import platform
 import random
@@ -321,16 +322,15 @@ def git_pull():
     print(f'Error updating the script: {e}')
 
 async def restart_bot():
-  print("Restarting bot...")
-  try:
+    print("Restarting bot...")
     if platform.system() == "Windows":
-      subprocess.Popen(["startbot.bat"])
+        subprocess.Popen(["startbot.bat"])
     else:
-      subprocess.run(["chmod", "+x", "./startbot.sh"])
-      subprocess.Popen(["./startbot.sh"])
+        subprocess.run(["chmod", "+x", "./startbot.sh"])
+        subprocess.Popen(["./startbot.sh"])
 
-    await asyncio.sleep(1)
-    sys.exit(0)
+        await asyncio.sleep(1)
+        sys.exit(0)
 
   except Exception as e:
     print(f"Error during restart: {e}")
