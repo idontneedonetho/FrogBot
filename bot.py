@@ -1,4 +1,4 @@
-frog_version = "v1.4.22"
+frog_version = "v1.4.23"
 import asyncio
 import discord
 import os
@@ -161,13 +161,13 @@ async def on_message(message):
     if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
     	await message.channel.send('weeb')
     else:
-      await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO']))
+      await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!']))
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
     if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
       await message.channel.send('weeb')
     else:
-      await message.channel.send(random.choice(['o3o', 'UwU']))
+      await message.channel.send(random.choice(['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!']))
       
   elif message.content.lower() == '/points help':
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
