@@ -2,6 +2,9 @@ frog_version = "v1.4.26"
 import asyncio
 import discord
 import os
+import signal
+import psutil
+import logging
 import platform
 import random
 import schedule
@@ -347,17 +350,20 @@ async def git_stash():
 
 async def restart_bot():
   try:
-    await git_stash()
     print("Restarting bot...")
     if platform.system() == "Windows":
-      subprocess.Popen(["startbot.bat"])
+      new_process = subprocess.Popen(["startbot.bat"])
     else:
       subprocess.run(["chmod", "+x", "./startbot.sh"])
-      subprocess.Popen(["./startbot.sh"])
+      new_process = subprocess.Popen(["./startbot.sh"])
 
-    await asyncio.sleep(1)
+    await asyncio.sleep(5)
+    original_process = psutil.Process(os.getpid())
+    original_process.send_signal(signal.SIGTERM)
+
+    new_process.wait()
   except Exception as e:
-    print(f"Error during restart: {e}")
+    logging.error(f"Error during restart: {e}")
 
 async def main():
   await client.start(TOKEN)
