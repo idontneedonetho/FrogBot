@@ -157,18 +157,36 @@ async def on_message(message):
     except ValueError as e:
       await message.channel.send("Must be a whole number greater than zero.")
 
+  uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!']
+  owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!']
+
+  uwu_counter = 0
+  owo_counter = 0
+
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
     if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-    	await message.channel.send('weeb')
+        await message.channel.send('weeb')
     else:
-      await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!']))
+        selected_response = uwu_responses[uwu_counter]
+        await message.channel.send(selected_response)
+        uwu_counter += 1
+
+        if uwu_counter == 2:
+            random.shuffle(uwu_responses)
+            uwu_counter = 0
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
     if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-      await message.channel.send('weeb')
+        await message.channel.send('weeb')
     else:
-      await message.channel.send(random.choice(['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!']))
-      
+        selected_response = owo_responses[owo_counter]
+        await message.channel.send(selected_response)
+        owo_counter += 1
+
+        if owo_counter == 2:
+            random.shuffle(owo_responses)
+            owo_counter = 0
+          
   elif message.content.lower() == '/points help':
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
 
