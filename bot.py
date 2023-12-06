@@ -321,10 +321,11 @@ async def update_roles(member, user_points):
 
 import subprocess
 
-def git_pull():
+async def git_pull():
   repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
   
   try:
+    await git_stash()
     process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = process.communicate()
 
