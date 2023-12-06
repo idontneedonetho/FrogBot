@@ -22,6 +22,12 @@ user_points = {user_id: points or 0 for user_id, points in c.execute('SELECT * F
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 
+uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
+owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+
+uwu_counter = 0
+owo_counter = 0
+
 emoji_points = {
   "🐞": 250,
   "📜": 250,
@@ -156,12 +162,6 @@ async def on_message(message):
 
         except ValueError as e:
             await message.channel.send("Must be a whole number greater than zero.")
-
-    uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
-    owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
-
-    uwu_counter = 0
-    owo_counter = 0
 
     elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
         if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
@@ -346,10 +346,12 @@ async def restart_bot():
       subprocess.Popen(["./startbot.sh"])
 
     await asyncio.sleep(1)
-    sys.exit(0)
 
   except Exception as e:
     print(f"Error during restart: {e}")
+    
+  finally:
+    sys.exit(0)
 
 schedule.every().day.at("02:00").do(git_pull)
 schedule.every().day.at("02:05").do(restart_bot)
