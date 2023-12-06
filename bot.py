@@ -358,11 +358,6 @@ async def restart_bot():
     await asyncio.sleep(1)
   except Exception as e:
     print(f"Error during restart: {e}")
-  finally:
-    sys.exit(0)
-
-schedule.every().day.at("02:00").do(git_pull)
-schedule.every().day.at("02:05").do(restart_bot)
 
 async def main():
   await client.start(TOKEN)
