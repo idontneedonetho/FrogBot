@@ -1,4 +1,4 @@
-frog_version = "v1.4.21"
+frog_version = "v1.4.22"
 import asyncio
 import discord
 import os
@@ -158,16 +158,16 @@ async def on_message(message):
       await message.channel.send("Must be a whole number greater than zero.")
 
   elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
-    if str(message.author.id) == weeb_user_id and random.choice([True, False]):
-        await message.channel.send('weeb')
+    if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+    	await message.channel.send('weeb')
     else:
-        await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO']))
+      await message.channel.send(random.choice(['Wibbit X3 *nuzzles*', 'OwO']))
 
   elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
-    if str(message.author.id) == weeb_user_id and random.choice([True, False]):
-        await message.channel.send('weeb')
+    if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+      await message.channel.send('weeb')
     else:
-        await message.channel.send(random.choice(['o3o', 'UwU']))
+      await message.channel.send(random.choice(['o3o', 'UwU']))
       
   elif message.content.lower() == '/points help':
     await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
