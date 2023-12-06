@@ -141,8 +141,8 @@ async def on_message(message):
             await message.delete()
             return
 
-    elif any(keyword in message.content.lower() for keyword in ['weeb']):
-      await message.channel.send('https://media1.tenor.com/m/rM6sdvGLYCMAAAAC/bonk.gif')
+    elif message.content.lower() == 'weeb':
+        await message.channel.send('https://media1.tenor.com/m/rM6sdvGLYCMAAAAC/bonk.gif')
   
     elif ':coolfrog:' in message.content:
         await message.channel.send('<:coolfrog:1168605051779031060>')
