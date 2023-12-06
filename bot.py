@@ -1,4 +1,4 @@
-frog_version = "v1.4.20"
+frog_version = "v1.4.21"
 import asyncio
 import discord
 import os
@@ -216,11 +216,11 @@ async def on_message(message):
 
   lowercase_content = message.content.lower()
 
-  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
+  if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
     await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
     return
 
-  if lowercase_content.startswith(('add ', 'remove ', '/add ', '/remove ', '/points ')) and not lowercase_content == '/points help':
+  if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not lowercase_content == '/points help':
     command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
 
     if not mentioned_user:
@@ -229,18 +229,19 @@ async def on_message(message):
         user_id = mentioned_user.id
         user_points.setdefault(user_id, 0)
 
-        if command in ('add', '/add', 'remove', '/remove') and len(message.content.split()) > 1:
+        if command in ('add', '/add') and len(message.content.split()) > 1:
             points_to_modify = int(message.content.split()[1])
 
-            if command == 'add' or command == '/add':
-                c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
-                user_points[user_id] += points_to_modify
-                points_formatted = "{:,}".format(user_points[user_id])
-                await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
+            c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
+            user_points[user_id] += points_to_modify
+            points_formatted = "{:,}".format(user_points[user_id])
+            await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
 
-            elif command == 'remove' or command == '/remove':
-                c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
-                user_points[user_id] -= points_to_modify
+        elif command in ('remove', '/remove') and len(message.content.split()) > 1:
+            points_to_modify = int(message.content.split()[1])
+
+            c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
+            user_points[user_id] -= points_to_modify
 
         elif command in ('points', '/points') and len(message.content.split()) == 1:
             points_formatted = "{:,}".format(user_points[user_id])
