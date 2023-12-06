@@ -336,8 +336,17 @@ def git_pull():
   except Exception as e:
     print(f'Error updating the script: {e}')
 
+async def git_stash():
+  try:
+    print("Stashing changes...")
+    subprocess.run(["git", "stash"])
+    print("Changes stashed successfully.")
+  except Exception as e:
+    print(f"Error stashing changes: {e}")
+
 async def restart_bot():
   try:
+    await git_stash()
     print("Restarting bot...")
     if platform.system() == "Windows":
       subprocess.Popen(["startbot.bat"])
@@ -346,10 +355,8 @@ async def restart_bot():
       subprocess.Popen(["./startbot.sh"])
 
     await asyncio.sleep(1)
-
   except Exception as e:
     print(f"Error during restart: {e}")
-    
   finally:
     sys.exit(0)
 
