@@ -123,151 +123,151 @@ async def on_raw_reaction_add(payload):
 
 @client.event
 async def on_message(message):
-  if message.author == client.user:
-    return
+    if message.author == client.user:
+        return
 
-  ios_fleet_manager_role = discord.utils.get(message.guild.roles, name="iOS Fleet Manager")
-  if ios_fleet_manager_role and ios_fleet_manager_role.mention in message.content:
-    if str(message.author.id) != "391783950005305344":
-      await message.delete()
-      return
+    ios_fleet_manager_role = discord.utils.get(message.guild.roles, name="iOS Fleet Manager")
+    if ios_fleet_manager_role and ios_fleet_manager_role.mention in message.content:
+        if str(message.author.id) != "391783950005305344":
+            await message.delete()
+            return
 
-  elif ':coolfrog:' in message.content:
-    await message.channel.send('<:coolfrog:1168605051779031060>')
+    elif ':coolfrog:' in message.content:
+        await message.channel.send('<:coolfrog:1168605051779031060>')
 
-  elif ':frog:' in message.content or message.content.lower() == "/frog":
-    await message.channel.send(":frog:")
-    
-  elif message.content.lower().startswith('/top'):
-    try:
-      num = int(message.content[4:])
-      if num <= 0:
-        raise ValueError("Number should be greater than zero.")
+    elif ':frog:' in message.content or message.content.lower() == "/frog":
+        await message.channel.send(":frog:")
 
-      num = min(num, 25)
+    elif message.content.lower().startswith('/top'):
+        try:
+            num = int(message.content[4:])
+            if num <= 0:
+                raise ValueError("Number should be greater than zero.")
 
-      top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
+            num = min(num, 25)
 
-      if not top_users:
-        await message.channel.send(f"No users found.")
+            top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:num]
+
+            if not top_users:
+                await message.channel.send(f"No users found.")
+            else:
+                leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
+                await message.channel.send(f"Top {num} Users:\n{leaderboard}")
+
+        except ValueError as e:
+            await message.channel.send("Must be a whole number greater than zero.")
+
+    uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
+    owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+
+    uwu_counter = 0
+    owo_counter = 0
+
+    elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
+        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+            await message.channel.send('weeb')
+        else:
+            selected_response = uwu_responses[uwu_counter]
+            await message.channel.send(selected_response)
+            uwu_counter += 1
+
+            if uwu_counter == 2:
+                random.shuffle(uwu_responses)
+                uwu_counter = 0
+
+    elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
+        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+            await message.channel.send('weeb')
+        else:
+            selected_response = owo_responses[owo_counter]
+            await message.channel.send(selected_response)
+            owo_counter += 1
+
+            if owo_counter == 2:
+                random.shuffle(owo_responses)
+                owo_counter = 0
+
+    elif message.content.lower() == '/points help':
+        await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
+
+    elif message.content.lower() == '/frog help':
+        await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top #"** - Show the top # users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
+
+    elif message.content.startswith(('/mypoints')):
+      if 'help' in message.content.lower():
+        await message.channel.send('>>> Points work as follows:\n\n1,000 points - Tadpole Trekker\n2,500 points - Puddle Pioneer\n5,000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n')
+
       else:
-        leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
-        await message.channel.send(f"Top {num} Users:\n{leaderboard}")
-
-    except ValueError as e:
-      await message.channel.send("Must be a whole number greater than zero.")
-
-  uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
-  owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
-
-  uwu_counter = 0
-  owo_counter = 0
-
-  elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
-    if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-      await message.channel.send('weeb')
-    else:
-      selected_response = uwu_responses[uwu_counter]
-      await message.channel.send(selected_response)
-      uwu_counter += 1
-
-      if uwu_counter == 2:
-        random.shuffle(uwu_responses)
-        uwu_counter = 0
-
-  elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
-    if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-      await message.channel.send('weeb')
-    else:
-      selected_response = owo_responses[owo_counter]
-      await message.channel.send(selected_response)
-      owo_counter += 1
-
-      if owo_counter == 2:
-        random.shuffle(owo_responses)
-        owo_counter = 0
-          
-  elif message.content.lower() == '/points help':
-    await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
-
-  elif message.content.lower() == '/frog help':
-    await message.channel.send('>>> *Keywords for bot reactions will not be listed*\n\n**"/mypoints"** - Check your points and rank. (add "help" after for points rules)\n**"/top #"** - Show the top # users in terms of points\n**"/frog"** - Ribbit.\n**"/frog help"** - Display this help message.')
-
-  elif message.content.startswith(('/mypoints')):
-    if 'help' in message.content.lower():
-      await message.channel.send('>>> Points work as follows:\n\n1,000 points - Tadpole Trekker\n2,500 points - Puddle Pioneer\n5,000 points - Jumping Junior\n10,000 points - Croaking Cadet\n25,000 points - Ribbit Ranger\n50,000 points - Frog Star\n100,000 points - Lily Legend\n250,000 points - Froggy Monarch\n500,000 points - Never Nourished Fat Frog\n1,000,000 points - Frog Daddy\n\nBug report = 250 points\nError log included += 250 points\nVideo included += 500 points\n\nFeature request = 100 points\nDetailed/thought out += 250 points\n\nSubmitting a PR = 1000 points\nPR gets merged += 2500 points\n\nHelping someone with a question = 100 points\n')
-
-    else:
-      user_id = message.author.id
-      user_points.setdefault(user_id, 0)
-      sorted_user_points = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
-      user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
-      points_formatted = "{:,}".format(user_points[user_id])
-      await message.channel.send(f'Your rank is #{user_rank} with {points_formatted} points!')
-
-  elif any(keyword in message.content.lower() for keyword in ['primary mod']):
-    await message.channel.send(':eyes:')
-
-  frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
-  def permission_check():
-    return frog_ai_user_role in message.author.roles
-    
-  if message.content.lower() == '/update':
-    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-      await message.channel.send("Manually triggering git pull...")
-
-      loop = asyncio.get_event_loop()
-      loop.create_task(git_pull())
-
-    else:
-      await message.channel.send("You don't have permission to use this command.")
-  
-  if message.content.lower() == '/reboot':
-    if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-      await message.channel.send("Restarting...")
-
-      loop = asyncio.get_event_loop()
-      loop.create_task(restart_bot())
-
-    else:
-      await message.channel.send("You don't have permission to use this command.")
-
-  lowercase_content = message.content.lower()
-
-  if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
-    await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
-    return
-
-  if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not lowercase_content == '/points help':
-    command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
-
-    if not mentioned_user:
-        await message.channel.send(f'Please mention a user to {command} points for.')
-    else:
-        user_id = mentioned_user.id
+        user_id = message.author.id
         user_points.setdefault(user_id, 0)
+        sorted_user_points = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
+        user_rank = sorted_user_points.index((user_id, user_points[user_id])) + 1
+        points_formatted = "{:,}".format(user_points[user_id])
+        await message.channel.send(f'Your rank is #{user_rank} with {points_formatted} points!')
 
-        if command in ('add', '/add') and len(message.content.split()) > 1:
-            points_to_modify = int(message.content.split()[1])
+    elif any(keyword in message.content.lower() for keyword in ['primary mod']):
+      await message.channel.send(':eyes:')
 
-            c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
-            user_points[user_id] += points_to_modify
-            points_formatted = "{:,}".format(user_points[user_id])
-            await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
+    frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
+    def permission_check():
+      return frog_ai_user_role in message.author.roles
+    
+    if message.content.lower() == '/update':
+      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+        await message.channel.send("Manually triggering git pull...")
+  
+        loop = asyncio.get_event_loop()
+        loop.create_task(git_pull())
+  
+      else:
+        await message.channel.send("You don't have permission to use this command.")
+      
+    if message.content.lower() == '/reboot':
+      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+        await message.channel.send("Restarting...")
+  
+        loop = asyncio.get_event_loop()
+        loop.create_task(restart_bot())
+  
+      else:
+        await message.channel.send("You don't have permission to use this command.")
+  
+    lowercase_content = message.content.lower()
 
-        elif command in ('remove', '/remove') and len(message.content.split()) > 1:
-            points_to_modify = int(message.content.split()[1])
+    if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
+      await message.channel.send('You do not have permission to use this command. Check "/Frog help" for further info.')
+      return
+  
+    if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not lowercase_content == '/points help':
+      command, mentioned_user = message.content.split()[0].lower(), message.mentions[0] if message.mentions else None
+  
+      if not mentioned_user:
+          await message.channel.send(f'Please mention a user to {command} points for.')
+      else:
+          user_id = mentioned_user.id
+          user_points.setdefault(user_id, 0)
 
-            c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
-            user_points[user_id] -= points_to_modify
+          if command in ('add', '/add') and len(message.content.split()) > 1:
+              points_to_modify = int(message.content.split()[1])
+  
+              c.execute('UPDATE user_points SET points = points + ? WHERE user_id = ?', (points_to_modify, user_id))
+              user_points[user_id] += points_to_modify
+              points_formatted = "{:,}".format(user_points[user_id])
+              await message.channel.send(f'Added {points_to_modify} points to {mentioned_user.mention}\'s total! Now they have {points_formatted} points.')
+  
+          elif command in ('remove', '/remove') and len(message.content.split()) > 1:
+              points_to_modify = int(message.content.split()[1])
+  
+              c.execute('UPDATE user_points SET points = points - ? WHERE user_id = ?', (points_to_modify, user_id))
+              user_points[user_id] -= points_to_modify
+  
+          elif command in ('points', '/points') and len(message.content.split()) == 1:
+              points_formatted = "{:,}".format(user_points[user_id])
+              await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
+  
+          await update_roles(mentioned_user, user_points[user_id])
 
-        elif command in ('points', '/points') and len(message.content.split()) == 1:
-            points_formatted = "{:,}".format(user_points[user_id])
-            await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
-
-        await update_roles(mentioned_user, user_points[user_id])
-
-  conn.commit()
+    conn.commit()
 
 @client.event
 async def on_member_update(before, after):
