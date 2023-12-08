@@ -1,4 +1,4 @@
-frog_version = "v1.4.30"
+frog_version = "v1.4.29"
 import asyncio
 import discord
 import os
@@ -7,7 +7,7 @@ import psutil
 import logging
 import platform
 import random
-import time
+import schedule
 import sqlite3
 import subprocess
 import sys
@@ -24,6 +24,12 @@ user_points = {user_id: points or 0 for user_id, points in c.execute('SELECT * F
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
+
+uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
+owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+
+uwu_counter = 0
+owo_counter = 0
 
 emoji_points = {
   "🐞": 250,
@@ -50,12 +56,6 @@ role_thresholds = {
   100000: '1178751985760079995', 250000: '1178752169894223983',
   500000: '1178752236717883534', 1000000: '1178752300592922634'
 }
-
-uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
-owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
-    
-uwu_counter = 0
-owo_counter = 0
 
 @client.event
 async def on_ready():
@@ -132,7 +132,6 @@ async def on_raw_reaction_add(payload):
 
 @client.event
 async def on_message(message):
-    global uwu_counter, owo_counter
     if message.author == client.user:
         return
 
@@ -171,30 +170,28 @@ async def on_message(message):
             await message.channel.send("Must be a whole number greater than zero.")
 
     elif 'UwU' in message.content.lower():
-      if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-        await message.channel.send('weeb')
-      else:
-        selected_response = uwu_responses[uwu_counter]
-        uwu_counter += 1
+        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+            await message.channel.send('weeb')
+        else:
+            selected_response = uwu_responses[uwu_counter]
+            await message.channel.send(selected_response)
+            uwu_counter += 1
 
-        if uwu_counter == 2:
-            random.shuffle(uwu_responses)
-            uwu_counter = 0
-
-        await message.channel.send(selected_response)
+            if uwu_counter == 2:
+                random.shuffle(uwu_responses)
+                uwu_counter = 0
 
     elif 'OwO' in message.content.lower():
-      if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-        await message.channel.send('weeb')
-      else:
-        selected_response = owo_responses[owo_counter]
-        owo_counter += 1
+        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+            await message.channel.send('weeb')
+        else:
+            selected_response = owo_responses[owo_counter]
+            await message.channel.send(selected_response)
+            owo_counter += 1
 
-        if owo_counter == 2:
-            random.shuffle(owo_responses)
-            owo_counter = 0
-
-        await message.channel.send(selected_response)
+            if owo_counter == 2:
+                random.shuffle(owo_responses)
+                owo_counter = 0
 
     elif message.content.lower() == '/points help':
         await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
@@ -220,6 +217,27 @@ async def on_message(message):
     frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
     def permission_check():
       return frog_ai_user_role in message.author.roles
+    
+    if message.content.lower() == '/update':
+      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+        await message.channel.send("Manually triggering git pull...")
+  
+        loop = asyncio.get_event_loop()
+        loop.create_task(git_pull())
+  
+      else:
+        await message.channel.send("You don't have permission to use this command.")
+      
+    if message.content.lower() == '/reboot':
+      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
+        await message.channel.send("Restarting...")
+  
+        loop = asyncio.get_event_loop()
+        loop.create_task(restart_bot())
+  
+      else:
+        await message.channel.send("You don't have permission to use this command.")
+  
     lowercase_content = message.content.lower()
 
     if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
@@ -307,4 +325,67 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-client.run(TOKEN)
+import subprocess
+
+async def git_pull():
+  repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
+  
+  try:
+    await git_stash()
+    process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+
+    if process.returncode == 0:
+      print('Git pull successful. Please restart the script.')
+    else:
+      print(f'Error updating the script: {error.decode()}')
+
+  except Exception as e:
+    print(f'Error updating the script: {e}')
+
+async def git_stash():
+  try:
+    print("Stashing changes...")
+    subprocess.run(["git", "stash"])
+    print("Changes stashed successfully.")
+  except Exception as e:
+    print(f"Error stashing changes: {e}")
+
+async def restart_bot():
+  try:
+    print("Restarting bot...")
+    if platform.system() == "Windows":
+      new_process = subprocess.Popen(["startbot.bat"])
+    else:
+      subprocess.run(["chmod", "+x", "./startbot.sh"])
+      new_process = subprocess.Popen(["./startbot.sh"])
+
+    await asyncio.sleep(5)
+    original_process = psutil.Process(os.getpid())
+    original_process.send_signal(signal.SIGTERM)
+
+    new_process.wait()
+  except Exception as e:
+    logging.error(f"Error during restart: {e}")
+
+async def main():
+  await client.start(TOKEN)
+
+async def run_scheduled_tasks():
+  while True:
+    schedule.run_pending()
+    await asyncio.sleep(1)
+
+if __name__ == "__main__":
+  loop = asyncio.get_event_loop()
+  tasks = asyncio.gather(main(), run_scheduled_tasks())
+
+  try:
+    loop.run_until_complete(tasks)
+
+  except KeyboardInterrupt:
+    pass
+
+  finally:
+    loop.run_until_complete(client.close())
+    loop.close()
