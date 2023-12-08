@@ -1,11 +1,11 @@
+# bot.py
 frog_version = "v2"
 import discord
-import asyncio
-from discord.ext import commands, tasks
+from discord.ext import commands
 from dotenv import load_dotenv
 import os
 
-from commands import uwu, owo, help, points, leaderboard
+from commands import uwu, owo, help, points, leaderboard, emoji
 
 load_dotenv()
 
@@ -15,10 +15,6 @@ if TOKEN is None:
     raise ValueError("Bot token not found in .env file. Please add it.")
 
 intents = discord.Intents.all()
-client = discord.Client(intents=intents)
-
-user_points = points.initialize_points_database()
-
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 # Add-ons
@@ -34,6 +30,12 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 @bot.event
+async def on_raw_reaction_add(payload):
+    user_points = points.initialize_points_database()  # Initialize user_points here
+    channel = bot.get_channel(payload.channel_id)
+    await emoji.process_reaction(bot, payload, user_points)
+
+@bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
@@ -41,6 +43,8 @@ async def on_message(message):
     content = message.content.lower()
 
     # Reactions
+    if bot.user.mentioned_in(message) and len(message.content) == len(bot.user.mention):
+        await message.channel.send(":frog:")
     if message.content == "uwu":
         await uwu.uwu(message)
     elif message.content == "owo":
@@ -49,12 +53,7 @@ async def on_message(message):
         await message.channel.send('https://media1.tenor.com/m/rM6sdvGLYCMAAAAC/bonk.gif')
     elif ':coolfrog:' in message.content:
         await message.channel.send('<:coolfrog:1168605051779031060>')
-    
-    await bot.process_commands(message)
 
-# Commands
-@bot.command(name="frog")
-async def frog(ctx):
-    await ctx.send(":frog:")
+    await bot.process_commands(message)
 
 bot.run(TOKEN)

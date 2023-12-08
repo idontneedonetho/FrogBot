@@ -54,22 +54,20 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: commands.cl
             user_id = user.id
             current_points = user_points.get(user_id, 0)
 
-            if current_points >= points_to_remove:
-                new_points = current_points - points_to_remove
+            new_points = current_points - points_to_remove
 
-                conn = sqlite3.connect('user_points.db')
-                c = conn.cursor()
-                c.execute('INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, ?)', (user_id, new_points))
-                conn.commit()
-                conn.close()
+            conn = sqlite3.connect('user_points.db')
+            c = conn.cursor()
+            c.execute('INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, ?)', (user_id, new_points))
+            conn.commit()
+            conn.close()
 
-                await ctx.send(f"{points_to_remove} points removed from {user.mention}. They now have {new_points} points.")
-            else:
-                await ctx.send(f"{user.mention} does not have enough points to remove.")
+            await ctx.send(f"{points_to_remove} points removed from {user.mention}. They now have {new_points} points.")
         else:
             await ctx.send("Invalid syntax. Please use '@bot remove <points> points @user'.")
     else:
         await ctx.send("You do not have the necessary permissions to remove points.")
+
 
 @commands.command(name="check")
 @commands.check(is_admin())
