@@ -169,7 +169,7 @@ async def on_message(message):
         except ValueError as e:
             await message.channel.send("Must be a whole number greater than zero.")
 
-    elif any(keyword in message.content.lower() for keyword in ["/uwu", "uwu", "uWu", "WuW"]):
+    elif 'UwU' in message.content.lower():
         if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
             await message.channel.send('weeb')
         else:
@@ -181,7 +181,7 @@ async def on_message(message):
                 random.shuffle(uwu_responses)
                 uwu_counter = 0
 
-    elif any(keyword in message.content.lower() for keyword in ["/owo", "owo", "oWo", "OwO"]):
+    elif 'OwO' in message.content.lower():
         if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
             await message.channel.send('weeb')
         else:
