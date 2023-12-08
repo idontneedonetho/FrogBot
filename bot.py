@@ -1,4 +1,4 @@
-frog_version = "v1.4.31"
+frog_version = "v1.5"
 import asyncio
 import discord
 import os
@@ -95,6 +95,22 @@ async def update_roles_on_startup(guild):
       role_names = ', '.join([role.name for role in new_roles])
       await channel.send(f"Congratulations! {member.mention} has been granted the following role: {role_names}!")
 
+async def update_leaderboard(guild):
+    channel = guild.get_channel(leaderboard_channel_id)
+    if not channel:
+        return
+
+    leaderboard_message_id = 1178764276157141093
+    leaderboard_message = await channel.fetch_message(leaderboard_message_id)
+
+    top_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)[:25]
+    leaderboard = "\n".join([f"#{i + 1}: {client.get_user(user_id).name} - {points:,} points" for i, (user_id, points) in enumerate(top_users)])
+
+    if not leaderboard_message:
+        leaderboard_message = await channel.send(f"Top 25 Users:\n{leaderboard}")
+    else:
+        await leaderboard_message.edit(content=f"Top 25 Users:\n{leaderboard}")
+
 @client.event
 async def on_thread_create(thread):
   try:
@@ -143,6 +159,7 @@ async def on_raw_reaction_add(payload):
 
   await update_roles(message.author, user_points[user_id])
   conn.commit()
+  await update_leaderboard(guild)
 
 @client.event
 async def on_message(message):
@@ -286,6 +303,7 @@ async def on_message(message):
               await message.channel.send(f'{mentioned_user.mention} has {points_formatted} points!')
   
           await update_roles(mentioned_user, user_points[user_id])
+          await update_leaderboard(message.guild)
 
     conn.commit()
 
@@ -293,6 +311,7 @@ async def on_message(message):
 async def on_member_update(before, after):
   if before.roles != after.roles:
     await process_role_changes(after.id, before.roles, after.roles)
+    await update_leaderboard(after.guild)
 
 async def process_role_changes(user_id, before_roles, after_roles):
   added_roles = [role for role in after_roles if role not in before_roles]
@@ -313,10 +332,13 @@ async def on_roles_added(user_id, added_roles):
 
     if channel:
       await channel.send(f"Congratulations! {user.mention} has been granted the following role: {role_names}!")
+  
+  await update_leaderboard(guild)
 
 async def on_roles_removed(user_id, removed_roles):
   user = await client.fetch_user(user_id)
   role_names = ', '.join([role.name for role in removed_roles])
+  await update_leaderboard(guild)
 
 async def update_roles(member, user_points):
   roles_to_remove = [member.guild.get_role(int(role_id)) for role_id in role_thresholds.values() if member.guild.get_role(int(role_id)) in member.roles]
@@ -341,6 +363,14 @@ async def update_roles(member, user_points):
 
 import subprocess
 
+async def git_stash():
+  try:
+    print("Stashing changes...")
+    subprocess.run(["git", "stash"])
+    print("Changes stashed successfully.")
+  except Exception as e:
+    print(f"Error stashing changes: {e}")
+
 async def git_pull():
   repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
   
@@ -356,14 +386,6 @@ async def git_pull():
 
   except Exception as e:
     print(f'Error updating the script: {e}')
-
-async def git_stash():
-  try:
-    print("Stashing changes...")
-    subprocess.run(["git", "stash"])
-    print("Changes stashed successfully.")
-  except Exception as e:
-    print(f"Error stashing changes: {e}")
 
 async def restart_bot():
     try:
