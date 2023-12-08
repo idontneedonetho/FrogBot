@@ -62,11 +62,10 @@ role_thresholds = {
 
 @client.event
 async def on_ready():
-  print(f'{client.user} has connected to Discord!')
-  for guild in client.guilds:
-    await update_roles_on_startup(guild)
-  await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
-  asyncio.create_task(check_termination_signal())
+    print(f'{client.user} has connected to Discord!')
+    for guild in client.guilds:
+        await update_roles_on_startup(guild)
+    await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 async def check_termination_signal():
   terminate_signal_file = "terminate_signal.txt"
@@ -405,7 +404,7 @@ async def main():
   await client.start(TOKEN)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    asyncio.run(main())
 
     try:
         asyncio.run(check_termination_signal())
