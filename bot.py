@@ -398,22 +398,18 @@ async def restart_bot():
         if os.path.exists(backup_directory):
             shutil.rmtree(backup_directory, ignore_errors=True)
 
-asyncio.run(restart_bot())
-
 async def main():
-  await client.start(TOKEN)
+    await client.start(TOKEN)
+
+async def check_termination_signal():
+    terminate_signal_file = "terminate_signal.txt"
+    while True:
+        if os.path.exists(terminate_signal_file):
+            logging.info("Termination signal detected. Shutting down...")
+            os.remove(terminate_signal_file)
+            await client.close()
+            break
+        await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
-    try:
-        asyncio.run(check_termination_signal())
-
-        if not os.path.exists("terminate_signal.txt"):
-            asyncio.run(restart_bot())
-
-    except KeyboardInterrupt:
-        pass
-
-    finally:
-        loop.close()
+    asyncio.gather(main(), check_termination_signal())
