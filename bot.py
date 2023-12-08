@@ -1,4 +1,4 @@
-frog_version = "v1.4.30"
+frog_version = "v1.4.31"
 import asyncio
 import discord
 import os
@@ -7,10 +7,11 @@ import psutil
 import logging
 import platform
 import random
-import schedule
 import sqlite3
 import subprocess
 import sys
+import shutil
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,6 +22,8 @@ conn = sqlite3.connect('user_points.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS user_points (user_id INTEGER PRIMARY KEY, points INTEGER)''')
 user_points = {user_id: points or 0 for user_id, points in c.execute('SELECT * FROM user_points')}
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -63,6 +66,17 @@ async def on_ready():
   for guild in client.guilds:
     await update_roles_on_startup(guild)
   await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
+  asyncio.create_task(check_termination_signal())
+
+async def check_termination_signal():
+  terminate_signal_file = "terminate_signal.txt"
+  while True:
+    if os.path.exists(terminate_signal_file):
+      logging.info("Termination signal detected. Shutting down...")
+      os.remove(terminate_signal_file)
+      await client.close()
+      break
+    await asyncio.sleep(1)
 
 async def update_roles_on_startup(guild):
   channel = client.get_channel(channel_id)
@@ -353,43 +367,55 @@ async def git_stash():
 
 async def restart_bot():
     try:
-        print("Restarting bot...")
+        logging.info("Restarting bot...")
+
+        backup_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        backup_directory = f"backup_{backup_timestamp}"
+        shutil.copytree(".", backup_directory)
+
+        terminate_signal_file = "terminate_signal.txt"
 
         if platform.system() == "Windows":
             new_process = subprocess.Popen(["startbot.bat"])
         else:
             subprocess.run(["chmod", "+x", "./startbot.sh"])
             new_process = subprocess.Popen(["./startbot.sh"])
-          
-        await asyncio.sleep(5)
 
-        with open("terminate_signal.txt", "w") as signal_file:
-            signal_file.write("terminate")
+        for _ in range(30):
+            if new_process.poll() is not None:
+                break
+            await asyncio.sleep(1)
+        else:
+            raise TimeoutError("Timeout reached during bot restart.")
 
-        new_process.wait()
-
-        with open("terminate_signal.txt", "w") as signal_file:
-            signal_file.write("")
-
+    except FileNotFoundError:
+        logging.error("File not found error during restart.")
     except Exception as e:
         logging.error(f"Error during restart: {e}")
+    finally:
+        with open(terminate_signal_file, "w") as signal_file:
+            signal_file.write("terminate")
+
+        if os.path.exists(backup_directory):
+            shutil.rmtree(backup_directory, ignore_errors=True)
+
+asyncio.run(restart_bot())
 
 async def main():
   await client.start(TOKEN)
-
-async def run_scheduled_tasks():
-  while True:
-    schedule.run_pending()
-    await asyncio.sleep(1)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     try:
-        loop.run_until_complete(restart_bot())
+        asyncio.run(check_termination_signal())
+
+        if not os.path.exists("terminate_signal.txt"):
+            asyncio.run(restart_bot())
 
     except KeyboardInterrupt:
         pass
 
     finally:
         loop.close()
+
