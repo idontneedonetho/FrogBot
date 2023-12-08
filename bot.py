@@ -412,4 +412,7 @@ async def check_termination_signal():
         await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    asyncio.gather(main(), check_termination_signal())
+    try:
+        asyncio.gather(main(), check_termination_signal())
+    except discord.errors.LoginFailure:
+        logging.error("Failed to log in. Check your TOKEN.")
