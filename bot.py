@@ -171,28 +171,30 @@ async def on_message(message):
             await message.channel.send("Must be a whole number greater than zero.")
 
     elif 'UwU' in message.content.lower():
-        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-            await message.channel.send('weeb')
-        else:
-            selected_response = uwu_responses[uwu_counter]
-            await message.channel.send(selected_response)
-            uwu_counter += 1
+      if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+        await message.channel.send('weeb')
+      else:
+        selected_response = uwu_responses[uwu_counter]
+        uwu_counter += 1
 
-            if uwu_counter == 2:
-                random.shuffle(uwu_responses)
-                uwu_counter = 0
+        if uwu_counter == 2:
+            random.shuffle(uwu_responses)
+            uwu_counter = 0
+
+        await message.channel.send(selected_response)
 
     elif 'OwO' in message.content.lower():
-        if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
-            await message.channel.send('weeb')
-        else:
-            selected_response = owo_responses[owo_counter]
-            await message.channel.send(selected_response)
-            owo_counter += 1
+      if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
+        await message.channel.send('weeb')
+      else:
+        selected_response = owo_responses[owo_counter]
+        owo_counter += 1
 
-            if owo_counter == 2:
-                random.shuffle(owo_responses)
-                owo_counter = 0
+        if owo_counter == 2:
+            random.shuffle(owo_responses)
+            owo_counter = 0
+
+        await message.channel.send(selected_response)
 
     elif message.content.lower() == '/points help':
         await message.channel.send('>>> *For commands below, the user must have the "FrogBotUser" rank.*\n\n**"/add [amount] @user"** - Add points to a user.\n**"/remove [amount] @user"** - Remove points from a user.\n**"/points @user"** - Check points for a user.')
