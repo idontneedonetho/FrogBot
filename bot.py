@@ -333,7 +333,6 @@ async def on_roles_added(user_id, added_roles):
 
     if channel:
       await channel.send(f"Congratulations! {user.mention} has been granted the following role: {role_names}!")
-  
   await update_leaderboard(guild)
 
 async def on_roles_removed(user_id, removed_roles):
