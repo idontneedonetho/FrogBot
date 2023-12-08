@@ -94,6 +94,7 @@ async def update_roles_on_startup(guild):
     if new_roles:
       role_names = ', '.join([role.name for role in new_roles])
       await channel.send(f"Congratulations! {member.mention} has been granted the following role: {role_names}!")
+    await update_leaderboard(guild)
 
 async def update_leaderboard(guild):
     channel = guild.get_channel(leaderboard_channel_id)
