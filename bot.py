@@ -13,21 +13,29 @@ import sys
 import shutil
 from datetime import datetime
 from dotenv import load_dotenv
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 channel_id = int(os.getenv('CHANNEL_ID'))
+
 weeb_user_id = '263565721336807424'
+
 conn = sqlite3.connect('user_points.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS user_points (user_id INTEGER PRIMARY KEY, points INTEGER)''')
 user_points = {user_id: points or 0 for user_id, points in c.execute('SELECT * FROM user_points')}
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
+
 uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
 owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+
 uwu_counter = 0
 owo_counter = 0
+
 emoji_points = {
   "🐞": 250,
   "📜": 250,
@@ -59,14 +67,14 @@ async def on_ready():
   await client.change_presence(activity=discord.Game(name=f"version {frog_version}"))
   asyncio.create_task(check_termination_signal())
 async def check_termination_signal():
-  terminate_signal_file = "terminate_signal.txt"
-  while True:
-    if os.path.exists(terminate_signal_file):
-      logging.info("Termination signal detected. Shutting down...")
-      os.remove(terminate_signal_file)
-      await client.close()
-      break
-    await asyncio.sleep(1)
+    terminate_signal_file = "terminate_signal.txt"
+    while True:
+        if os.path.exists(terminate_signal_file):
+            logging.info("Termination signal detected. Shutting down...")
+            os.remove(terminate_signal_file)
+            await client.close()
+            break
+        await asyncio.sleep(1)
 async def update_roles_on_startup(guild):
   channel = client.get_channel(channel_id)
   if not channel:
@@ -282,25 +290,32 @@ async def update_roles(member, user_points):
   return new_roles
 import subprocess
 async def git_pull():
-  repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
-  
-  try:
-    await git_stash()
-    process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, error = process.communicate()
-    if process.returncode == 0:
-      print('Git pull successful. Please restart the script.')
-    else:
-      print(f'Error updating the script: {error.decode()}')
-  except Exception as e:
-    print(f'Error updating the script: {e}')
+    repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
+
+    try:
+        await git_stash()
+        process = await asyncio.create_subprocess_exec('git', 'pull', repo_url,
+                                                       stdout=asyncio.subprocess.PIPE,
+                                                       stderr=asyncio.subprocess.PIPE)
+        output, error = await process.communicate()
+        if process.returncode == 0:
+            print('Git pull successful. Please restart the script.')
+        else:
+            print(f'Error updating the script: {error.decode()}')
+    except Exception as e:
+        print(f'Error updating the script: {e}')
+
 async def git_stash():
-  try:
-    print("Stashing changes...")
-    subprocess.run(["git", "stash"])
-    print("Changes stashed successfully.")
-  except Exception as e:
-    print(f"Error stashing changes: {e}")
+    try:
+        print("Stashing changes...")
+        process = await asyncio.create_subprocess_exec('git', 'stash',
+                                                       stdout=asyncio.subprocess.PIPE,
+                                                       stderr=asyncio.subprocess.PIPE)
+        await process.communicate()
+        print("Changes stashed successfully.")
+    except Exception as e:
+        print(f"Error stashing changes: {e}")
+
 async def restart_bot():
     try:
         logging.info("Restarting bot...")
