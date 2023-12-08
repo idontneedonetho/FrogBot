@@ -7,7 +7,7 @@ import psutil
 import logging
 import platform
 import random
-import schedule
+import time
 import sqlite3
 import subprocess
 import sys
@@ -362,14 +362,14 @@ async def restart_bot():
             subprocess.run(["chmod", "+x", "./startbot.sh"])
             new_process = subprocess.Popen(["./startbot.sh"])
 
-        await asyncio.sleep(5)
+        while new_process.poll() is None:
+            with open("terminate_signal.txt", "r") as signal_file:
+                if signal_file.read().strip() == "terminate":
+                    print("Terminating bot restart.")
+                    new_process.terminate()
+                    break
 
-        with open("terminate_signal.txt", "r") as signal_file:
-            if signal_file.read().strip() == "terminate":
-                print("Terminating bot restart.")
-                return
-
-        new_process.wait()
+            time.sleep(1)
 
         with open("terminate_signal.txt", "w") as signal_file:
             signal_file.write("")
@@ -379,11 +379,6 @@ async def restart_bot():
 
 async def main():
   await client.start(TOKEN)
-
-async def run_scheduled_tasks():
-  while True:
-    schedule.run_pending()
-    await asyncio.sleep(1)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
