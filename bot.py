@@ -132,6 +132,7 @@ async def on_raw_reaction_add(payload):
 
 @client.event
 async def on_message(message):
+    global uwu_counter, owo_counter
     if message.author == client.user:
         return
 
@@ -360,11 +361,13 @@ async def restart_bot():
         else:
             subprocess.run(["chmod", "+x", "./startbot.sh"])
             new_process = subprocess.Popen(["./startbot.sh"])
-          
+
         await asyncio.sleep(5)
 
-        with open("terminate_signal.txt", "w") as signal_file:
-            signal_file.write("terminate")
+        with open("terminate_signal.txt", "r") as signal_file:
+            if signal_file.read().strip() == "terminate":
+                print("Terminating bot restart.")
+                return
 
         new_process.wait()
 
