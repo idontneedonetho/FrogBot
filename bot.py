@@ -375,31 +375,19 @@ async def restart_bot():
 
         terminate_signal_file = "terminate_signal.txt"
 
-        if platform.system() == "Windows":
-            new_process = subprocess.Popen(["startbot.bat"])
-        else:
-            subprocess.run(["chmod", "+x", "./startbot.sh"])
-            new_process = subprocess.Popen(["./startbot.sh"])
-
-        for _ in range(30):
-            if new_process.poll() is not None:
-                break
-            await asyncio.sleep(1)
-        else:
-            raise TimeoutError("Timeout reached during bot restart.")
-
-    except FileNotFoundError:
-        logging.error("File not found error during restart.")
-    except Exception as e:
-        logging.error(f"Error during restart: {e}")
-    finally:
         with open(terminate_signal_file, "w") as signal_file:
             signal_file.write("terminate")
 
+        await asyncio.sleep(2)
+        os.execl(sys.executable, sys.executable, *sys.argv)
+
+    except FileNotFoundError as e:
+        logging.error(f"File not found error during restart: {e}")
+    except Exception as e:
+        logging.error(f"Error during restart: {e}")
+    finally:
         if os.path.exists(backup_directory):
             shutil.rmtree(backup_directory, ignore_errors=True)
-
-asyncio.run(restart_bot())
 
 async def main():
   await client.start(TOKEN)
