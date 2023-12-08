@@ -338,8 +338,6 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-import subprocess
-
 async def git_pull():
   repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
   
