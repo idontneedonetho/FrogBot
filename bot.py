@@ -327,17 +327,6 @@ async def restart_bot():
 async def main():
   await client.start(TOKEN)
 
-
-    
-          
-            
-    
-
-          
-          Expand Down
-    
-    
-  
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     try:
