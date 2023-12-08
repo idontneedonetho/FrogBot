@@ -1,3 +1,7 @@
+# .gitignore
+
+# Ignore files and directories
+__pycache__/
 .env
 bot.bat
 prompt.bat
