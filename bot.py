@@ -1,4 +1,4 @@
-frog_version = "v1.4.29"
+frog_version = "v1.4.30"
 import asyncio
 import discord
 import os
@@ -352,21 +352,27 @@ async def git_stash():
     print(f"Error stashing changes: {e}")
 
 async def restart_bot():
-  try:
-    print("Restarting bot...")
-    if platform.system() == "Windows":
-      new_process = subprocess.Popen(["startbot.bat"])
-    else:
-      subprocess.run(["chmod", "+x", "./startbot.sh"])
-      new_process = subprocess.Popen(["./startbot.sh"])
+    try:
+        print("Restarting bot...")
 
-    await asyncio.sleep(5)
-    original_process = psutil.Process(os.getpid())
-    original_process.send_signal(signal.SIGTERM)
+        if platform.system() == "Windows":
+            new_process = subprocess.Popen(["startbot.bat"])
+        else:
+            subprocess.run(["chmod", "+x", "./startbot.sh"])
+            new_process = subprocess.Popen(["./startbot.sh"])
+          
+        await asyncio.sleep(5)
 
-    new_process.wait()
-  except Exception as e:
-    logging.error(f"Error during restart: {e}")
+        with open("terminate_signal.txt", "w") as signal_file:
+            signal_file.write("terminate")
+
+        new_process.wait()
+
+        with open("terminate_signal.txt", "w") as signal_file:
+            signal_file.write("")
+
+    except Exception as e:
+        logging.error(f"Error during restart: {e}")
 
 async def main():
   await client.start(TOKEN)
@@ -377,15 +383,13 @@ async def run_scheduled_tasks():
     await asyncio.sleep(1)
 
 if __name__ == "__main__":
-  loop = asyncio.get_event_loop()
-  tasks = asyncio.gather(main(), run_scheduled_tasks())
+    loop = asyncio.get_event_loop()
 
-  try:
-    loop.run_until_complete(tasks)
+    try:
+        loop.run_until_complete(restart_bot())
 
-  except KeyboardInterrupt:
-    pass
+    except KeyboardInterrupt:
+        pass
 
-  finally:
-    loop.run_until_complete(client.close())
-    loop.close()
+    finally:
+        loop.close()
