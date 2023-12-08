@@ -11,7 +11,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 if TOKEN is None:
     raise ValueError("Bot token not found in .env file. Please add it.")
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"))
+bot = commands.Bot(command_prefix=commands.when_mentioned)
 
 @bot.event
 async def on_ready():
