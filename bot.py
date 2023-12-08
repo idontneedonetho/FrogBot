@@ -17,7 +17,6 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 channel_id = int(os.getenv('CHANNEL_ID'))
-
 weeb_user_id = '263565721336807424'
 
 conn = sqlite3.connect('user_points.db')
