@@ -51,6 +51,12 @@ role_thresholds = {
   500000: '1178752236717883534', 1000000: '1178752300592922634'
 }
 
+uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
+owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+    
+uwu_counter = 0
+owo_counter = 0
+
 @client.event
 async def on_ready():
   print(f'{client.user} has connected to Discord!')
@@ -163,12 +169,6 @@ async def on_message(message):
 
         except ValueError as e:
             await message.channel.send("Must be a whole number greater than zero.")
-
-      uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
-      owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
-    
-      uwu_counter = 0
-      owo_counter = 0
 
     elif 'UwU' in message.content.lower():
         if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
