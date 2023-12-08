@@ -2,6 +2,6 @@
 from discord.ext import commands
 
 @commands.command(name="frog")
-async def ping(ctx):
-    """Frog command."""
+async def frog(ctx):
+    """Frog command that responds with :frog:"""
     await ctx.send(":frog:")
