@@ -218,27 +218,6 @@ async def on_message(message):
     frog_ai_user_role = discord.utils.get(message.guild.roles, name="FrogBotUser")
     def permission_check():
       return frog_ai_user_role in message.author.roles
-    
-    if message.content.lower() == '/update':
-      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-        await message.channel.send("Manually triggering git pull...")
-  
-        loop = asyncio.get_event_loop()
-        loop.create_task(git_pull())
-  
-      else:
-        await message.channel.send("You don't have permission to use this command.")
-      
-    if message.content.lower() == '/reboot':
-      if frog_ai_user_role in message.author.roles or str(message.author.id) == '126123710435295232':
-        await message.channel.send("Restarting...")
-  
-        loop = asyncio.get_event_loop()
-        loop.create_task(restart_bot())
-  
-      else:
-        await message.channel.send("You don't have permission to use this command.")
-  
     lowercase_content = message.content.lower()
 
     if lowercase_content.startswith(('/add ', '/remove ', '/points ')) and not permission_check() and not lowercase_content == '/points help':
