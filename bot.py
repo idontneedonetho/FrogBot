@@ -25,12 +25,6 @@ user_points = {user_id: points or 0 for user_id, points in c.execute('SELECT * F
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 
-uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
-owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
-
-uwu_counter = 0
-owo_counter = 0
-
 emoji_points = {
   "🐞": 250,
   "📜": 250,
@@ -169,6 +163,12 @@ async def on_message(message):
 
         except ValueError as e:
             await message.channel.send("Must be a whole number greater than zero.")
+
+    uwu_responses = ['Wibbit X3 *nuzzles*', 'OwO', 'Froggy hugs for you~', 'Hai hai, Kero-chan desu~', 'Froggy wisdom: always keep it kawaii, even in the rain!', 'Froggy waifu for laifu!']
+    owo_responses = ['o3o', 'UwU', 'Hoppy-chan kawaii desu~', 'Ribbit-senpai noticed you!', 'Froggy power, activate! Transform into maximum kawaii mode!', 'Ribbit-senpai, notice my kawaii vibes!']
+    
+    uwu_counter = 0
+    owo_counter = 0
 
     elif 'UwU' in message.content.lower():
         if str(message.author.id) == weeb_user_id and random.choice([True, False], p=[0.01, 0.99]):
