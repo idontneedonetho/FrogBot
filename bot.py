@@ -305,4 +305,4 @@ async def update_roles(member, user_points):
 
   return new_roles
 
-await client.start(TOKEN)
+client.run(TOKEN)
