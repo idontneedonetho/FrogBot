@@ -352,27 +352,26 @@ async def git_stash():
   except Exception as e:
     print(f"Error stashing changes: {e}")
 
+restart_flag = True
+
 async def restart_bot():
     try:
+        global restart_flag
+
         print("Restarting bot...")
 
-        if platform.system() == "Windows":
-            new_process = subprocess.Popen(["startbot.bat"])
-        else:
-            subprocess.run(["chmod", "+x", "./startbot.sh"])
-            new_process = subprocess.Popen(["./startbot.sh"])
+        while restart_flag:
+            if platform.system() == "Windows":
+                new_process = subprocess.Popen(["startbot.bat"])
+            else:
+                subprocess.run(["chmod", "+x", "./startbot.sh"])
+                new_process = subprocess.Popen(["./startbot.sh"])
 
-        while new_process.poll() is None:
-            with open("terminate_signal.txt", "r") as signal_file:
-                if signal_file.read().strip() == "terminate":
-                    print("Terminating bot restart.")
-                    new_process.terminate()
-                    break
+            # Wait for the process to complete or until restart_flag changes
+            while new_process.poll() is None and restart_flag:
+                time.sleep(1)
 
-            time.sleep(1)
-
-        with open("terminate_signal.txt", "w") as signal_file:
-            signal_file.write("")
+            new_process.terminate()
 
     except Exception as e:
         logging.error(f"Error during restart: {e}")
