@@ -1,6 +1,6 @@
 # commands/emoji.py
 import discord
-import sqlite3  # Add this line
+import sqlite3  
 
 async def process_reaction(bot, payload, user_points):
     emoji_points = {

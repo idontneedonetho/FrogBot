@@ -1,11 +1,12 @@
 # bot.py
 frog_version = "v2"
 import discord
+import asyncio
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
 
-from commands import uwu, owo, help, points, leaderboard, emoji
+from commands import uwu, owo, help, points, leaderboard, emoji, roles
 
 load_dotenv()
 
@@ -21,27 +22,41 @@ bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case
 points.setup(bot)
 help.setup(bot)
 leaderboard.setup(bot)
+roles.setup(bot)
 
 last_used_responses = {"uwu": None, "owo": None}
 
 @bot.event
 async def on_ready():
     print(f"Ready {bot.user.name}")
+    user_points = points.initialize_points_database()
     await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    user_points = points.initialize_points_database()  # Initialize user_points here
+    user_points = points.initialize_points_database()
     channel = bot.get_channel(payload.channel_id)
     await emoji.process_reaction(bot, payload, user_points)
+
+@bot.event
+async def on_thread_create(thread):
+    try:
+        await asyncio.sleep(0.1)
+        if thread.parent_id == 1162100167110053888:
+            emojis_to_add = ["🐞", "📜", "📹"]
+        if thread.parent_id in [1167651506560962581, 1160318669839147259]:
+            emojis_to_add = ["💡", "🧠"]
+        first_message = await thread.fetch_message(thread.id)
+        for emoji in emojis_to_add:
+            await first_message.add_reaction(emoji)
+    except Exception as e:
+        print(f"Error in on_thread_create: {e}")
 
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
-
     content = message.content.lower()
-
     # Reactions
     if bot.user.mentioned_in(message) and len(message.content) == len(bot.user.mention):
         await message.channel.send(":frog:")
@@ -53,7 +68,15 @@ async def on_message(message):
         await message.channel.send('https://media1.tenor.com/m/rM6sdvGLYCMAAAAC/bonk.gif')
     elif ':coolfrog:' in message.content:
         await message.channel.send('<:coolfrog:1168605051779031060>')
-
+    elif any(keyword in message.content.lower() for keyword in ['primary mod']):
+        await message.channel.send(':eyes:')
     await bot.process_commands(message)
+    # Example of updating points
+    #await points.add_points_command.invoke(ctx, points_to_add=10, keyword="points", user=message.author)
+
+@bot.event
+async def on_member_update(before, after):
+    if before.roles != after.roles:
+        await roles.process_role_changes(bot, after.id, before.roles, after.roles)
 
 bot.run(TOKEN)

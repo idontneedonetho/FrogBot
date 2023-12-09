@@ -18,7 +18,7 @@ async def top25_command(ctx):
         await ctx.send("The leaderboard is empty.")
         return
 
-    leaderboard_str = "Top 25 Leaderboard:\n"
+    leaderboard_str = ">>> Top 25 Leaderboard:\n"
     for index, (user_id, points) in enumerate(leaderboard_data, start=1):
         try:
             user = await ctx.guild.fetch_member(user_id)
