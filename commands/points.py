@@ -8,7 +8,7 @@ import asyncio
 print('Points.py loaded')
 
 DATABASE_FILE = 'user_points.db'
-    
+
 def initialize_points_database(bot, user):
     user_points = {}
     with sqlite3.connect(DATABASE_FILE) as conn:
@@ -16,7 +16,6 @@ def initialize_points_database(bot, user):
         rows = conn.execute('SELECT * FROM user_points').fetchall()
         user_points = {user_id: points or 0 for user_id, points in rows}
 
-        # Check if the user from the payload is not in the database
         if user.id not in user_points:
             user_points[user.id] = 0
             conn.execute('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user.id, 0))
@@ -50,7 +49,7 @@ async def send_points_message(ctx, user, points_change, current_points):
 @commands.check(is_admin())
 async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_content, user: discord.User):
     if keyword.lower() == "points":
-        user_points = initialize_points_database(ctx.bot, user)  # Pass the correct user object
+        user_points = initialize_points_database(ctx.bot, user)
 
         user_id = user.id
         current_points = get_user_points(user_id, user_points)
@@ -65,7 +64,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
 @commands.check(is_admin())
 async def remove_points_command(ctx, points_to_remove: int, keyword: commands.clean_content, user: discord.User):
     if keyword.lower() == "points":
-        user_points = initialize_points_database(ctx.bot, user)  # Pass the correct user object
+        user_points = initialize_points_database(ctx.bot, user)
 
         user_id = user.id
         current_points = get_user_points(user_id, user_points)
@@ -96,33 +95,20 @@ async def check_or_rank_command(ctx, *args):
         else:
             user_id = ctx.author.id
 
-        user_points = initialize_points_database(ctx.bot, user)  # Pass the correct parameters
+        user_points = initialize_points_database(ctx.bot, user)
         current_points = user_points.get(user_id, 0)
         sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
-        user_index = next((index for index, (id, points) in enumerate(sorted_users) if id == user_id), None)
 
-        if user_index is not None:
-            num_users_to_display = 5
-            start_index = max(0, user_index - num_users_to_display // 2)
-            end_index = min(len(sorted_users) - 1, start_index + num_users_to_display - 1)
+        leaderboard_str = f">>> __**User: {user.display_name} with {current_points} points.**__\n"
+        for index, (user_id, points) in enumerate(sorted_users):
+            try:
+                user = await ctx.guild.fetch_member(user_id)
+                display_name = user.display_name
+            except:
+                display_name = f"User ID {user_id}"
 
-            leaderboard_str = f">>> __**Rank: #{user_index + 1} with {current_points} points.**__\n"
-            for index in range(start_index, end_index + 1):
-                user_id, points = sorted_users[index]
+            leaderboard_str += f"{index + 1}. {display_name}: {points} points\n"
 
-                try:
-                    user = await ctx.guild.fetch_member(user_id)
-                    display_name = user.display_name
-                except:
-                    display_name = f"User ID {user_id}"
-
-                if user_id == ctx.author.id:
-                    leaderboard_str += f"***{index + 1}. {display_name}: {points} points***"
-                else:
-                    leaderboard_str += f"{index + 1}. {display_name}: {points} points\n"
-
-            await ctx.send(leaderboard_str)
-        else:
-            await ctx.send("You have not earned any points yet.")
+        await ctx.send(leaderboard_str)
     else:
         await ctx.send("Invalid syntax. Please use '@bot check points @user'.")
