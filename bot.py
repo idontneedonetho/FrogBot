@@ -1,4 +1,5 @@
 # bot.py
+
 frog_version = "v2"
 import discord
 import asyncio
@@ -83,10 +84,14 @@ async def on_ready():
 @bot.event
 async def on_raw_reaction_add(payload):
     user_id = payload.user_id
-    user = await bot.fetch_user(user_id)
-
-    if user.guild_permissions.administrator:
+    guild_id = payload.guild_id
+    guild = bot.get_guild(guild_id)
+    member = guild.get_member(user_id)
+    
+    if member and member.guild_permissions.administrator:
+        user = bot.get_user(user_id)
         user_points = points.initialize_points_database(bot, user)
+
         channel = bot.get_channel(payload.channel_id)
         await emoji.process_reaction(bot, payload, user_points)
         await roles.check_user_points(bot)
@@ -128,4 +133,7 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-bot.run(TOKEN)
+try:
+    bot.run(TOKEN)
+except Exception as e:
+    print(f"An error occurred: {e}")
