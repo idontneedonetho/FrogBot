@@ -5,13 +5,14 @@ import subprocess
 import sys
 print('Restart.py loaded')
 
-def is_admin():
+def is_admin_or_user(user_id=126123710435295232):
     async def predicate(ctx):
-        return ctx.author.guild_permissions.administrator
+        author_id = ctx.author.id
+        return ctx.author.guild_permissions.administrator or author_id == user_id
     return commands.check(predicate)
 
 @commands.command(name="restart")
-@commands.check(is_admin())
+@commands.check(is_admin_or_user())
 async def restart_bot(ctx):
     print("Restarting bot...")
 
