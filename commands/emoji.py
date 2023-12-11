@@ -1,4 +1,5 @@
 # commands/emoji.py
+
 import discord
 import sqlite3
 print('Emoji.py loaded')

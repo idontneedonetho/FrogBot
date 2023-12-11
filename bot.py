@@ -63,6 +63,14 @@ except ImportError as e:
     print(f"Error importing update: {e}")
 except Exception as e:
     print(f"Error settings up update: {e}")
+    
+try: # Restart
+    from commands import restart
+    restart.setup(bot)
+except ImportError as e:
+    print(f"Error importing restart: {e}")
+except Exception as e:
+    print(f"Error settings up restart: {e}")
 
 last_used_responses = {"uwu": None, "owo": None}
 

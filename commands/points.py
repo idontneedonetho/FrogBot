@@ -1,4 +1,5 @@
 # commands/points.py
+
 import discord
 from discord.ext import commands
 from .roles import check_user_points

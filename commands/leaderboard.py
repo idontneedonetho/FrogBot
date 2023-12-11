@@ -1,7 +1,13 @@
 # commands/leaderboard.py
+
 from discord.ext import commands
 import sqlite3
 print('Leaderboard.py loaded')
+
+def is_admin():
+    async def predicate(ctx):
+        return ctx.author.guild_permissions.administrator
+    return commands.check(predicate)
 
 def get_leaderboard():
     conn = sqlite3.connect('user_points.db')
@@ -12,6 +18,7 @@ def get_leaderboard():
     return leaderboard_data
 
 @commands.command(name="top", aliases=["topusers"])
+@commands.check(is_admin())
 async def top25_command(ctx):
     leaderboard_data = get_leaderboard()
 
