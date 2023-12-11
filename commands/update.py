@@ -17,8 +17,6 @@ async def git_pull(ctx):
 
     try:
         await git_stash()
-
-        # Run git pull
         process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = process.communicate()
 
