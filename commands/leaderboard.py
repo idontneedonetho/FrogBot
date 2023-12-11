@@ -1,6 +1,7 @@
 # commands/leaderboard.py
 from discord.ext import commands
 import sqlite3
+print('Leaderboard.py loaded')
 
 def get_leaderboard():
     conn = sqlite3.connect('user_points.db')

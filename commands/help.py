@@ -27,7 +27,7 @@ async def custom_help_command(ctx, category=None):
             await points_help(ctx)
         # Add more categories as needed
     else:
-        general_help_message = ('>>> *Keywords for bot reactions will not be listed*\n\n*temp command*\n**"@FrogBot top"** - displays the top 25 users based on points.\n\n**"@FrogBot help points"** - Displays the points help message.\n**"@FrogBot my rank"** - Check your points and rank.\n**"@FrogBot"** - :frog:.\n**"@FrogBot help"** - Display this help message.')
+        general_help_message = ('>>> *Keywords for bot reactions will not be listed*\n\n*temp command*\n**"@FrogBot top"** - displays the top 25 users based on points.\n\n**"@FrogBot help points"** - Displays the points help message.\n**"@FrogBot check points"** - Check your points and rank.\n**"@FrogBot"** - :frog:.\n**"@FrogBot help"** - Display this help message.')
         await ctx.send(f"{general_help_message}")
 
 def setup(bot):

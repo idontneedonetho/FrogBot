@@ -2,11 +2,11 @@
 frog_version = "v2"
 import discord
 import asyncio
-from discord.ext import commands
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 import os
 
-from commands import uwu, owo, help, points, leaderboard, emoji, roles
+from commands import uwu, owo
 
 load_dotenv()
 
@@ -18,25 +18,60 @@ if TOKEN is None:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
-# Add-ons
-points.setup(bot)
-help.setup(bot)
-leaderboard.setup(bot)
-roles.setup(bot)
+try: # Help
+    from commands import help
+    help.setup(bot)
+except ImportError as e:
+    print(f"Error importing help: {e}")
+except Exception as e:
+    print(f"Error setting up help: {e}")
+
+try: # Points
+    from commands import points
+    points.setup(bot)
+except ImportError as e:
+    print(f"Error importing points: {e}")
+except Exception as e:
+    print(f"Error setting up points: {e}")
+
+try: # Leaderboard
+    from commands import leaderboard
+    leaderboard.setup(bot)
+except ImportError as e:
+    print(f"Error importing leaderboard: {e}")
+except Exception as e:
+    print(f"Error setting up leaderboard: {e}")
+
+try: # Emoji
+    from commands import emoji
+except ImportError as e:
+    print(f"Error importing emoji: {e}")
+except Exception as e:
+    print(f"Error setting up emoji: {e}")
+
+try: # Roles
+    from commands import roles
+except ImportError as e:
+    print(f"Error importing roles: {e}")
+except Exception as e:
+    print(f"Error setting up roles: {e}")
 
 last_used_responses = {"uwu": None, "owo": None}
 
 @bot.event
 async def on_ready():
     print(f"Ready {bot.user.name}")
-    user_points = points.initialize_points_database()
+    await roles.check_user_points(bot)
     await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    user_points = points.initialize_points_database()
+    user_id = payload.user_id
+    user = await bot.fetch_user(user_id)
+    user_points = points.initialize_points_database(bot, user)
     channel = bot.get_channel(payload.channel_id)
     await emoji.process_reaction(bot, payload, user_points)
+    await roles.check_user_points(bot)
 
 @bot.event
 async def on_thread_create(thread):
@@ -70,13 +105,7 @@ async def on_message(message):
         await message.channel.send('<:coolfrog:1168605051779031060>')
     elif any(keyword in message.content.lower() for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
+    
     await bot.process_commands(message)
-    # Example of updating points
-    #await points.add_points_command.invoke(ctx, points_to_add=10, keyword="points", user=message.author)
-
-@bot.event
-async def on_member_update(before, after):
-    if before.roles != after.roles:
-        await roles.process_role_changes(bot, after.id, before.roles, after.roles)
 
 bot.run(TOKEN)
