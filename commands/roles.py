@@ -19,16 +19,24 @@ async def check_user_points(bot):
         1000000: 1178752300592922634
     }
 
-    # Connect to SQLite database
     connection = sqlite3.connect('user_points.db')
     cursor = connection.cursor()
 
-    # Get the Discord guild object
-    guild = bot.get_guild(1137853399715549214)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_points (
+            user_id INTEGER PRIMARY KEY,
+            points INTEGER
+        )
+    ''')
 
-    # Loop through each user in the database
+    connection.commit()
+
+    guild = bot.guilds[0] if bot.guilds else None
+    if guild is None:
+        print("Guild not found. Make sure the guild ID is correct.")
+        return
+
     for row in cursor.execute('SELECT user_id, points FROM user_points'):
-        # Get the Discord member object
         member = guild.get_member(row[0])
 
         if member is None:
@@ -46,5 +54,4 @@ async def check_user_points(bot):
                     await member.add_roles(role_to_add)
                     break
 
-    # Close the database connection
     connection.close()
