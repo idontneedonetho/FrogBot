@@ -7,8 +7,8 @@ print('Roles.py loaded')
 
 async def check_user_points(bot):
     role_thresholds = {
-        1000: 1173370706759786549,
-        2500: 1183575706018521189,
+        1000: 1178750004869996574,
+        2500: 1178751163462586368,
         5000: 1178751322506416138,
         10000: 1178751607509364828,
         25000: 1178751819434963044,
@@ -24,7 +24,7 @@ async def check_user_points(bot):
     cursor = connection.cursor()
 
     # Get the Discord guild object
-    guild = bot.get_guild(698205243103641711)
+    guild = bot.get_guild(1137853399715549214)
 
     # Loop through each user in the database
     for row in cursor.execute('SELECT user_id, points FROM user_points'):
