@@ -4,13 +4,14 @@ from discord.ext import commands
 import subprocess
 print('Update.py loaded')
 
-def is_admin():
+def is_admin_or_user(user_id=126123710435295232):
     async def predicate(ctx):
-        return ctx.author.guild_permissions.administrator
+        author_id = ctx.author.id
+        return ctx.author.guild_permissions.administrator or author_id == user_id
     return commands.check(predicate)
 
 @commands.command(name="update")
-@commands.check(is_admin())
+@commands.check(is_admin_or_user())
 async def git_pull(ctx):
     print('update command invoked')
     repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
