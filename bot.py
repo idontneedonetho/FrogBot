@@ -1,6 +1,6 @@
 # bot.py
 
-frog_version = "v2"
+frog_version = "v2 beta"
 import discord
 import asyncio
 from discord.ext import commands, tasks
