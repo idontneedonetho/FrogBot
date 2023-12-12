@@ -28,7 +28,7 @@ async def check_user_points(bot):
             points INTEGER
         )
     ''')
-
+    
     connection.commit()
 
     guild = bot.guilds[0] if bot.guilds else None
@@ -42,11 +42,9 @@ async def check_user_points(bot):
         if member is None:
             continue
 
-        # Remove all roles related to points system
         roles_to_remove = [guild.get_role(role_id) for role_id in role_thresholds.values() if guild.get_role(role_id)]
         await member.remove_roles(*roles_to_remove)
 
-        # Add role based on points
         for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
             if row[1] >= threshold:
                 role_to_add = guild.get_role(role_id)
