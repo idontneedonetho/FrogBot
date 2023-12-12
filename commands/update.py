@@ -12,19 +12,23 @@ def is_admin_or_user(user_id=126123710435295232):
 
 @commands.command(name="update")
 @commands.check(is_admin_or_user())
-async def git_pull(ctx):
+async def git_pull(ctx, branch="testing"):
     print('update command invoked')
-    repo_url = 'https://github.com/idontneedonetho/FrogBot.git'
 
     try:
+        current_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
+        if current_branch != branch:
+            await ctx.send(f"Switching to branch {branch}")
+            subprocess.run(["git", "checkout", branch])
+
         await git_stash()
-        process = subprocess.Popen(['git', 'pull', repo_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        process = subprocess.Popen(['git', 'pull', 'origin', branch], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = process.communicate()
 
         if process.returncode == 0:
             print('Git pull successful.')
             await ctx.send('Git pull successful.')
-
         else:
             print(f'Error updating the script: {error.decode()}')
             await ctx.send(f'Error updating the script: {error.decode()}')
