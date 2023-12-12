@@ -15,7 +15,7 @@ def is_admin_or_user(user_id=126123710435295232):
 @commands.check(is_admin_or_user())
 async def restart_bot(ctx):
     print("Restarting bot...")
-    await ctx.send("Bot restarting...")
+    await ctx.send("Bot restarting. This may at least 5 seconds...")
     await ctx.bot.close()
     sys.exit()
 
