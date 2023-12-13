@@ -28,21 +28,21 @@ async def process_reaction(bot, payload, user_points):
         return
 
     guild_id = payload.guild_id
-    user_id = payload.user_id
-
-    if user_id is None:
-        return
-
     channel = bot.get_channel(payload.channel_id)
     message = await channel.fetch_message(payload.message_id)
-    author_id = message.author.id
+    guild = bot.get_guild(guild_id)
+    reactor = guild.get_member(payload.user_id)
 
+    if not reactor.guild_permissions.administrator:
+        return
+
+    author_id = message.author.id
     points_to_add = emoji_points[emoji_name]
-    user_points[user_id] = user_points.get(user_id, 0) + points_to_add
+    user_points[author_id] = user_points.get(author_id, 0) + points_to_add
 
     conn = sqlite3.connect('user_points.db')
     c = conn.cursor()
-    c.execute('INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, ?)', (user_id, user_points[user_id]))
+    c.execute('INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, ?)', (author_id, user_points[author_id]))
     conn.commit()
     conn.close()
 
@@ -53,5 +53,5 @@ async def process_reaction(bot, payload, user_points):
         message_custom_formatted = message_custom.format(points=points_to_add)
         await channel.send(f'{message.author.mention}{message_custom_formatted}')
     else:
-        points_formatted = "{:,}".format(user_points[user_id])
+        points_formatted = "{:,}".format(user_points[author_id])
         await channel.send(f'{message.author.mention} has been awarded {points_to_add} points! They now have {points_formatted}.')
