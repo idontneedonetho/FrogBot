@@ -5,7 +5,7 @@ print('Help.py loaded')
 
 async def advanced_help(ctx):
     # Create the help function here
-    help_message = ('>>> *For commands below, the user must have the admin privileges.*\n\n**"@FrogBot add [amount] points @user"** - Add points to a user.\n**"@FrogBot remove [amount] points @user"** - Remove points from a user.\n**"@FrogBot check points @user"** - Check points for a user.')
+    help_message = ('>>> *For commands below, the user must have the admin privileges.*\n\n**"@FrogBot add [amount] points @user"** - Add points to a user.\n**"@FrogBot remove [amount] points @user"** - Remove points from a user.\n**"@FrogBot check points @user"** - Check points for a user.\n**"@FrogBot killbot"** - Shutdown the bot, needs confirmation.\n**"@FrogBot init_leaderboard"** - Initialize the leaderboard.')
     await ctx.send(f"{help_message}")
     
 async def points_help(ctx):
