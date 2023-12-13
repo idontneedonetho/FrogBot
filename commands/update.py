@@ -6,12 +6,14 @@ print('Update.py loaded')
 
 def is_admin_or_user(user_id=126123710435295232):
     async def predicate(ctx):
-        author_id = ctx.author.id
-        return ctx.author.guild_permissions.administrator or author_id == user_id
+        is_admin = ctx.author.guild_permissions.administrator
+        is_specific_user = ctx.author.id == user_id
+        print(f"Admin check: {is_admin}, Specific user check: {is_specific_user}")
+        return is_admin or is_specific_user
     return commands.check(predicate)
 
 @commands.command(name="update")
-@commands.check(is_admin_or_user())
+@is_admin_or_user()
 async def git_pull(ctx, branch="testing"):
     print('update command invoked')
 
