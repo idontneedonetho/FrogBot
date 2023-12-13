@@ -20,11 +20,19 @@ intents = discord.Intents.default()
 intents.members = True
 intents.guilds = True
 intents.messages = True
+intents.message_content = True
 intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 RESTART_FLAG_FILE = 'restart.flag'
+
+try: # GPT
+    from commands import GPT
+except ImportError as e:
+    print(f"Error importing GPT: {e}")
+except Exception as e:
+    print(f"Error setting up GPT: {e}")
 
 try: # Help
     from commands import help
@@ -135,22 +143,34 @@ async def on_thread_create(thread):
 async def on_message(message):
     if message.author == bot.user:
         return
-    content = message.content.lower()
-    # Reactions
-    if bot.user.mentioned_in(message) and len(message.content) == len(bot.user.mention):
+    content_lower = message.content.lower()
+    if content_lower == '🐸':
         await message.channel.send(":frog:")
-    if message.content == "uwu":
+    elif content_lower == "uwu":
         await uwu.uwu(message)
-    elif message.content == "owo":
+    elif content_lower == "owo":
         await owo.owo(message)
-    elif message.content.lower() == "weeb":
+    elif content_lower == "weeb":
         await message.channel.send('https://media1.tenor.com/m/rM6sdvGLYCMAAAAC/bonk.gif')
-    elif ':coolfrog:' in message.content:
+    elif ':coolfrog:' in content_lower:
         await message.channel.send('<:coolfrog:1168605051779031060>')
-    elif any(keyword in message.content.lower() for keyword in ['primary mod']):
+    elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
-    
-    await bot.process_commands(message)
+    else:
+        if bot.user.mentioned_in(message):
+            content = message.content.replace(bot.user.mention, '').strip()
+
+            if content:
+                ctx = await bot.get_context(message)
+                if ctx.valid:
+                    await bot.process_commands(message)
+                else:
+                    placeholder_message = await message.channel.send('Generating Response...')
+                    response = await GPT.ask_gpt(content)
+                    await placeholder_message.edit(content=response)
+            return
+        else:
+            await bot.process_commands(message)
 
 try:
     bot.run(TOKEN)
