@@ -19,6 +19,8 @@ if TOKEN is None:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
+RESTART_FLAG_FILE = 'restart.flag'
+
 try: # Help
     from commands import help
     help.setup(bot)
@@ -79,6 +81,11 @@ last_used_responses = {"uwu": None, "owo": None}
 async def on_ready():
     print(f"Ready {bot.user.name}")
     await roles.check_user_points(bot)
+    if os.path.exists(RESTART_FLAG_FILE):
+        channel = bot.get_channel(1178764276157141093)
+        await channel.send("Bot is back online after restart.")
+
+        os.remove(RESTART_FLAG_FILE)
     await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 @bot.event
