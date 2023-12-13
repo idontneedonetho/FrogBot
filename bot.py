@@ -81,11 +81,16 @@ last_used_responses = {"uwu": None, "owo": None}
 async def on_ready():
     print(f"Ready {bot.user.name}")
     await roles.check_user_points(bot)
+    
     if os.path.exists(RESTART_FLAG_FILE):
         channel = bot.get_channel(1178764276157141093)
-        await channel.send("Bot is back online after restart.")
+        
+        if channel is not None:
+            await channel.send("Bot is back online after restart.")
+            os.remove(RESTART_FLAG_FILE)
+        else:
+            print("Channel not found. Make sure the channel ID is correct.")
 
-        os.remove(RESTART_FLAG_FILE)
     await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
 
 @bot.event
