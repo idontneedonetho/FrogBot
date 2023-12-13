@@ -16,7 +16,12 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN is None:
     raise ValueError("Bot token not found in .env file. Please add it.")
 
-intents = discord.Intents.all()
+intents = discord.Intents.default()
+intents.members = True
+intents.guilds = True
+intents.messages = True
+intents.guild_messages = True
+intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 RESTART_FLAG_FILE = 'restart.flag'
