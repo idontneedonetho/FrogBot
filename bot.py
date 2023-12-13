@@ -103,7 +103,9 @@ async def on_raw_reaction_add(payload):
         await emoji.process_reaction(bot, payload, user_points)
         await roles.check_user_points(bot)
     else:
-        print(f"{user.name} does not have the Administrator permission. Ignoring the reaction.")
+        user = await bot.fetch_user(user_id)
+        user_name = user.name
+        print(f"{user_name} does not have the Administrator permission. Ignoring the reaction.")
 
 @bot.event
 async def on_thread_create(thread):
