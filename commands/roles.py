@@ -36,20 +36,27 @@ async def check_user_points(bot):
         print("Guild not found. Make sure the guild ID is correct.")
         return
 
+    if not guild.chunked:
+        await guild.chunk(cache=True)
+
     for row in cursor.execute('SELECT user_id, points FROM user_points'):
         member = guild.get_member(row[0])
-
         if member is None:
             continue
 
-        roles_to_remove = [guild.get_role(role_id) for role_id in role_thresholds.values() if guild.get_role(role_id)]
-        await member.remove_roles(*roles_to_remove)
+        try:
+            roles_to_remove = [guild.get_role(role_id) for role_id in role_thresholds.values() if guild.get_role(role_id)]
+            await member.remove_roles(*roles_to_remove, reason="Updating roles based on points")
 
-        for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
-            if row[1] >= threshold:
-                role_to_add = guild.get_role(role_id)
-                if role_to_add:
-                    await member.add_roles(role_to_add)
-                    break
+            for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
+                if row[1] >= threshold:
+                    role_to_add = guild.get_role(role_id)
+                    if role_to_add:
+                        await member.add_roles(role_to_add, reason="Updating roles based on points")
+                        break
+        except discord.Forbidden:
+            print(f"Bot doesn't have permission to manage roles for {member}")
+        except discord.HTTPException as e:
+            print(f"HTTP request failed: {e}")
 
     connection.close()
