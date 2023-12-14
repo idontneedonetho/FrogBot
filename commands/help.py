@@ -29,7 +29,7 @@ async def custom_help_command(ctx, category=None):
             await points_help(ctx)
         # Add more categories as needed
     else:
-        general_help_message = ('>>> *Keywords for bot reactions will not be listed*\n\n**"@FrogBot [question]"** - Ask ChatGPT a question. This has a 15 second cooldown.\n\n**"@FrogBot help points"** - Displays the points help message.\n**"@FrogBot check points"** - Check your points and rank.\n":frog:" - :frog:.\n**"@FrogBot help"** - Display this help message.\n\n__*Commands below need Admin permissions*__\n**"@FrogBot help advanced"** - Displays advanced commands.')
+        general_help_message = ('>>> *Keywords for bot reactions will not be listed*\n\n**"@FrogBot [question]"** - Ask ChatGPT a question. This has a 15 second cooldown. To continue conversations, you must reply to the bots message.\n\n**"@FrogBot help points"** - Displays the points help message.\n**"@FrogBot check points"** - Check your points and rank.\n":frog:" - :frog:.\n**"@FrogBot help"** - Display this help message.\n\n__*Commands below need Admin permissions*__\n**"@FrogBot help advanced"** - Displays advanced commands.')
         await ctx.send(f"{general_help_message}")
 
 def setup(bot):
