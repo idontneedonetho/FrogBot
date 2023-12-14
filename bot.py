@@ -5,7 +5,11 @@ import discord
 import asyncio
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 import os
+
+user_request_times = {}
+RATE_LIMIT = timedelta(seconds=15)
 
 from commands import uwu, owo
 
@@ -139,10 +143,35 @@ async def on_thread_create(thread):
     except Exception as e:
         print(f"Error in on_thread_create: {e}")
 
+def count_tokens(text):
+    return len(text) // 4
+
+async def fetch_reply_chain(message, max_tokens=4096):
+    context = []
+    tokens_used = 0
+
+    while message.reference is not None and tokens_used < max_tokens:
+        try:
+            message = await message.channel.fetch_message(message.reference.message_id)
+            message_content = message.content
+            message_tokens = len(message_content) // 4
+
+            if tokens_used + message_tokens <= max_tokens:
+                context.append(message_content)
+                tokens_used += message_tokens
+            else:
+                break
+        except Exception as e:
+            print(f"Error fetching reply chain message: {e}")
+            break
+
+    return context[::-1]
+
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
+
     content_lower = message.content.lower()
     if content_lower == '🐸':
         await message.channel.send(":frog:")
@@ -158,19 +187,26 @@ async def on_message(message):
         await message.channel.send(':eyes:')
     else:
         if bot.user.mentioned_in(message):
-            content = message.content.replace(bot.user.mention, '').strip()
+                content = message.content.replace(bot.user.mention, '').strip()
+                if content:
+                    ctx = await bot.get_context(message)
+                    if ctx.valid:
+                        await bot.process_commands(message)
+                    else:
+                        current_time = datetime.now()
+                        last_request_time = user_request_times.get(message.author.id)
 
-            if content:
-                ctx = await bot.get_context(message)
-                if ctx.valid:
-                    await bot.process_commands(message)
-                else:
-                    placeholder_message = await message.channel.send('Generating Response...')
-                    response = await GPT.ask_gpt(content)
-                    await placeholder_message.edit(content=response)
-            return
-        else:
-            await bot.process_commands(message)
+                        if last_request_time and current_time - last_request_time < RATE_LIMIT:
+                            await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
+                            return
+                        user_request_times[message.author.id] = current_time
+                        placeholder_message = await message.reply('Generating Response...')
+                        context = await fetch_reply_chain(message, max_tokens=4096)
+                        combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
+                        response = await GPT.ask_gpt(combined_messages)
+                        await placeholder_message.edit(content=response)
+                    return
+        await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
