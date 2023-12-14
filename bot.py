@@ -172,6 +172,13 @@ async def on_message(message):
         else:
             await bot.process_commands(message)
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        pass
+    else:
+        print(f"An error occurred: {error}")
+
 try:
     bot.run(TOKEN)
 except Exception as e:
