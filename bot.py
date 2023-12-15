@@ -170,6 +170,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
 
 @bot.event
 async def on_message(message):
+    content = None
     if message.author == bot.user:
         return
 
