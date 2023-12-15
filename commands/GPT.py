@@ -4,7 +4,6 @@ import openai
 import os
 import asyncio
 from discord.ext import commands
-
 print('GPT.py loaded')
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -12,18 +11,16 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         try:
-            conversation = ""
-            for message in input_messages:
-                role = message.get("role", "user")
-                content = message.get("content", "")
-                conversation += f"{role}: {content}\n"
+            messages_payload = input_messages
+            if not input_messages:
+                messages_payload = [{"role": "system", "content": "You are a helpful assistant."},
+                                    {"role": "user", "content": " "}]
 
-            response = openai.Completion.create(
+            response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
-                prompt=conversation,
-                max_tokens=4096
+                messages=messages_payload
             )
-            return response.choices[0].text.strip()
+            return response.choices[0].message['content']
         except Exception as e:
             print(f"Error in ask_gpt (attempt {attempt + 1}): {e}")
             if attempt < retry_attempts - 1:
