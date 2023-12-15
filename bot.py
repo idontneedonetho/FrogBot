@@ -6,6 +6,7 @@ import asyncio
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from discord.errors import HTTPException, NotFound
 import os
 
 user_request_times = {}
@@ -187,25 +188,40 @@ async def on_message(message):
         await message.channel.send(':eyes:')
     else:
         if bot.user.mentioned_in(message):
-                content = message.content.replace(bot.user.mention, '').strip()
-                if content:
-                    ctx = await bot.get_context(message)
-                    if ctx.valid:
-                        await bot.process_commands(message)
-                    else:
-                        current_time = datetime.now()
-                        last_request_time = user_request_times.get(message.author.id)
+            content = message.content.replace(bot.user.mention, '').strip()
+        if content:
+            ctx = await bot.get_context(message)
+            if ctx.valid:
+                await bot.process_commands(message)
+            else:
+                current_time = datetime.now()
+                last_request_time = user_request_times.get(message.author.id)
 
-                        if last_request_time and current_time - last_request_time < RATE_LIMIT:
-                            await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
-                            return
-                        user_request_times[message.author.id] = current_time
-                        placeholder_message = await message.reply('Generating Response...')
-                        context = await fetch_reply_chain(message, max_tokens=4096)
-                        combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
-                        response = await GPT.ask_gpt(combined_messages)
-                        await placeholder_message.edit(content=response)
+                if last_request_time and current_time - last_request_time < RATE_LIMIT:
+                    try:
+                        await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
+                    except (HTTPException, NotFound):
+                        await message.channel.send("Could not send rate limit message, the original message might have been deleted.")
                     return
+
+                user_request_times[message.author.id] = current_time
+
+                try:
+                    placeholder_message = await message.reply('Generating Response...')
+                except (HTTPException, NotFound):
+                    await message.channel.send("Could not send placeholder response, the original message might have been deleted.")
+                    return
+
+                context = await fetch_reply_chain(message, max_tokens=4096)
+                combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
+
+                response = await GPT.ask_gpt(combined_messages)
+                
+                try:
+                    await placeholder_message.edit(content=response)
+                except HTTPException:
+                    await message.channel.send(response)
+            return
         await bot.process_commands(message)
 
 @bot.event
