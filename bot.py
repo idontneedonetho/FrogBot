@@ -151,10 +151,13 @@ async def fetch_reply_chain(message, max_tokens=4096):
     context = []
     tokens_used = 0
 
+    current_prompt_tokens = len(message.content) // 4
+    max_tokens -= current_prompt_tokens
+
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            message_content = message.content
+            message_content = f"{message.author.display_name}: {message.content}"
             message_tokens = len(message_content) // 4
 
             if tokens_used + message_tokens <= max_tokens:
@@ -198,6 +201,7 @@ async def on_message(message):
                 current_time = datetime.now()
                 last_request_time = user_request_times.get(message.author.id)
 
+                # Rate limit check
                 if last_request_time and current_time - last_request_time < RATE_LIMIT:
                     try:
                         await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
@@ -207,22 +211,19 @@ async def on_message(message):
 
                 user_request_times[message.author.id] = current_time
 
-                try:
-                    placeholder_message = await message.reply('Generating Response...')
-                except (HTTPException, NotFound):
-                    await message.channel.send("Could not send placeholder response, the original message might have been deleted.")
-                    return
+                # Show typing indicator
+                async with message.channel.typing():
+                    context = await fetch_reply_chain(message, max_tokens=4096)
+                    combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
+                    response = await GPT.ask_gpt(combined_messages)
 
-                context = await fetch_reply_chain(message, max_tokens=4096)
-                combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
-
-                response = await GPT.ask_gpt(combined_messages)
-                
+                # Respond to the message
                 try:
-                    await placeholder_message.edit(content=response)
+                    await message.reply(response)
                 except HTTPException:
                     await message.channel.send(response)
             return
+
         await bot.process_commands(message)
 
 @bot.event

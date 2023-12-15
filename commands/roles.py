@@ -21,14 +21,12 @@ async def check_user_points(bot):
 
     connection = sqlite3.connect('user_points.db')
     cursor = connection.cursor()
-
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_points (
             user_id INTEGER PRIMARY KEY,
             points INTEGER
         )
     ''')
-    
     connection.commit()
 
     guild = bot.guilds[0] if bot.guilds else None
@@ -39,24 +37,26 @@ async def check_user_points(bot):
     if not guild.chunked:
         await guild.chunk(cache=True)
 
-    for row in cursor.execute('SELECT user_id, points FROM user_points'):
-        member = guild.get_member(row[0])
+    for user_id, points in cursor.execute('SELECT user_id, points FROM user_points'):
+        member = guild.get_member(user_id)
         if member is None:
             continue
 
-        try:
-            roles_to_remove = [guild.get_role(role_id) for role_id in role_thresholds.values() if guild.get_role(role_id)]
-            await member.remove_roles(*roles_to_remove, reason="Updating roles based on points")
+        appropriate_role = None
+        for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
+            if points >= threshold:
+                appropriate_role = guild.get_role(role_id)
+                break
 
-            for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
-                if row[1] >= threshold:
-                    role_to_add = guild.get_role(role_id)
-                    if role_to_add:
-                        await member.add_roles(role_to_add, reason="Updating roles based on points")
-                        break
-        except discord.Forbidden:
-            print(f"Bot doesn't have permission to manage roles for {member}")
-        except discord.HTTPException as e:
-            print(f"HTTP request failed: {e}")
+        if appropriate_role and appropriate_role not in member.roles:
+            try:
+                roles_to_add = [appropriate_role]
+                roles_to_remove = [role for role in member.roles if role.id in role_thresholds.values() and role != appropriate_role]
+                await member.add_roles(*roles_to_add, reason="Updating roles based on points")
+                await member.remove_roles(*roles_to_remove, reason="Removing outdated roles based on points")
+            except discord.Forbidden:
+                print(f"Bot doesn't have permission to manage roles for {member}")
+            except discord.HTTPException as e:
+                print(f"HTTP request failed: {e}")
 
     connection.close()

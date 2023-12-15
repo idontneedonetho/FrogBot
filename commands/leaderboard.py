@@ -56,7 +56,7 @@ async def init_leaderboard(ctx):
     
 async def format_leaderboard(bot, leaderboard_data):
     guild = bot.guilds[0]
-    embed = discord.Embed(title="Top 10 Leaderboard", color=discord.Color.blue())
+    embed = discord.Embed(title="Top 10 Leaderboard", color=discord.Color.red())
 
     for index, (user_id, points) in enumerate(leaderboard_data, start=1):
         member = guild.get_member(user_id)
