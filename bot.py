@@ -11,6 +11,7 @@ import os
 
 user_request_times = {}
 RATE_LIMIT = timedelta(seconds=15)
+RESTART_FLAG_FILE = 'restart.flag'
 
 from commands import uwu, owo
 
@@ -29,8 +30,6 @@ intents.message_content = True
 intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
-
-RESTART_FLAG_FILE = 'restart.flag'
 
 try: # GPT
     from commands import GPT
@@ -201,7 +200,6 @@ async def on_message(message):
                 current_time = datetime.now()
                 last_request_time = user_request_times.get(message.author.id)
 
-                # Rate limit check
                 if last_request_time and current_time - last_request_time < RATE_LIMIT:
                     try:
                         await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
@@ -211,17 +209,25 @@ async def on_message(message):
 
                 user_request_times[message.author.id] = current_time
 
-                # Show typing indicator
                 async with message.channel.typing():
                     context = await fetch_reply_chain(message, max_tokens=4096)
                     combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
                     response = await GPT.ask_gpt(combined_messages)
 
-                # Respond to the message
-                try:
-                    await message.reply(response)
-                except HTTPException:
-                    await message.channel.send(response)
+                    max_length = 2000
+                    if len(response) > max_length:
+                        parts = [response[i:i + max_length] for i in range(0, len(response), max_length)]
+                        for part in parts:
+                            try:
+                                await message.reply(part)
+                            except HTTPException:
+                                await message.channel.send(part)
+                            await asyncio.sleep(1)
+                    else:
+                        try:
+                            await message.reply(response)
+                        except HTTPException:
+                            await message.channel.send(response)
             return
 
         await bot.process_commands(message)

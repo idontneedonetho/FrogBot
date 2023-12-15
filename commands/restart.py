@@ -27,13 +27,10 @@ async def restart_bot(ctx):
     command = [sys.executable, "bot.py"]
 
     try:
-        subprocess.Popen(command, close_fds=True)
-        await ctx.send("Bot restarting...")
+        subprocess.run(command, check=True, text=True)
+        await ctx.send("Bot restarted successfully.")
         await ctx.bot.close()
         sys.exit()
-
-    except SystemExit:
-        pass
 
     except Exception as e:
         print(f"Error restarting the bot: {e}")
