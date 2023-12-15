@@ -10,7 +10,7 @@ from discord.errors import HTTPException, NotFound
 import os
 
 user_request_times = {}
-RATE_LIMIT = timedelta(seconds=15)
+gpt_semaphore = asyncio.Semaphore(1)
 RESTART_FLAG_FILE = 'restart.flag'
 
 from commands import uwu, owo
@@ -204,7 +204,7 @@ async def on_message(message):
                     try:
                         await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
                     except (HTTPException, NotFound):
-                        await message.channel.send("Could not send rate limit message, the original message might have been deleted.")
+                        await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
                     return
 
                 user_request_times[message.author.id] = current_time
@@ -212,7 +212,9 @@ async def on_message(message):
                 async with message.channel.typing():
                     context = await fetch_reply_chain(message, max_tokens=4096)
                     combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
-                    response = await GPT.ask_gpt(combined_messages)
+                    
+                    async with gpt_semaphore:
+                        response = await GPT.ask_gpt(combined_messages)
 
                     max_length = 2000
                     if len(response) > max_length:
@@ -230,7 +232,7 @@ async def on_message(message):
                             await message.channel.send(response)
             return
 
-        await bot.process_commands(message)
+    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
