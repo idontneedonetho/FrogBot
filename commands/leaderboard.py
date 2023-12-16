@@ -3,7 +3,6 @@
 import discord
 from discord.ext import commands
 import sqlite3
-print('Leaderboard.py loaded')
 
 LEADERBOARD_CHANNEL_ID = 1178764276157141093
 LEADERBOARD_MESSAGE_ID = None

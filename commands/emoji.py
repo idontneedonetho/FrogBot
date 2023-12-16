@@ -2,7 +2,6 @@
 
 import discord
 import sqlite3
-print('Emoji.py loaded')
 
 async def process_reaction(bot, payload, user_points):
     emoji_points = {

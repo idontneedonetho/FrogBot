@@ -4,10 +4,10 @@ import discord
 from discord.ext import commands
 from .roles import check_user_points
 from .leaderboard import update_leaderboard
+import random
 import sqlite3
 import time
 import asyncio
-print('Points.py loaded')
 
 DATABASE_FILE = 'user_points.db'
 
@@ -119,7 +119,9 @@ async def check_or_rank_command(ctx, *args):
         start_index = max(0, min(user_rank - 2, len(sorted_users) - 5))
         end_index = min(len(sorted_users), start_index + 5)
 
-        embed = discord.Embed(title="__Leaderboard__", color=discord.Color.blue())
+        random_color = discord.Color.from_rgb(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+        embed = discord.Embed(title="__Leaderboard__", color=random_color)
         for index in range(start_index, end_index):
             user_id, points = sorted_users[index]
             try:
@@ -128,11 +130,12 @@ async def check_or_rank_command(ctx, *args):
             except:
                 display_name = f"User ID {user_id}"
 
-            rank_text = f"{display_name}: {points} points"
+            # Format with rank next to the username
+            rank_text = f"#{index + 1} {display_name}: {points} points"
             if user_id == user.id:
                 rank_text = f"***{rank_text}***"
 
-            embed.add_field(name=f"#{index + 1}", value=rank_text, inline=False)
+            embed.add_field(name="\u200b", value=rank_text, inline=False)
 
         await ctx.send(embed=embed)
     else:

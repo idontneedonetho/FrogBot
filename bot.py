@@ -1,10 +1,11 @@
 # bot.py
 
-frog_version = "v2 beta"
+frog_version = "v2 beta 3"
 import discord
 import asyncio
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+import importlib
 from datetime import datetime, timedelta
 from discord.errors import HTTPException, NotFound
 import os
@@ -12,6 +13,7 @@ import os
 user_request_times = {}
 gpt_semaphore = asyncio.Semaphore(1)
 RESTART_FLAG_FILE = 'restart.flag'
+RATE_LIMIT = timedelta(seconds=5)
 
 from commands import uwu, owo
 
@@ -31,66 +33,28 @@ intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
-try: # GPT
-    from commands import GPT
-except ImportError as e:
-    print(f"Error importing GPT: {e}")
-except Exception as e:
-    print(f"Error setting up GPT: {e}")
+modules = [
+    "GPT", 
+    "help", 
+    "points", 
+    "leaderboard", 
+    "emoji", 
+    "roles", 
+    "update", 
+    "restart"
+]
 
-try: # Help
-    from commands import help
-    help.setup(bot)
-except ImportError as e:
-    print(f"Error importing help: {e}")
-except Exception as e:
-    print(f"Error setting up help: {e}")
-
-try: # Points
-    from commands import points
-    points.setup(bot)
-except ImportError as e:
-    print(f"Error importing points: {e}")
-except Exception as e:
-    print(f"Error setting up points: {e}")
-
-try: # Leaderboard
-    from commands import leaderboard
-    leaderboard.setup(bot)
-except ImportError as e:
-    print(f"Error importing leaderboard: {e}")
-except Exception as e:
-    print(f"Error setting up leaderboard: {e}")
-
-try: # Emoji
-    from commands import emoji
-except ImportError as e:
-    print(f"Error importing emoji: {e}")
-except Exception as e:
-    print(f"Error setting up emoji: {e}")
-
-try: # Roles
-    from commands import roles
-except ImportError as e:
-    print(f"Error importing roles: {e}")
-except Exception as e:
-    print(f"Error setting up roles: {e}")
-    
-try: # Update
-    from commands import update
-    update.setup(bot)
-except ImportError as e:
-    print(f"Error importing update: {e}")
-except Exception as e:
-    print(f"Error settings up update: {e}")
-    
-try: # Restart
-    from commands import restart
-    restart.setup(bot)
-except ImportError as e:
-    print(f"Error importing restart: {e}")
-except Exception as e:
-    print(f"Error settings up restart: {e}")
+for module_name in modules:
+    try:
+        mod = importlib.import_module(f'commands.{module_name}')
+        globals()[module_name] = mod
+        if hasattr(mod, 'setup'):
+            mod.setup(bot)
+        print(f"Successfully imported and set up {module_name}")
+    except ImportError as e:
+        print(f"Error importing {module_name}: {e}")
+    except Exception as e:
+        print(f"Error setting up {module_name}: {e}")
 
 last_used_responses = {"uwu": None, "owo": None}
 

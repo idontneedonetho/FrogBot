@@ -3,7 +3,6 @@
 import discord
 import sqlite3
 import asyncio
-print('Roles.py loaded')
 
 async def check_user_points(bot):
     role_thresholds = {

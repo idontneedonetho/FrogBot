@@ -2,7 +2,6 @@
 
 from discord.ext import commands
 import subprocess
-print('Update.py loaded')
 
 def is_admin_or_user(user_id=126123710435295232):
     async def predicate(ctx):

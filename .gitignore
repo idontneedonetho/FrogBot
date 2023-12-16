@@ -8,3 +8,4 @@ prompt.bat
 testbot.py
 user_points.db
 restart.flag
+bot_started.flag

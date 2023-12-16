@@ -4,7 +4,6 @@ from discord.ext import commands
 import subprocess
 import sys
 import asyncio
-print('Restart.py loaded')
 
 RESTART_FLAG_FILE = 'restart.flag'
 

@@ -1,7 +1,6 @@
 # commands/help.py
 
 from discord.ext import commands
-print('Help.py loaded')
 
 async def advanced_help(ctx):
     # Create the help function here

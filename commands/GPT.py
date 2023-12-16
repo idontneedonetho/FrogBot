@@ -4,7 +4,6 @@ import openai
 import os
 import asyncio
 from discord.ext import commands
-print('GPT.py loaded')
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
