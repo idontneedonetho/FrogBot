@@ -5,6 +5,7 @@ from discord.ext import commands
 from .roles import check_user_points
 from .leaderboard import update_leaderboard
 import random
+import datetime
 import sqlite3
 import time
 import asyncio
@@ -96,6 +97,31 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: commands.cl
     else:
         await ctx.send("Invalid syntax. Please use '@bot remove <points> points @user'.")
 
+role_thresholds = {
+    1000: 1178750004869996574,
+    2500: 1178751163462586368,
+    5000: 1178751322506416138,
+    10000: 1178751607509364828,
+    25000: 1178751819434963044,
+    50000: 1178751897855856790,
+    100000: 1178751985760079995,
+    250000: 1178752169894223983,
+    500000: 1178752236717883534,
+    1000000: 1178752300592922634
+}
+
+def get_next_threshold(points, thresholds):
+    for threshold in sorted(thresholds.keys()):
+        if points < threshold:
+            return threshold
+    return max(thresholds.keys())
+
+def create_progress_bar(current, total, length=10):
+    if total == 0:
+        total = 1
+    progress = int((current / total) * length)
+    return '█' * progress + '░' * (length - progress)
+
 @commands.command(name="check")
 async def check_or_rank_command(ctx, *args):
     if args and args[0].lower() == 'points':
@@ -119,20 +145,43 @@ async def check_or_rank_command(ctx, *args):
         start_index = max(0, min(user_rank - 2, len(sorted_users) - 5))
         end_index = min(len(sorted_users), start_index + 5)
 
-        random_color = discord.Color.from_rgb(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        if not ctx.guild:
+            await ctx.send("This command can only be used in a guild.")
+            return
 
-        embed = discord.Embed(title="__Leaderboard__", color=random_color)
+        role_id_to_name = {role.id: role.name for role in ctx.guild.roles}
+
+        embed = discord.Embed(
+            title="🏆 Leaderboard",
+            description="Here's how everyone is ranking up!",
+            color=discord.Color.gold()
+        )
+
         for index in range(start_index, end_index):
             user_id, points = sorted_users[index]
-            display_name = f"User ID {user_id}"
 
-            rank_emoji = "🏆" if index < 3 else ""
-            rank_text = f"{rank_emoji} #{index + 1} {display_name}: {points} points"
+            try:
+                member = await ctx.guild.fetch_member(user_id)
+                display_name = member.display_name
+            except Exception:
+                display_name = f"User ID {user_id}"
+
+            next_role_id = next((threshold_role_id for threshold, threshold_role_id in sorted(role_thresholds.items()) if points < threshold), None)
+            next_rank_name = role_id_to_name.get(next_role_id, "next rank")
+
+            points_needed = get_next_threshold(points, role_thresholds) - points
+            progress_bar = create_progress_bar(points, get_next_threshold(points, role_thresholds))
+
+            rank_emoji = "🌟" if index < 3 else "⭐"
             if user_id == user.id:
-                rank_text = f"***{rank_text}***"
+                rank_text = f"{rank_emoji} ***__#{index + 1} {display_name}: {points} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+            else:
+                rank_text = f"{rank_emoji} #{index + 1} {display_name}: {points} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
 
             embed.add_field(name="\u200b", value=rank_text, inline=False)
 
+        embed.set_footer(text=f"Leaderboard as of {datetime.datetime.now().strftime('%Y-%m-%d')}")
         await ctx.send(embed=embed)
+
     else:
         await ctx.send("Invalid syntax. Please use '@bot check points [@user]'.")
