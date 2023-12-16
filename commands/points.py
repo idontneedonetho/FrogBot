@@ -64,8 +64,8 @@ def setup(bot):
     bot.add_command(check_or_rank_command) 
 
 async def send_points_message(ctx, user, points_change, current_points):
-    await ctx.send(f"{points_change} points {'added' if points_change >= 0 else 'removed'} from {user.mention}. "
-                   f"They now have {current_points} points.")
+    action = "added to" if points_change >= 0 else "removed from"
+    await ctx.reply(f"{abs(points_change)} points {action} {user.mention}. They now have {current_points} points.")
 
 @commands.command(name="add")
 @is_admin()
