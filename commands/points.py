@@ -124,14 +124,10 @@ async def check_or_rank_command(ctx, *args):
         embed = discord.Embed(title="__Leaderboard__", color=random_color)
         for index in range(start_index, end_index):
             user_id, points = sorted_users[index]
-            try:
-                member = await ctx.guild.fetch_member(user_id)
-                display_name = member.display_name
-            except:
-                display_name = f"User ID {user_id}"
+            display_name = f"User ID {user_id}"
 
-            # Format with rank next to the username
-            rank_text = f"#{index + 1} {display_name}: {points} points"
+            rank_emoji = "🏆" if index < 3 else ""
+            rank_text = f"{rank_emoji} #{index + 1} {display_name}: {points} points"
             if user_id == user.id:
                 rank_text = f"***{rank_text}***"
 
