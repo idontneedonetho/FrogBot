@@ -1,6 +1,6 @@
 # bot.py
 
-frog_version = "v2 beta 3"
+frog_version = "v2 beta 4"
 import discord
 import asyncio
 from discord.ext import commands, tasks
@@ -182,17 +182,24 @@ async def on_message(message):
 
                     max_length = 2000
                     if len(response) > max_length:
-                        parts = [response[i:i + max_length] for i in range(0, len(response), max_length)]
+                        parts = []
+                        while len(response) > max_length:
+                            split_index = response.rfind(' ', 0, max_length)
+                            if split_index == -1:
+                                split_index = max_length
+                            parts.append(response[:split_index])
+                            response = response[split_index:].strip()
+                        parts.append(response)
                         for part in parts:
                             try:
                                 await message.reply(part)
-                            except HTTPException:
+                            except discord.HTTPException:
                                 await message.channel.send(part)
                             await asyncio.sleep(1)
                     else:
                         try:
                             await message.reply(response)
-                        except HTTPException:
+                        except discord.HTTPException:
                             await message.channel.send(response)
             return
 
