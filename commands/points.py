@@ -63,9 +63,24 @@ def setup(bot):
     bot.add_command(remove_points_command)
     bot.add_command(check_or_rank_command) 
 
-async def send_points_message(ctx, user, points_change, current_points):
-    action = "added to" if points_change >= 0 else "removed from"
-    await ctx.reply(f"{abs(points_change)} points {action} {user.mention}. They now have {current_points} points.")
+def create_points_embed(user, current_points, role_thresholds, action):
+    title = "Points Added 🡅" if action == "add" else "Points Removed 🡇"
+    next_role_id = next((threshold_role_id for threshold, threshold_role_id in sorted(role_thresholds.items()) if current_points < threshold), None)
+    next_rank_name = "Max Rank" if next_role_id is None else "Next Rank"
+    points_needed = get_next_threshold(current_points, role_thresholds) - current_points
+    progress_bar = create_progress_bar(current_points, get_next_threshold(current_points, role_thresholds))
+
+    embed = discord.Embed(
+        title=title,
+        description=f"Here's the current standing of {user.display_name}.",
+        color=discord.Color.green()
+    )
+
+    rank_emoji = "🌟"
+    rank_text = f"{rank_emoji} **{user.display_name}: {current_points} points**\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+    embed.add_field(name="\u200b", value=rank_text, inline=False)
+
+    return embed
 
 @commands.command(name="add")
 @is_admin()
@@ -78,7 +93,8 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
         new_points = current_points + points_to_add
 
         await update_points(user_id, new_points, ctx.bot)
-        await send_points_message(ctx, user, points_to_add, new_points)
+        new_embed = create_points_embed(user, new_points, role_thresholds, action="add")
+        await ctx.send(embed=new_embed)
     else:
         await ctx.send("Invalid syntax. Please use '@bot add <points> points @user'.")
 
@@ -93,7 +109,8 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: commands.cl
         new_points = current_points - points_to_remove
 
         await update_points(user_id, new_points, ctx.bot)
-        await send_points_message(ctx, user, -points_to_remove, new_points)
+        new_embed = create_points_embed(user, new_points, role_thresholds, action="remove")
+        await ctx.send(embed=new_embed)
     else:
         await ctx.send("Invalid syntax. Please use '@bot remove <points> points @user'.")
 
