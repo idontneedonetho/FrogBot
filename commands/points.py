@@ -64,7 +64,7 @@ def setup(bot):
     bot.add_command(check_or_rank_command) 
 
 def create_points_embed(user, current_points, role_thresholds, action):
-    title = "Points Added 🡅" if action == "add" else "Points Removed 🡇"
+    title = "Points Added ⬆️" if action == "add" else "Points Removed ⬇️"
     next_role_id = next((threshold_role_id for threshold, threshold_role_id in sorted(role_thresholds.items()) if current_points < threshold), None)
     next_rank_name = "Max Rank" if next_role_id is None else "Next Rank"
     points_needed = get_next_threshold(current_points, role_thresholds) - current_points
@@ -169,8 +169,8 @@ async def check_or_rank_command(ctx, *args):
         role_id_to_name = {role.id: role.name for role in ctx.guild.roles}
 
         embed = discord.Embed(
-            title="🏆 Leaderboard",
-            description="Here's how everyone is ranking up!",
+            title="Your Progress Snapshot 🌟",
+            description="Here's your current points, rank, and other info.",
             color=discord.Color.gold()
         )
 
