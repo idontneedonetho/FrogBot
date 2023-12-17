@@ -169,8 +169,8 @@ async def check_or_rank_command(ctx, *args):
         role_id_to_name = {role.id: role.name for role in ctx.guild.roles}
 
         embed = discord.Embed(
-            title="Your Progress Snapshot 🌟",
-            description="Here's your current points, rank, and other info.",
+            title="**🏆 Your Current Standing**",
+            description="Here's your current points, rank, etc.",
             color=discord.Color.gold()
         )
 
@@ -189,7 +189,14 @@ async def check_or_rank_command(ctx, *args):
             points_needed = get_next_threshold(points, role_thresholds) - points
             progress_bar = create_progress_bar(points, get_next_threshold(points, role_thresholds))
 
-            rank_emoji = "🌟" if index < 3 else "⭐"
+            if index == 0:
+                rank_emoji = "🥇"
+            elif index == 1:
+                rank_emoji = "🥈"
+            elif index == 2:
+                rank_emoji = "🥉"
+            else:
+                rank_emoji = "⭐"
             if user_id == user.id:
                 rank_text = f"{rank_emoji} ***__#{index + 1} {display_name}: {points} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
             else:
