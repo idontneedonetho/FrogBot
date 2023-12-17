@@ -45,7 +45,7 @@ def initialize_points_database(bot, user):
 async def update_points(user_id, points, bot):
     db_access_with_retry('UPDATE user_points SET points = ? WHERE user_id = ?', points, user_id)
     await check_user_points(bot)
-    await update_leaderboard(bot)
+    #await update_leaderboard(bot)
 
 def get_user_points(user_id, user_points):
     return user_points.get(user_id, 0)
@@ -94,9 +94,9 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
 
         await update_points(user_id, new_points, ctx.bot)
         new_embed = create_points_embed(user, new_points, role_thresholds, action="add")
-        await ctx.send(embed=new_embed)
+        await ctx.reply(embed=new_embed)
     else:
-        await ctx.send("Invalid syntax. Please use '@bot add <points> points @user'.")
+        await ctx.reply("Invalid syntax. Please use '@bot add <points> points @user'.")
 
 @commands.command(name="remove")
 @is_admin()
@@ -110,9 +110,9 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: commands.cl
 
         await update_points(user_id, new_points, ctx.bot)
         new_embed = create_points_embed(user, new_points, role_thresholds, action="remove")
-        await ctx.send(embed=new_embed)
+        await ctx.reply(embed=new_embed)
     else:
-        await ctx.send("Invalid syntax. Please use '@bot remove <points> points @user'.")
+        await ctx.reply("Invalid syntax. Please use '@bot remove <points> points @user'.")
 
 role_thresholds = {
     1000: 1178750004869996574,
