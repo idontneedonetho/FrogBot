@@ -6,6 +6,7 @@ import sys
 import asyncio
 import os
 
+WATCHDOG_PID_FILE = '../watchdog.pid'
 RESTART_FLAG_FILE = 'restart.flag'
 
 def is_admin_or_user(user_id=126123710435295232):
