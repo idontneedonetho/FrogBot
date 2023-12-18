@@ -189,25 +189,20 @@ async def check_or_rank_command(ctx, *args):
             points_needed = get_next_threshold(points, role_thresholds) - points
             progress_bar = create_progress_bar(points, get_next_threshold(points, role_thresholds))
 
-            if index == 0:
-                rank_emoji = "🥇"
-            elif index == 1:
-                rank_emoji = "🥈"
-            elif index == 2:
-                rank_emoji = "🥉"
-            elif index == 3:
-                rank_emoji = "🏅"  # Emoji for rank 4
-            elif index == 4:
-                rank_emoji = "🎖"  # Emoji for rank 5
-            elif index == 5:
-                rank_emoji = "🏵"  # Emoji for rank 6
+            rank_text = ""
+            if index < 3:
+                rank_emoji = ["🥇", "🥈", "🥉"][index]
+                if user_id == user.id:
+                    rank_text = f"{rank_emoji} | ***__{display_name}: {points} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                else:
+                    rank_text = f"{rank_emoji} | {display_name}: {points} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
             else:
                 rank_emoji = "⭐"
-            if user_id == user.id:
-                rank_text = f"{rank_emoji} ***__#{index + 1} {display_name}: {points} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
-            else:
-                rank_text = f"{rank_emoji} #{index + 1} {display_name}: {points} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
-            
+                if user_id == user.id:
+                    rank_text = f"{rank_emoji} ***__#{index + 1} | {display_name}: {points} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                else:
+                    rank_text = f"{rank_emoji} #{index + 1} | {display_name}: {points} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+        
             embed.add_field(name="\u200b", value=rank_text, inline=False)
             
         embed.set_footer(text=f"Leaderboard as of {datetime.datetime.now().strftime('%Y-%m-%d')}")
