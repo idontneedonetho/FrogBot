@@ -5,6 +5,7 @@ import sys
 import time
 import subprocess
 import signal
+import atexit
 
 WATCHDOG_PID_FILE = 'watchdog.pid'
 RESTART_FLAG_FILE = 'restart.flag'
