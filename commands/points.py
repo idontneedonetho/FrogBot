@@ -193,14 +193,14 @@ async def check_or_rank_command(ctx, *args):
             if index < 3:
                 rank_emoji = ["🥇", "🥈", "🥉"][index]
                 if user_id == user.id:
-                    rank_text = f"{rank_emoji} | ***__{display_name}: {points:,} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                    rank_text = f"{rank_emoji} | ***__{display_name}: {points:,} points__***\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
                 else:
-                    rank_text = f"{rank_emoji} | {display_name}: {points:,} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                    rank_text = f"{rank_emoji} | {display_name}: {points:,} points\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
             else:
                 if user_id == user.id:
-                    rank_text = f"***__#{index + 1} | {display_name}: {points:,} points__***\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                    rank_text = f"***__#{index + 1} | {display_name}: {points:,} points__***\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
                 else:
-                    rank_text = f"#{index + 1} | {display_name}: {points:,} points\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
+                    rank_text = f"#{index + 1} | {display_name}: {points:,} points\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
         
             embed.add_field(name="\u200b", value=rank_text, inline=False)
             
