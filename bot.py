@@ -3,6 +3,8 @@
 frog_version = "v2 beta 4"
 import discord
 import asyncio
+import subprocess
+import sys
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 import importlib
@@ -213,6 +215,8 @@ async def on_command_error(ctx, error):
         print(f"An error occurred: {error}")
 
 try:
-    bot.run(TOKEN)
+    if __name__ == "__main__":
+        subprocess.Popen([sys.executable, 'commands/watchdog.py'])
+        bot.run(TOKEN)
 except Exception as e:
     print(f"An error occurred: {e}")
