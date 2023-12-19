@@ -1,25 +1,25 @@
 # commands/GPT.py
 
-import openai
-import os
+import google.generativeai as genai
 import asyncio
-from discord.ext import commands
+import os
+from dotenv import load_dotenv
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Set your API key from an environment variable or a secure location
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+
+# Initialize the Google AI client with your API key
+genai.configure(api_key=GOOGLE_API_KEY)
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         try:
-            messages_payload = input_messages
-            if not input_messages:
-                messages_payload = [{"role": "system", "content": "You are a helpful assistant."},
-                                    {"role": "user", "content": " "}]
-
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=messages_payload
-            )
-            return response.choices[0].message['content']
+            # Assuming you can start a chat and send messages in a similar way to OpenAI
+            combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+            model = genai.GenerativeModel("gemini-pro")
+            chat = model.start_chat()
+            response = chat.send_message(combined_messages)
+            return response.text
         except Exception as e:
             print(f"Error in ask_gpt (attempt {attempt + 1}): {e}")
             if attempt < retry_attempts - 1:
