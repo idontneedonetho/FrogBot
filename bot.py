@@ -181,10 +181,13 @@ async def on_message(message):
                     
                     async with gpt_semaphore:
                         response = await GPT.ask_gpt(combined_messages)
-
+    
+                    response = response.replace("FrogBot:", "").strip()
+    
                     max_length = 2000
                     if len(response) > max_length:
                         parts = []
+                        last_reply = None
                         while len(response) > max_length:
                             split_index = response.rfind(' ', 0, max_length)
                             if split_index == -1:
@@ -192,9 +195,10 @@ async def on_message(message):
                             parts.append(response[:split_index])
                             response = response[split_index:].strip()
                         parts.append(response)
+    
                         for part in parts:
                             try:
-                                await message.reply(part)
+                                last_reply = await (last_reply.reply(part) if last_reply else message.reply(part))
                             except discord.HTTPException:
                                 await message.channel.send(part)
                             await asyncio.sleep(1)
@@ -204,9 +208,8 @@ async def on_message(message):
                         except discord.HTTPException:
                             await message.channel.send(response)
             return
-
     await bot.process_commands(message)
-
+    
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
