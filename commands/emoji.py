@@ -46,24 +46,30 @@ async def process_reaction(bot, payload, user_points):
     conn.commit()
     conn.close()
 
-    print(f"Points added: {points_to_add} for {message.author.name} ({message.author.id})")
-    new_reaction_message = f'{message.author.mention}{emoji_messages.get(emoji_name, "").format(points=points_to_add)}'
-
-    # Check if the bot has already replied to this message
+    def capitalize_sentences(message):
+        sentences = message.split('!')
+        if len(sentences) > 1:
+            sentences[1] = sentences[1].strip().lower()
+        capitalized_sentences = [sentences[0].strip().capitalize()]
+        if len(sentences) > 1:
+            capitalized_sentences.append(sentences[1])
+        return ', '.join(capitalized_sentences) + '!'
+    reaction_reason = emoji_messages.get(emoji_name, "").split(' for ')[1]
+    
     bot_reply_info = bot_replies.get(message.id)
     if bot_reply_info:
         bot_reply_id = bot_reply_info['reply_id']
         try:
             bot_reply_message = await channel.fetch_message(bot_reply_id)
-            # Append the new reaction message to the existing content
-            new_reply_content = bot_reply_info['content'] + "\nAnd " + new_reaction_message
-            await bot_reply_message.edit(content=new_reply_content)
-            bot_replies[message.id]['content'] = new_reply_content  # Update stored content
+            total_points = bot_reply_info['total_points'] + points_to_add
+            reasons = bot_reply_info['reasons'] + [reaction_reason]
+            formatted_reasons = ' and '.join(reasons)
+            combined_message = capitalize_sentences(f"@{message.author.display_name} has been awarded {total_points} points for {formatted_reasons}")
+            await bot_reply_message.edit(content=combined_message)
+            bot_replies[message.id] = {'reply_id': bot_reply_id, 'total_points': total_points, 'reasons': reasons}
         except discord.NotFound:
-            # If the reply message was not found, reset the entry
             bot_replies[message.id] = None
-
+    
     if not bot_replies.get(message.id):
-        # Send a new reply and store the reply message ID and content
-        bot_reply_message = await message.reply(new_reaction_message)
-        bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'content': new_reaction_message}
+        bot_reply_message = await message.reply(f"@{message.author.display_name} has been awarded {points_to_add} points for {reaction_reason}")
+        bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': points_to_add, 'reasons': [reaction_reason]}
