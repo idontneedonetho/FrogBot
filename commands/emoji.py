@@ -71,5 +71,5 @@ async def process_reaction(bot, payload, user_points):
             bot_replies[message.id] = None
     
     if not bot_replies.get(message.id):
-        bot_reply_message = await message.reply(f"@{message.author.display_name} has been awarded {points_to_add} points for {reaction_reason}")
+        bot_reply_message = await message.reply(f"@{message.author.mention} has been awarded {points_to_add} points for {reaction_reason}")
         bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': points_to_add, 'reasons': [reaction_reason]}
