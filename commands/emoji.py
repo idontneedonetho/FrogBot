@@ -64,12 +64,12 @@ async def process_reaction(bot, payload, user_points):
             total_points = bot_reply_info['total_points'] + points_to_add
             reasons = bot_reply_info['reasons'] + [reaction_reason]
             formatted_reasons = ' and '.join(reasons)
-            combined_message = capitalize_sentences(f"@{message.author.display_name} has been awarded {total_points} points for {formatted_reasons}")
+            combined_message = capitalize_sentences(f"{message.author.mention} has been awarded {total_points} points for {formatted_reasons}")
             await bot_reply_message.edit(content=combined_message)
             bot_replies[message.id] = {'reply_id': bot_reply_id, 'total_points': total_points, 'reasons': reasons}
         except discord.NotFound:
             bot_replies[message.id] = None
     
     if not bot_replies.get(message.id):
-        bot_reply_message = await message.reply(f"@{message.author.mention} has been awarded {points_to_add} points for {reaction_reason}")
+        bot_reply_message = await message.reply(f"{message.author.mention} has been awarded {points_to_add} points for {reaction_reason}")
         bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': points_to_add, 'reasons': [reaction_reason]}
