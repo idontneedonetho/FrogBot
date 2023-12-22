@@ -62,30 +62,46 @@ def setup(bot):
     bot.add_command(add_points_command)
     bot.add_command(remove_points_command)
     bot.add_command(check_or_rank_command) 
+    
+def calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds):
+    user_points = initialize_points_database(ctx.bot, user)
+    sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
+    user_rank = next((index for index, (u_id, _) in enumerate(sorted_users) if u_id == user.id), -1)
+    next_threshold = get_next_threshold(user_points[user.id], role_thresholds)
+    next_role_id = next((role_id for threshold, role_id in sorted(role_thresholds.items()) if user_points[user.id] < threshold), None)
 
-def create_points_embed(user, current_points, role_thresholds, action):
+    if next_role_id is not None:
+        next_rank_role = ctx.guild.get_role(next_role_id)
+        next_rank_name = next_rank_role.name if next_rank_role else "Next Rank"
+    else:
+        next_rank_name = "Max Rank"
+
+    return user_rank, next_rank_name
+    
+def create_points_embed(user, current_points, role_thresholds, action, user_rank, next_rank_name):
     title = "Points Added ⬆️" if action == "add" else "Points Removed ⬇️"
-    next_role_id = next((threshold_role_id for threshold, threshold_role_id in sorted(role_thresholds.items()) if current_points < threshold), None)
-    next_rank_name = "Max Rank" if next_role_id is None else "Next Rank"
     points_needed = get_next_threshold(current_points, role_thresholds) - current_points
     progress_bar = create_progress_bar(current_points, get_next_threshold(current_points, role_thresholds))
+
+    rank_emojis = ["🥇", "🥈", "🥉"]
+    rank_emoji = rank_emojis[user_rank] if user_rank < 3 else f"#{user_rank + 1}"
+    rank_text = f"**__{rank_emoji} | {user.display_name}: {current_points:,} points__**\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
 
     embed = discord.Embed(
         title=title,
         description=f"Here's the current standing of {user.display_name}.",
         color=discord.Color.green()
     )
-
-    rank_emoji = "🌟"
-    rank_text = f"{rank_emoji} **{user.display_name}: {current_points} points**\nProgress: {progress_bar} ({points_needed} pts to {next_rank_name})"
     embed.add_field(name="\u200b", value=rank_text, inline=False)
+    embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d')}")
 
     return embed
-
+        
 @commands.command(name="add")
 @is_admin()
 async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_content, user: discord.User):
     if keyword.lower() == "points":
+        action = "add"
         user_points = initialize_points_database(ctx.bot, user)
 
         user_id = user.id
@@ -93,7 +109,8 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
         new_points = current_points + points_to_add
 
         await update_points(user_id, new_points, ctx.bot)
-        new_embed = create_points_embed(user, new_points, role_thresholds, action="add")
+        user_rank, next_rank_name = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
         await ctx.reply("Invalid syntax. Please use '@bot add <points> points @user'.")
@@ -102,6 +119,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
 @is_admin()
 async def remove_points_command(ctx, points_to_remove: int, keyword: commands.clean_content, user: discord.User):
     if keyword.lower() == "points":
+        action = "remove"
         user_points = initialize_points_database(ctx.bot, user)
 
         user_id = user.id
@@ -109,7 +127,8 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: commands.cl
         new_points = current_points - points_to_remove
 
         await update_points(user_id, new_points, ctx.bot)
-        new_embed = create_points_embed(user, new_points, role_thresholds, action="remove")
+        user_rank, next_rank_name = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
         await ctx.reply("Invalid syntax. Please use '@bot remove <points> points @user'.")

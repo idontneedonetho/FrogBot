@@ -4,6 +4,8 @@ import discord
 import sqlite3
 import asyncio
 
+CHANNEL_ID = 1178764276157141093
+
 async def check_user_points(bot):
     role_thresholds = {
         1000: 1178750004869996574,
@@ -36,26 +38,40 @@ async def check_user_points(bot):
     if not guild.chunked:
         await guild.chunk(cache=True)
 
+    notification_channel = guild.get_channel(CHANNEL_ID)
+    if notification_channel is None:
+        print("Notification channel not found. Make sure the channel ID is correct.")
+        return
+    
     for user_id, points in cursor.execute('SELECT user_id, points FROM user_points'):
         member = guild.get_member(user_id)
         if member is None:
             continue
-
+    
         appropriate_role = None
         for threshold, role_id in sorted(role_thresholds.items(), reverse=True):
             if points >= threshold:
                 appropriate_role = guild.get_role(role_id)
                 break
-
+    
         if appropriate_role and appropriate_role not in member.roles:
             try:
+                highest_existing_role = max(member.roles, key=lambda r: r.position, default=None)
+                is_upgrade = highest_existing_role is None or appropriate_role.position > highest_existing_role.position
+    
                 roles_to_add = [appropriate_role]
                 roles_to_remove = [role for role in member.roles if role.id in role_thresholds.values() and role != appropriate_role]
-                await member.add_roles(*roles_to_add, reason="Updating roles based on points")
-                await member.remove_roles(*roles_to_remove, reason="Removing outdated roles based on points")
+                
+                if roles_to_add or roles_to_remove:
+                    await member.add_roles(*roles_to_add, reason="Updating roles based on points")
+                    await member.remove_roles(*roles_to_remove, reason="Removing outdated roles based on points")
+    
+                    if is_upgrade:
+                        await notification_channel.send(f"Congratulations! {member.mention} has been granted the following role: {appropriate_role.name}!")
+    
             except discord.Forbidden:
                 print(f"Bot doesn't have permission to manage roles for {member}")
             except discord.HTTPException as e:
                 print(f"HTTP request failed: {e}")
-
+    
     connection.close()
