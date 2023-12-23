@@ -14,13 +14,13 @@ async def process_reaction(bot, payload, user_points):
         "❤️": 100
     }
 
-    emoji_messages = {
-        "🐞": " has been awarded {points} points for their bug report!",
-        "📜": " has been awarded {points} points for including an error log in their bug report!",
-        "📹": " has been awarded {points} points for including footage in their bug report!",
-        "💡": " has been awarded {points} points for their feature request!",
-        "🧠": " has been awarded {points} points for their well-thought-out feature request!",
-        "❤️": " has been awarded {points} points for being a good frog!"
+    emoji_responses = {
+        "🐞": "their bug report",
+        "📜": "an error log",
+        "📹": "footage",
+        "💡": "a feature request",
+        "🧠": "a well-thought-out feature request",
+        "❤️": "being a good frog"
     }
 
     emoji_name = str(payload.emoji)
@@ -46,30 +46,33 @@ async def process_reaction(bot, payload, user_points):
     conn.commit()
     conn.close()
 
-    def capitalize_sentences(message):
-        sentences = message.split('!')
-        if len(sentences) > 1:
-            sentences[1] = sentences[1].strip().lower()
-        capitalized_sentences = [sentences[0].strip().capitalize()]
-        if len(sentences) > 1:
-            capitalized_sentences.append(sentences[1])
-        return ', '.join(capitalized_sentences) + '!'
-    reaction_reason = emoji_messages.get(emoji_name, "").split(' for ')[1]
-    
-    bot_reply_info = bot_replies.get(message.id)
-    if bot_reply_info:
-        bot_reply_id = bot_reply_info['reply_id']
+    bot_reply_info = bot_replies.get(message.id, {'reply_id': None, 'total_points': 0, 'reasons': []})
+    if emoji_responses[emoji_name] not in bot_reply_info['reasons']:
+        bot_reply_info['reasons'].append(emoji_responses[emoji_name])
+
+    active_responses = bot_reply_info['reasons']
+    if bot_reply_info['reply_id']:
         try:
-            bot_reply_message = await channel.fetch_message(bot_reply_id)
+            bot_reply_message = await channel.fetch_message(bot_reply_info['reply_id'])
             total_points = bot_reply_info['total_points'] + points_to_add
-            reasons = bot_reply_info['reasons'] + [reaction_reason]
-            formatted_reasons = ' and '.join(reasons)
-            combined_message = capitalize_sentences(f"{message.author.mention} has been awarded {total_points} points for {formatted_reasons}")
+            response_parts = []
+            for reason in active_responses:
+                if reason == active_responses[-1]:  # Last reason
+                    response_parts.append(f"{reason}!")
+                else:
+                    response_parts.append(f"{reason},")
+            combined_reasons = " and ".join(response_parts)
+            combined_message = f"{message.author.mention} has been awarded {total_points} points for {combined_reasons}"
             await bot_reply_message.edit(content=combined_message)
-            bot_replies[message.id] = {'reply_id': bot_reply_id, 'total_points': total_points, 'reasons': reasons}
+            bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': total_points, 'reasons': active_responses}
         except discord.NotFound:
             bot_replies[message.id] = None
-    
-    if not bot_replies.get(message.id):
-        bot_reply_message = await message.reply(f"{message.author.mention} has been awarded {points_to_add} points for {reaction_reason}")
-        bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': points_to_add, 'reasons': [reaction_reason]}
+    else:
+        if active_responses:
+            response_parts = [f"{active_responses[0]}!"]
+        else:
+            response_parts = [""]
+        combined_reasons = " and ".join(response_parts)
+        bot_reply_message = await message.reply(f"{message.author.mention} has been awarded {points_to_add} points for {combined_reasons}")
+        bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': points_to_add, 'reasons': active_responses}
+
