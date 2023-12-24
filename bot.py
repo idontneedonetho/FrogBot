@@ -1,11 +1,15 @@
 # bot.py
 
-frog_version = "v2 beta 6"
+frog_version = "v2 dev 1"
 import discord
 import asyncio
 import subprocess
 import sys
-from discord.ext import commands, tasks
+import re
+import tempfile
+import aiohttp
+from urllib.parse import urlparse
+from discord.ext import commands
 from dotenv import load_dotenv
 import importlib
 from datetime import datetime, timedelta
@@ -22,6 +26,7 @@ from commands import uwu, owo
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+IMAGE_API_KEY = os.getenv('IMAGE_API_KEY')
 
 if TOKEN is None:
     raise ValueError("Bot token not found in .env file. Please add it.")
@@ -136,12 +141,48 @@ async def fetch_reply_chain(message, max_tokens=4096):
 
     return context[::-1]
 
+async def download_image(image_url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(image_url) as response:
+            if response.status == 200:
+                # Create a temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                    temp_file.write(await response.read())
+                    return temp_file.name
+            else:
+                return None
+
+async def upload_to_freeimagehost(temp_file_path):
+    url = 'https://freeimage.host/api/1/upload'
+    api_key = os.getenv('IMAGE_API_KEY')
+
+    data = aiohttp.FormData()
+    data.add_field('key', api_key)
+
+    # Open the temporary file and add it to the FormData
+    with open(temp_file_path, 'rb') as temp_file:
+        data.add_field('source', temp_file, filename=os.path.basename(temp_file_path), content_type='image/jpeg')
+        data.add_field('format', 'json')
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if result['status_code'] == 200:
+                        return result['image']['url']
+                    else:
+                        print(f"FreeImageHost API Error: {result['error']['message']}")
+                        return None
+                else:
+                    error_details = await response.text()
+                    print(f"Failed to upload to FreeImageHost. Status: {response.status}, Details: {error_details}")
+                    return None
+
 @bot.event
 async def on_message(message):
     content = None
     if message.author == bot.user:
         return
-
     content_lower = message.content.lower()
     if content_lower == '🐸':
         await message.channel.send(":frog:")
@@ -156,8 +197,58 @@ async def on_message(message):
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
     else:
-        if bot.user.mentioned_in(message):
-            content = message.content.replace(bot.user.mention, '').strip()
+        content = None
+        is_image = False
+        image_url = None
+
+        # Check for uploaded images on Discord
+        if message.attachments:
+            attachment = message.attachments[0]
+            temp_file_path = await download_image(attachment.url)
+            if temp_file_path:
+                async with message.channel.typing():
+                    imagehost_url = await upload_to_freeimagehost(temp_file_path)
+                    if imagehost_url:
+                        try:
+                            response = await GPT.ask_gpt([{"role": "user", "content": imagehost_url}], is_image=True)
+                            await message.reply(response)
+                        except Exception as e:
+                            await message.reply(f"An error occurred: {e}")
+                    else:
+                        await message.reply("Failed to upload image to ImageHost.")
+                    os.remove(temp_file_path)
+            else:
+                await message.reply("Failed to download image.")
+            return
+
+        # Check for linked images if no uploaded image
+        if not is_image:
+            urls = re.findall(r'(https?://\S+)', message.content)
+            if urls:
+                potential_image_url = urls[0]
+                parsed_url = urlparse(potential_image_url)
+                if any(ext in parsed_url.path for ext in ['.jpeg', '.jpg', '.png']):
+                    is_image = True
+                    image_url = potential_image_url
+                    print("Linked Image URL:", image_url)
+
+        # Process image if detected
+        if is_image and image_url:
+            async with message.channel.typing():
+                try:
+                    response = await GPT.ask_gpt([{"role": "user", "content": image_url}], is_image=True)
+                    await message.reply(response)
+                except Exception as e:
+                    await message.reply(f"An error occurred: {e}")
+            return
+
+        # Process non-image content
+        if not is_image:
+            if bot.user.mentioned_in(message):
+                user_message = message.content.replace(bot.user.mention, '').strip()
+                if user_message:
+                    content = user_message
+
         if content:
             ctx = await bot.get_context(message)
             if ctx.valid:
@@ -178,12 +269,12 @@ async def on_message(message):
                 async with message.channel.typing():
                     context = await fetch_reply_chain(message, max_tokens=4096)
                     combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
-                    
+
                     async with gpt_semaphore:
-                        response = await GPT.ask_gpt(combined_messages)
-    
+                        response = await GPT.ask_gpt(combined_messages, is_image=is_image)
+
                     response = response.replace("FrogBot:", "").strip()
-    
+
                     max_length = 2000
                     if len(response) > max_length:
                         parts = []
@@ -195,7 +286,7 @@ async def on_message(message):
                             parts.append(response[:split_index])
                             response = response[split_index:].strip()
                         parts.append(response)
-    
+
                         for part in parts:
                             try:
                                 last_reply = await (last_reply.reply(part) if last_reply else message.reply(part))
