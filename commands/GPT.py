@@ -19,7 +19,7 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
 
-def load_image_from_url(image_url: str) -> PIL.Image.Image:
+async def load_image_from_url(image_url: str) -> PIL.Image.Image:
     with urllib.request.urlopen(image_url) as response:
         image_data = response.read()
     image = PIL.Image.open(io.BytesIO(image_data))
@@ -33,7 +33,7 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
             if not image_url.endswith(('.jpeg', '.jpg', '.png')):
                 return "Invalid image format. Only JPEG and PNG are supported."
             # Download the image
-            image = load_image_from_url(image_url)
+            image = await load_image_from_url(image_url)
             # Check if the image is successfully downloaded
             if image is None:
                 return "Failed to download the image."
