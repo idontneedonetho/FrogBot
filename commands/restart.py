@@ -21,7 +21,7 @@ def is_admin_or_user(user_id=126123710435295232):
 @is_admin_or_user()
 async def restart_bot(ctx):
     try:
-        await ctx.send("Restarting bot, this may take up to 15 seconds...")
+        await ctx.send("Restarting bot, this may take up to a minute...")
         with open(RESTART_FLAG_FILE, 'w') as file:
             file.write('restarting')
         await ctx.bot.close()
