@@ -1,6 +1,5 @@
 # bot.py
 
-frog_version = "v2 dev"
 import discord
 import asyncio
 import subprocess
@@ -64,6 +63,15 @@ for module_name in modules:
         print(f"Error setting up {module_name}: {e}")
 
 last_used_responses = {"uwu": None, "owo": None}
+
+def get_git_version():
+    try:
+        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()[:7]
+        return f"v2 {branch} {commit}"
+    except subprocess.CalledProcessError:
+        return "v2 unknown-version"
+frog_version = get_git_version()
 
 @bot.event
 async def on_ready():
