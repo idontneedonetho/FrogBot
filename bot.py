@@ -77,17 +77,14 @@ frog_version = get_git_version()
 async def on_ready():
     print(f"Ready {bot.user.name}")
     await roles.check_user_points(bot)
-    
     if os.path.exists(RESTART_FLAG_FILE):
         channel = bot.get_channel(1178764276157141093)
-        
         if channel is not None:
             await channel.send("Bot is back online after restart.")
             os.remove(RESTART_FLAG_FILE)
         else:
             print("Channel not found. Make sure the channel ID is correct.")
-
-    await bot.change_presence(activity=discord.Game(name=f"version {frog_version}"))
+    await bot.change_presence(activity=discord.Game(name=f"{frog_version}"))
 
 @bot.event
 async def on_raw_reaction_add(payload):
