@@ -13,7 +13,7 @@ def is_admin_or_user(user_id=126123710435295232):
 
 @commands.command(name="update")
 @is_admin_or_user()
-async def git_pull(ctx, branch="testing"):
+async def git_pull(ctx, branch="beta"):
     print('update command invoked')
 
     try:
