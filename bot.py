@@ -1,6 +1,6 @@
 # bot.py
 
-frog_version = "v2 dev 1"
+frog_version = "v2 beta 7"
 import discord
 import asyncio
 import subprocess
