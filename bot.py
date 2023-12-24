@@ -198,7 +198,7 @@ async def on_message(message):
         await message.channel.send(':eyes:')
     else:
         if bot.user.mentioned_in(message):
-            content = None
+            content = message.content.replace(bot.user.mention, '').strip()
             is_image = False
             image_url = None
     
