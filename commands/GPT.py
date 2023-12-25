@@ -1,3 +1,5 @@
+# commands/GPT.py
+
 import google.generativeai as genai
 import openai
 from PIL import Image
@@ -43,42 +45,42 @@ async def process_image_with_google_api(temp_file_path):
     return response.text
 
 async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
-    try:
-        if is_image:
-            image_url = input_messages[0]['content']
-            if not re.search(r'\.(jpeg|jpg|png)', image_url.lower()):
-                print("Invalid image format detected.")
-                return "Invalid image format. Only JPEG and PNG are supported."
+    for attempt in range(retry_attempts):
+        try:
+            if is_image:
+                image_url = input_messages[0]['content']
+                if not re.search(r'\.(jpeg|jpg|png)', image_url.lower()):
+                    print("Invalid image format detected.")
+                    return "Invalid image format. Only JPEG and PNG are supported."
 
-            temp_file_path = await download_image(image_url)
-            if temp_file_path is None:
-                return "Failed to download the image."
+                temp_file_path = await download_image(image_url)
+                if temp_file_path is None:
+                    return "Failed to download the image."
 
-            response_text = await process_image_with_google_api(temp_file_path)
-            os.remove(temp_file_path)
-            print("Temporary file deleted after processing.")
-            return response_text
-        else:
-            combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
-            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
-            chat = model.start_chat()
-            print(f"Sending text to Google AI: {combined_messages}")
-            response = chat.send_message(combined_messages)
-            return response.text
+                response_text = await process_image_with_google_api(temp_file_path)
+                os.remove(temp_file_path)
+                print("Temporary file deleted after processing.")
+                return response_text
+            else:
+                combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+                model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
+                chat = model.start_chat()
+                print(f"Sending text to Google AI: {combined_messages}")
+                response = chat.send_message(combined_messages)
+                return response.text
 
-    except Exception as e:
-        print(f"Error in ask_gpt with Google AI: {e}")
-        if retry_attempts > 0:
-            await asyncio.sleep(delay)
-            return await ask_gpt(input_messages, is_image, retry_attempts - 1, delay)
-        else:
-            try:
-                print("Fallback to OpenAI due to Google AI failure.")
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": combined_messages}]
-                )
-                return response.choices[0].message['content']
-            except Exception as e:
-                print(f"Error in ask_gpt with OpenAI: {e}")
-                return "I'm sorry, I couldn't process that due to an error in both services."
+        except Exception as e:
+            print(f"Error in ask_gpt with Google AI: {e}")
+            if attempt < retry_attempts - 1:
+                await asyncio.sleep(delay)
+            else:
+                try:
+                    print("Fallback to OpenAI due to Google AI failure.")
+                    response = openai.ChatCompletion.create(
+                        model="gpt-3.5-turbo",
+                        messages=[{"role": "user", "content": combined_messages}]
+                    )
+                    return response.choices[0].message['content']
+                except Exception as e:
+                    print(f"Error in ask_gpt with OpenAI: {e}")
+    return "I'm sorry, I couldn't process that due to an error in both services."
