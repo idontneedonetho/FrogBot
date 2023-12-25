@@ -5,9 +5,6 @@ import asyncio
 import subprocess
 import sys
 import re
-import tempfile
-import aiohttp
-from urllib.parse import urlparse
 from discord.ext import commands
 from dotenv import load_dotenv
 import importlib
@@ -173,15 +170,28 @@ async def on_message(message):
                     return
                 user_request_times[message.author.id] = current_time
 
-                is_image = False
-                image_url = None
-                # Check for uploaded images or linked images
-                if message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content):
-                    is_image = True
-                    image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
                 async with message.channel.typing():
-                    try:
-                        response = await GPT.ask_gpt([{"role": "user", "content": image_url or content}], is_image=is_image)
+                    context = await fetch_reply_chain(message, max_tokens=4096)
+
+                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
+                    if is_image:
+                        image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
+                        uid = await GPT.download_image(image_url)
+                        if uid:
+                            content_for_gpt = f"Image UID: {uid}"
+                        else:
+                            print("Failed to download or save the image.")
+                            content_for_gpt = content
+                    else:
+                        content_for_gpt = content
+
+                    combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
+
+                    async with gpt_semaphore:
+                        response = await GPT.ask_gpt(combined_messages, is_image=is_image)
+
+                        bot_name = bot.user.name
+                        response = response.replace(bot_name + ":", "").strip()
                         max_length = 2000
                         if len(response) > max_length:
                             parts = []
@@ -198,8 +208,6 @@ async def on_message(message):
                                 await asyncio.sleep(1)
                         else:
                             await message.reply(response)
-                    except Exception as e:
-                        await message.reply(f"An error occurred: {e}")
             return
     await bot.process_commands(message)
     
