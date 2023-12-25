@@ -2,6 +2,7 @@
 
 import google.generativeai as genai
 import openai
+import re
 from PIL import Image
 from pathlib import Path
 import asyncio
@@ -54,10 +55,12 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
             if is_image:
                 uid_found = False
                 for msg in input_messages:
-                    if msg['content'].startswith("Image UID:"):
-                        uid = msg['content'].split("Image UID:")[1].strip()
-                        uid_found = True
-                        break
+                    if "> Image UID:" in msg['content']:
+                        uid_match = re.search(r'> Image UID: (\S+)', msg['content'])
+                        if uid_match:
+                            uid = uid_match.group(1)
+                            uid_found = True
+                            break
 
                 if uid_found:
                     image_path = Path('./images') / f'{uid}.jpg'
