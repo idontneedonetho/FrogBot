@@ -112,7 +112,7 @@ def count_tokens(text):
 
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
-    uids = []  # List to store found UIDs
+    uids = []
     tokens_used = 0
 
     current_prompt_tokens = len(message.content) // 4
