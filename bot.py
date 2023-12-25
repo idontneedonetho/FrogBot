@@ -173,15 +173,19 @@ async def on_message(message):
                     return
                 user_request_times[message.author.id] = current_time
 
-                is_image = False
-                image_url = None
-                # Check for uploaded images or linked images
-                if message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content):
-                    is_image = True
-                    image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
                 async with message.channel.typing():
-                    try:
-                        response = await GPT.ask_gpt([{"role": "user", "content": image_url or content}], is_image=is_image)
+                    context = await fetch_reply_chain(message, max_tokens=4096)
+
+                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
+                    image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group() if is_image else None
+
+                    combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": image_url if is_image else content}]
+
+                    async with gpt_semaphore:
+                        response = await GPT.ask_gpt(combined_messages, is_image=is_image)
+
+                        bot_name = bot.user.name
+                        response = response.replace(bot_name + ":", "").strip()
                         max_length = 2000
                         if len(response) > max_length:
                             parts = []
@@ -198,8 +202,6 @@ async def on_message(message):
                                 await asyncio.sleep(1)
                         else:
                             await message.reply(response)
-                    except Exception as e:
-                        await message.reply(f"An error occurred: {e}")
             return
     await bot.process_commands(message)
     
