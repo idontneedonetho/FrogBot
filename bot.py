@@ -177,11 +177,8 @@ async def on_message(message):
         await message.channel.send('<:coolfrog:1168605051779031060>')
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
-    else:
-        content = message.content.strip()
-        if bot.user.mentioned_in(message):
-            content = content.replace(bot.user.mention, '').strip()
-
+    elif bot.user.mentioned_in(message):
+        content = message.content.replace(bot.user.mention, '').strip()
         if content:
             ctx = await bot.get_context(message)
             if ctx.valid:
@@ -225,7 +222,8 @@ async def on_message(message):
                             response = response.replace(bot.user.name + ":", "").strip()
                             await send_long_message(message, response)
             return
-    await bot.process_commands(message)
+    else:
+        await bot.process_commands(message)
     
 @bot.event
 async def on_command_error(ctx, error):
