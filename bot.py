@@ -7,6 +7,7 @@ import sys
 import re
 import tempfile
 import aiohttp
+from urllib.parse import urlparse
 from discord.ext import commands
 from dotenv import load_dotenv
 import importlib
@@ -154,37 +155,53 @@ async def on_message(message):
         await message.channel.send('<:coolfrog:1168605051779031060>')
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
-    elif bot.user.mentioned_in(message):
-        content = message.content.replace(bot.user.mention, '').strip()
-        is_image = False
-        image_url = None
-        # Check for uploaded images or linked images
-        if message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content):
-            is_image = True
-            image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
-        async with message.channel.typing():
-            try:
-                response = await GPT.ask_gpt([{"role": "user", "content": image_url or content}], is_image=is_image)
-                max_length = 2000
-                if len(response) > max_length:
-                    parts = []
-                    while len(response) > max_length:
-                        split_index = response.rfind('\n', 0, max_length)
-                        if split_index == -1:
-                            split_index = max_length
-                        parts.append(response[:split_index])
-                        response = response[split_index:].strip()
-                    parts.append(response)
-                    last_message = None
-                    for part in parts:
-                        last_message = await (last_message.reply(part) if last_message else message.reply(part))
-                        await asyncio.sleep(1)
-                else:
-                    await message.reply(response)
-            except Exception as e:
-                await message.reply(f"An error occurred: {e}")
     else:
-        await bot.process_commands(message)
+        if bot.user.mentioned_in(message):
+            content = message.content.replace(bot.user.mention, '').strip()
+        if content:
+            ctx = await bot.get_context(message)
+            if ctx.valid:
+                await bot.process_commands(message)
+            else:
+                current_time = datetime.now()
+                last_request_time = user_request_times.get(message.author.id)
+                if last_request_time and current_time - last_request_time < RATE_LIMIT:
+                    try:
+                        await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
+                    except (HTTPException, NotFound):
+                        await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
+                    return
+                user_request_times[message.author.id] = current_time
+
+                is_image = False
+                image_url = None
+                # Check for uploaded images or linked images
+                if message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content):
+                    is_image = True
+                    image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
+                async with message.channel.typing():
+                    try:
+                        response = await GPT.ask_gpt([{"role": "user", "content": image_url or content}], is_image=is_image)
+                        max_length = 2000
+                        if len(response) > max_length:
+                            parts = []
+                            while len(response) > max_length:
+                                split_index = response.rfind('\n', 0, max_length)
+                                if split_index == -1:
+                                    split_index = max_length
+                                parts.append(response[:split_index])
+                                response = response[split_index:].strip()
+                            parts.append(response)
+                            last_message = None
+                            for part in parts:
+                                last_message = await (last_message.reply(part) if last_message else message.reply(part))
+                                await asyncio.sleep(1)
+                        else:
+                            await message.reply(response)
+                    except Exception as e:
+                        await message.reply(f"An error occurred: {e}")
+            return
+    await bot.process_commands(message)
     
 @bot.event
 async def on_command_error(ctx, error):
