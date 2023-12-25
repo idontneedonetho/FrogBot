@@ -112,6 +112,7 @@ def count_tokens(text):
 
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
+    uids = []  # List to store found UIDs
     tokens_used = 0
 
     current_prompt_tokens = len(message.content) // 4
@@ -123,6 +124,11 @@ async def fetch_reply_chain(message, max_tokens=4096):
             message_content = f"{message.author.display_name}: {message.content}"
             message_tokens = len(message_content) // 4
 
+            # Detect and store UIDs
+            uid_match = re.search(r'> Image UID: (\S+)', message_content)
+            if uid_match:
+                uids.append(uid_match.group(1))
+
             if tokens_used + message_tokens <= max_tokens:
                 context.append(message_content)
                 tokens_used += message_tokens
@@ -132,7 +138,26 @@ async def fetch_reply_chain(message, max_tokens=4096):
             print(f"Error fetching reply chain message: {e}")
             break
 
-    return context[::-1]
+    return context[::-1], uids
+
+
+async def send_long_message(message, response):
+    max_length = 2000
+    if len(response) > max_length:
+        parts = []
+        while len(response) > max_length:
+            split_index = response.rfind('\n', 0, max_length)
+            if split_index == -1:
+                split_index = max_length
+            parts.append(response[:split_index])
+            response = response[split_index:].strip()
+        parts.append(response)
+        last_message = None
+        for part in parts:
+            last_message = await (last_message.reply(part) if last_message else message.reply(part))
+            await asyncio.sleep(1)
+    else:
+        await message.reply(response)
 
 @bot.event
 async def on_message(message):
@@ -153,8 +178,10 @@ async def on_message(message):
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
     else:
+        content = message.content.strip()
         if bot.user.mentioned_in(message):
-            content = message.content.replace(bot.user.mention, '').strip()
+            content = content.replace(bot.user.mention, '').strip()
+
         if content:
             ctx = await bot.get_context(message)
             if ctx.valid:
@@ -165,49 +192,38 @@ async def on_message(message):
                 if last_request_time and current_time - last_request_time < RATE_LIMIT:
                     try:
                         await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
-                    except (HTTPException, NotFound):
+                    except discord.HTTPException:
                         await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
                     return
                 user_request_times[message.author.id] = current_time
 
                 async with message.channel.typing():
-                    context = await fetch_reply_chain(message, max_tokens=4096)
+                    context, uids = await fetch_reply_chain(message, max_tokens=4096)
 
                     is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
                     if is_image:
                         image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
                         uid = await GPT.download_image(image_url)
                         if uid:
-                            content_for_gpt = f"Image UID: {uid}"
+                            # Reply with Image UID and capture the reply message
+                            uid_reply = await message.reply(f"> Image UID: {uid}")
+                            
+                            # Process and Reply with Image Analysis as a reply to the UID message
+                            content_for_gpt = content + f"\n> Image UID: {uid}"
+                            combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
+                            async with gpt_semaphore:
+                                response = await GPT.ask_gpt(combined_messages, is_image=True)
+                                response = response.replace(bot.user.name + ":", "").strip()
+                                await send_long_message(uid_reply, response)
                         else:
                             print("Failed to download or save the image.")
-                            content_for_gpt = content
                     else:
                         content_for_gpt = content
-
-                    combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
-
-                    async with gpt_semaphore:
-                        response = await GPT.ask_gpt(combined_messages, is_image=is_image)
-
-                        bot_name = bot.user.name
-                        response = response.replace(bot_name + ":", "").strip()
-                        max_length = 2000
-                        if len(response) > max_length:
-                            parts = []
-                            while len(response) > max_length:
-                                split_index = response.rfind('\n', 0, max_length)
-                                if split_index == -1:
-                                    split_index = max_length
-                                parts.append(response[:split_index])
-                                response = response[split_index:].strip()
-                            parts.append(response)
-                            last_message = None
-                            for part in parts:
-                                last_message = await (last_message.reply(part) if last_message else message.reply(part))
-                                await asyncio.sleep(1)
-                        else:
-                            await message.reply(response)
+                        combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
+                        async with gpt_semaphore:
+                            response = await GPT.ask_gpt(combined_messages, is_image=False)
+                            response = response.replace(bot.user.name + ":", "").strip()
+                            await send_long_message(message, response)
             return
     await bot.process_commands(message)
     
