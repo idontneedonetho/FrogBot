@@ -7,7 +7,6 @@ import sys
 import re
 import tempfile
 import aiohttp
-from urllib.parse import urlparse
 from discord.ext import commands
 from dotenv import load_dotenv
 import importlib
@@ -39,16 +38,7 @@ intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
-modules = [
-    "GPT", 
-    "help", 
-    "points", 
-    "leaderboard", 
-    "emoji", 
-    "roles", 
-    "update", 
-    "restart"
-]
+modules = ["GPT", "help", "points", "leaderboard", "emoji", "roles", "update", "restart"]
 
 for module_name in modules:
     try:
@@ -146,43 +136,6 @@ async def fetch_reply_chain(message, max_tokens=4096):
 
     return context[::-1]
 
-async def download_image(image_url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(image_url) as response:
-            if response.status == 200:
-                # Create a temporary file
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-                    temp_file.write(await response.read())
-                    return temp_file.name
-            else:
-                return None
-
-async def upload_to_freeimagehost(temp_file_path):
-    url = 'https://freeimage.host/api/1/upload'
-    api_key = os.getenv('IMAGE_API_KEY')
-
-    data = aiohttp.FormData()
-    data.add_field('key', api_key)
-
-    # Open the temporary file and add it to the FormData
-    with open(temp_file_path, 'rb') as temp_file:
-        data.add_field('source', temp_file, filename=os.path.basename(temp_file_path), content_type='image/jpeg')
-        data.add_field('format', 'json')
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result['status_code'] == 200:
-                        return result['image']['url']
-                    else:
-                        print(f"FreeImageHost API Error: {result['error']['message']}")
-                        return None
-                else:
-                    error_details = await response.text()
-                    print(f"Failed to upload to FreeImageHost. Status: {response.status}, Details: {error_details}")
-                    return None
-
 @bot.event
 async def on_message(message):
     content = None
@@ -201,110 +154,36 @@ async def on_message(message):
         await message.channel.send('<:coolfrog:1168605051779031060>')
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
+    elif bot.user.mentioned_in(message):
+        content = message.content.replace(bot.user.mention, '').strip()
+        is_image = False
+        image_url = None
+        # Check for uploaded images or linked images
+        if message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content):
+            is_image = True
+            image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
+        async with message.channel.typing():
+            try:
+                response = await GPT.ask_gpt([{"role": "user", "content": image_url or content}], is_image=is_image)
+                max_length = 2000
+                if len(response) > max_length:
+                    parts = []
+                    while len(response) > max_length:
+                        split_index = response.rfind('\n', 0, max_length)
+                        if split_index == -1:
+                            split_index = max_length
+                        parts.append(response[:split_index])
+                        response = response[split_index:].strip()
+                    parts.append(response)
+                    last_message = None
+                    for part in parts:
+                        last_message = await (last_message.reply(part) if last_message else message.reply(part))
+                        await asyncio.sleep(1)
+                else:
+                    await message.reply(response)
+            except Exception as e:
+                await message.reply(f"An error occurred: {e}")
     else:
-        if bot.user.mentioned_in(message):
-            content = message.content.replace(bot.user.mention, '').strip()
-            is_image = False
-            image_url = None
-    
-            # Check for uploaded images on Discord
-            if message.attachments:
-                attachment = message.attachments[0]
-                temp_file_path = await download_image(attachment.url)
-                if temp_file_path:
-                    async with message.channel.typing():
-                        imagehost_url = await upload_to_freeimagehost(temp_file_path)
-                        if imagehost_url:
-                            try:
-                                response = await GPT.ask_gpt([{"role": "user", "content": imagehost_url}], is_image=True)
-                                await message.reply(response)
-                            except Exception as e:
-                                await message.reply(f"An error occurred: {e}")
-                        else:
-                            await message.reply("Failed to upload image to ImageHost.")
-                        os.remove(temp_file_path)
-                else:
-                    await message.reply("Failed to download image.")
-                return
-    
-            # Check for linked images if no uploaded image
-            if not is_image:
-                urls = re.findall(r'(https?://\S+)', message.content)
-                if urls:
-                    potential_image_url = urls[0]
-                    parsed_url = urlparse(potential_image_url)
-                    if any(ext in parsed_url.path for ext in ['.jpeg', '.jpg', '.png']):
-                        is_image = True
-                        image_url = potential_image_url
-                        print("Linked Image URL:", image_url)
-    
-            # Process image if detected
-            if is_image and image_url:
-                async with message.channel.typing():
-                    try:
-                        response = await GPT.ask_gpt([{"role": "user", "content": image_url}], is_image=True)
-                        await message.reply(response)
-                    except Exception as e:
-                        await message.reply(f"An error occurred: {e}")
-                return
-    
-            # Process non-image content
-            if not is_image:
-                if bot.user.mentioned_in(message):
-                    user_message = message.content.replace(bot.user.mention, '').strip()
-                    if user_message:
-                        content = user_message
-    
-            if content:
-                ctx = await bot.get_context(message)
-                if ctx.valid:
-                    await bot.process_commands(message)
-                else:
-                    current_time = datetime.now()
-                    last_request_time = user_request_times.get(message.author.id)
-    
-                    if last_request_time and current_time - last_request_time < RATE_LIMIT:
-                        try:
-                            await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
-                        except (HTTPException, NotFound):
-                            await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
-                        return
-    
-                    user_request_times[message.author.id] = current_time
-    
-                    async with message.channel.typing():
-                        context = await fetch_reply_chain(message, max_tokens=4096)
-                        combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content}]
-    
-                        async with gpt_semaphore:
-                            response = await GPT.ask_gpt(combined_messages, is_image=is_image)
-    
-                        response = response.replace("FrogBot:", "").strip()
-    
-                        max_length = 2000
-                        if len(response) > max_length:
-                            parts = []
-                            last_reply = None
-                            while len(response) > max_length:
-                                split_index = response.rfind(' ', 0, max_length)
-                                if split_index == -1:
-                                    split_index = max_length
-                                parts.append(response[:split_index])
-                                response = response[split_index:].strip()
-                            parts.append(response)
-    
-                            for part in parts:
-                                try:
-                                    last_reply = await (last_reply.reply(part) if last_reply else message.reply(part))
-                                except discord.HTTPException:
-                                    await message.channel.send(part)
-                                await asyncio.sleep(1)
-                        else:
-                            try:
-                                await message.reply(response)
-                            except discord.HTTPException:
-                                await message.channel.send(response)
-                return
         await bot.process_commands(message)
     
 @bot.event
