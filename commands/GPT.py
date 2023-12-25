@@ -1,5 +1,3 @@
-# commands/GPT.py
-
 import google.generativeai as genai
 import openai
 from PIL import Image
@@ -40,7 +38,7 @@ async def download_image(image_url):
 async def process_image_with_google_api(temp_file_path):
     print(f"Processing image with Google API: {temp_file_path}")
     image = Image.open(temp_file_path)
-    model = genai.GenerativeModel(model_name="gemini-pro-vision", generation_config={"temperature": 0.6, "top_p": 0.8, "top_k": 23}, safety_settings=safety_settings)
+    model = genai.GenerativeModel(model_name="gemini-pro-vision", safety_settings=safety_settings)
     response = model.generate_content([image])
     return response.text
 
@@ -62,7 +60,7 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
             return response_text
         else:
             combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
-            model = genai.GenerativeModel(model_name="gemini-pro", generation_config={"temperature": 0.6, "top_p": 0.8, "top_k": 23}, safety_settings=safety_settings)
+            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
             chat = model.start_chat()
             print(f"Sending text to Google AI: {combined_messages}")
             response = chat.send_message(combined_messages)
