@@ -194,20 +194,20 @@ async def on_message(message):
                     return
                 user_request_times[message.author.id] = current_time
     
-                            async with message.channel.typing():
-        context, uids = await fetch_reply_chain(message, max_tokens=4096)
-
-        is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
-        if is_image:
-            image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
-            uid = await GPT.download_image(image_url)
-            if uid:
-                content_for_gpt = content + f"\n> Image UID: {uid}"
+        async with message.channel.typing():
+            context, uids = await fetch_reply_chain(message, max_tokens=4096)
+    
+            is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
+            if is_image:
+                image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
+                uid = await GPT.download_image(image_url)
+                if uid:
+                    content_for_gpt = content + f"\n> Image UID: {uid}"
+                else:
+                    print("Failed to download or save the image.")
+                    content_for_gpt = content
             else:
-                print("Failed to download or save the image.")
                 content_for_gpt = content
-        else:
-            content_for_gpt = content
 
         combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
         async with gpt_semaphore:
