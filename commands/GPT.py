@@ -50,6 +50,7 @@ async def process_image_with_google_api(temp_file_path):
     return response.text
 
 async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
+    combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
     for attempt in range(retry_attempts):
         try:
             if is_image:
@@ -60,35 +61,36 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
                         uid = uid_match.group(1)
                         break
 
-                if uid_found:
+                if uid:
                     image_path = Path('./images') / f'{uid}.jpg'
                     if not image_path.exists():
                         print(f"Image not found at path: {image_path}")
                         return "Image not found."
-                    response_text = await process_image_with_google_api(Path('./images') / f'{uid}.jpg')
+                    response_text = await process_image_with_google_api(image_path)
+                    print("Image processing completed.")
                     return response_text + f"\n> Image UID: {uid}"
                 else:
+                    print("No valid UID found in the message.")
                     return "No valid UID found."
-            else:
-                combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
-                model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
-                chat = model.start_chat()
-                print(f"Sending text to Google AI: {combined_messages}")
-                response = chat.send_message(combined_messages)
-                return response.text
+
+            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
+            chat = model.start_chat()
+            print(f"Sending text to Google AI: {combined_messages}")
+            response = chat.send_message(combined_messages)
+            return response.text
 
         except Exception as e:
             print(f"Error in ask_gpt with Google AI: {e}")
             if attempt < retry_attempts - 1:
                 await asyncio.sleep(delay)
-            else:
-                try:
-                    print("Fallback to OpenAI due to Google AI failure.")
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[{"role": "user", "content": combined_messages}]
-                    )
-                    return response.choices[0].message['content']
-                except Exception as e:
-                    print(f"Error in ask_gpt with OpenAI: {e}")
+                continue
+            try:
+                print("Fallback to OpenAI due to Google AI failure.")
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": combined_messages}]
+                )
+                return response.choices[0].message['content']
+            except Exception as e:
+                print(f"Error in ask_gpt with OpenAI: {e}")
     return "I'm sorry, I couldn't process that due to an error in both services."
