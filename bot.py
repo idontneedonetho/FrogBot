@@ -196,22 +196,20 @@ async def on_message(message):
 
                 async with message.channel.typing():
                     context, uids = await fetch_reply_chain(message, max_tokens=4096)
-
+            
                     is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
                     if is_image:
                         image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
                         uid = await GPT.download_image(image_url)
                         if uid:
-                            # Reply with Image UID and capture the reply message
-                            uid_reply = await message.reply(f"> Image UID: {uid}")
-                            
-                            # Process and Reply with Image Analysis as a reply to the UID message
-                            content_for_gpt = content + f"\n> Image UID: {uid}"
+                            content_for_gpt = content
                             combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
                             async with gpt_semaphore:
                                 response = await GPT.ask_gpt(combined_messages, is_image=True)
                                 response = response.replace(bot.user.name + ":", "").strip()
-                                await send_long_message(uid_reply, response)
+            
+                                response_with_uid = response + f"\n> Image UID: {uid}"
+                                await send_long_message(message, response_with_uid)
                         else:
                             print("Failed to download or save the image.")
                     else:
