@@ -53,25 +53,21 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         try:
             if is_image:
-                uid_found = False
+                uid = None
                 for msg in input_messages:
-                    if "> Image UID:" in msg['content']:
-                        uid_match = re.search(r'> Image UID: (\S+)', msg['content'])
-                        if uid_match:
-                            uid = uid_match.group(1)
-                            uid_found = True
-                            break
+                    uid_match = re.search(r'> Image UID: (\S+)', msg['content'])
+                    if uid_match:
+                        uid = uid_match.group(1)
+                        break
 
                 if uid_found:
                     image_path = Path('./images') / f'{uid}.jpg'
                     if not image_path.exists():
                         print(f"Image not found at path: {image_path}")
                         return "Image not found."
-                    response_text = await process_image_with_google_api(image_path)
-                    print("Image processing completed.")
-                    return response_text
+                    response_text = await process_image_with_google_api(Path('./images') / f'{uid}.jpg')
+                    return response_text + f"\n> Image UID: {uid}"
                 else:
-                    print("No valid UID found in the message.")
                     return "No valid UID found."
             else:
                 combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
