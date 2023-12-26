@@ -18,12 +18,12 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
 
-safety_settings = {
-    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-    "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
-}
+# safety_settings = {
+#     "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+#     "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+#     "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+#     "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
+# }
 
 async def download_image(image_url):
     print(f"Downloading image from URL: {image_url}")
