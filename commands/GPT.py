@@ -45,7 +45,7 @@ async def download_image(image_url):
 async def process_image_with_google_api(temp_file_path):
     print(f"Processing image with Google API: {temp_file_path}")
     image = Image.open(temp_file_path)
-    model = genai.GenerativeModel(model_name="gemini-pro-vision", safety_settings=safety_settings)
+    model = genai.GenerativeModel(model_name="gemini-pro-vision")
     response = model.generate_content([image])
     return response.text
 
@@ -73,7 +73,7 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
                     print("No valid UID found in the message.")
                     return "No valid UID found."
 
-            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
+            model = genai.GenerativeModel(model_name="gemini-pro")
             chat = model.start_chat()
             print(f"Sending text to Google AI: {combined_messages}")
             response = chat.send_message(combined_messages)
