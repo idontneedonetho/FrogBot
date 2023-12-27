@@ -211,7 +211,7 @@ async def on_message(message):
     
                     combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
                     async with gpt_semaphore:
-                        response = await GPT.ask_gpt(combined_messages, is_image=is_image)
+                        response = await GPT.ask_gpt(combined_messages, is_image=is_image, context_uids=uids)
                         response = response.replace(bot.user.name + ":", "").strip()
                         await send_long_message(message, response)
                 return
