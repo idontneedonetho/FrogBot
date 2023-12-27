@@ -46,6 +46,10 @@ async def download_image(image_url):
 def compress_image(image, max_size):
     img_byte_arr = io.BytesIO()
     quality = 95
+    if image.mode == 'RGBA':
+        background = Image.new('RGB', image.size, (255, 255, 255))
+        background.paste(image, mask=image.split()[3])
+        image = background
     while True:
         img_byte_arr.seek(0)
         image.save(img_byte_arr, format='JPEG', quality=quality)
