@@ -18,13 +18,6 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
 
-# safety_settings = {
-#     "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-#     "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-#     "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-#     "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
-# }
-
 async def download_image(image_url):
     print(f"Downloading image from URL: {image_url}")
     uid = str(uuid.uuid4())
@@ -43,11 +36,12 @@ async def download_image(image_url):
                 return None
 
 async def process_image_with_google_api(temp_file_path):
-    print(f"Processing image with Google API: {temp_file_path}")
-    image = Image.open(temp_file_path)
-    model = genai.GenerativeModel(model_name="gemini-pro-vision")
-    response = model.generate_content([image])
-    return response.text
+    def process_image():
+        print(f"Processing image with Google API: {temp_file_path}")
+        image = Image.open(temp_file_path)
+        model = genai.GenerativeModel(model_name="gemini-pro-vision")
+        return model.generate_content([image]).text
+    return await asyncio.to_thread(process_image)
 
 async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
     combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
