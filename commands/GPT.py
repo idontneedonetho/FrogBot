@@ -9,6 +9,7 @@ import asyncio
 import aiohttp
 import uuid
 import os
+import io
 from dotenv import load_dotenv
 
 load_dotenv()
