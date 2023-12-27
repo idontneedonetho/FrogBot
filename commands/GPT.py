@@ -18,6 +18,11 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
 
+API_PROMPT = ("You're a helpful Discord bot, designed to provide useful and concise "
+              "answers. Remember to limit your responses to 2000 characters or less, "
+              "focusing on delivering clear and relevant information in a friendly and "
+              "engaging manner.")
+
 async def download_image(image_url):
     print(f"Downloading image from URL: {image_url}")
     uid = str(uuid.uuid4())
@@ -28,12 +33,27 @@ async def download_image(image_url):
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as response:
             if response.status == 200:
-                file_path.write_bytes(await response.read())
-                print(f"Image downloaded and saved as: {file_path}")
+                image_data = await response.read()
+                image = Image.open(io.BytesIO(image_data))
+                image = compress_image(image, max_size=4*1024*1024)
+                image.save(file_path, quality=85, optimize=True)
+                print(f"Image downloaded and compressed as: {file_path}")
                 return uid
             else:
                 print(f"Failed to download image. HTTP status: {response.status}")
                 return None
+
+def compress_image(image, max_size):
+    img_byte_arr = io.BytesIO()
+    quality = 95
+    while True:
+        img_byte_arr.seek(0)
+        image.save(img_byte_arr, format='JPEG', quality=quality)
+        if img_byte_arr.tell() <= max_size or quality <= 10:
+            break
+        quality -= 5
+    img_byte_arr.seek(0)
+    return Image.open(img_byte_arr)
 
 async def process_image_with_google_api(temp_file_path):
     def process_image():
@@ -44,7 +64,7 @@ async def process_image_with_google_api(temp_file_path):
     return await asyncio.to_thread(process_image)
 
 async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
-    combined_messages = " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+    combined_messages = API_PROMPT + " " + " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
     for attempt in range(retry_attempts):
         try:
             if is_image:
