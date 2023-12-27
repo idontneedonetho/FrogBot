@@ -30,7 +30,6 @@ async def download_image(image_url):
     images_dir = Path('./images')
     images_dir.mkdir(exist_ok=True)
     file_path = images_dir / f"{uid}.jpg"
-
     async with aiohttp.ClientSession() as session:
         async with session.get(image_url) as response:
             if response.status == 200:
@@ -64,8 +63,15 @@ async def process_image_with_google_api(temp_file_path):
         return model.generate_content([image]).text
     return await asyncio.to_thread(process_image)
 
-async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
+async def ask_gpt(input_messages, is_image=False, context_uids=[], retry_attempts=3, delay=1):
     combined_messages = API_PROMPT + " " + " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+    for uid in context_uids:
+        image_path = Path('./images') / f'{uid}.jpg'
+        if image_path.exists():
+            response_text = await process_image_with_google_api(image_path)
+            combined_messages += " " + response_text
+        else:
+            print(f"Image with UID {uid} not found in context.")
     for attempt in range(retry_attempts):
         try:
             if is_image:
@@ -75,7 +81,6 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
                     if uid_match:
                         uid = uid_match.group(1)
                         break
-
                 if uid:
                     image_path = Path('./images') / f'{uid}.jpg'
                     if not image_path.exists():
@@ -87,13 +92,11 @@ async def ask_gpt(input_messages, is_image=False, retry_attempts=3, delay=1):
                 else:
                     print("No valid UID found in the message.")
                     return "No valid UID found."
-
             model = genai.GenerativeModel(model_name="gemini-pro")
             chat = model.start_chat()
             print(f"Sending text to Google AI: {combined_messages}")
             response = chat.send_message(combined_messages)
             return response.text
-
         except Exception as e:
             print(f"Error in ask_gpt with Google AI: {e}")
             if attempt < retry_attempts - 1:
