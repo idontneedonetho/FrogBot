@@ -36,7 +36,7 @@ intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
-modules = ["GPT", "help", "points", "leaderboard", "emoji", "roles", "update", "restart"]
+modules = ["GPT", "help", "points", "leaderboard", "emoji", "roles", "update", "restart", "search"]
 
 for module_name in modules:
     try:
@@ -193,10 +193,8 @@ async def on_message(message):
                         await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
                     return
                 user_request_times[message.author.id] = current_time
-    
                 async with message.channel.typing():
                     context, uids = await fetch_reply_chain(message, max_tokens=4096)
-    
                     is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
                     if is_image:
                         image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
@@ -208,11 +206,14 @@ async def on_message(message):
                             content_for_gpt = content
                     else:
                         content_for_gpt = content
-    
                     combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
                     async with gpt_semaphore:
                         response = await GPT.ask_gpt(combined_messages, is_image=is_image, context_uids=uids)
                         response = response.replace(bot.user.name + ":", "").strip()
+                        if not search.estimate_confidence(response):
+                            print("Low confidence in response, fetching additional information.")
+                            search_response = await search.handle_query(content)
+                            response = search_response if search_response else response
                         await send_long_message(message, response)
                 return
     else:
