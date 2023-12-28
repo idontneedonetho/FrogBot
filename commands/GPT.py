@@ -63,7 +63,7 @@ async def process_image_with_google_api(temp_file_path):
     return await asyncio.to_thread(process_image)
 
 async def ask_gpt(input_messages, is_image=False, context_uids=[], retry_attempts=3, delay=1):
-    combined_messages = API_PROMPT + " " + " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+    combined_messages = " " + " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
     for uid in context_uids:
         image_path = Path('./images') / f'{uid}.jpg'
         if image_path.exists():
