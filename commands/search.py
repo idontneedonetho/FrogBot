@@ -7,7 +7,6 @@ import requests
 import aiohttp
 from commands import GPT
 
-# Download required NLTK data
 nltk.download('averaged_perceptron_tagger')
 nltk.download('punkt')
 nltk.download('maxent_ne_chunker')
