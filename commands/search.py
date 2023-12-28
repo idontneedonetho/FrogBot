@@ -7,6 +7,7 @@ import requests
 import aiohttp
 from commands import GPT
 
+# Download required NLTK data
 nltk.download('averaged_perceptron_tagger')
 nltk.download('punkt')
 nltk.download('maxent_ne_chunker')
@@ -62,23 +63,27 @@ async def google_custom_search(query):
         print(f"Error during Google Custom Search: {e}")
     return None
 
-async def handle_query(query):
+async def handle_query(query, is_image=False):
     print(f"Handling query: {query}")
-    initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
-    
-    if estimate_confidence(initial_response):
-        print("Confident response obtained from GPT.")
-        return initial_response
+    if is_image:
+        print("Received an image. Skipping internet search.")
+        return "Image processing is not supported for internet search queries."
     else:
-        print("Fetching additional information for the query.")
-        search_url = await google_custom_search(query)
-        
-        if search_url:
-            content = fetch_content_with_trafilatura(search_url)
-            if content:
-                return f"Here's what I found about '{query}':\n{content}\n\n[Source: {search_url}]"
-            else:
-                return "Error: Unable to fetch or summarize content."
+        initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
+        if estimate_confidence(initial_response):
+            print("Confident response obtained from GPT.")
+            return initial_response
         else:
-            print("No relevant results found for the query.")
-            return "No relevant results found."
+            print("Fetching additional information for the query.")
+            search_results = await google_custom_search(query)
+            if search_results and 'web' in search_results and search_results['web']['results']:
+                first_url = search_results['web']['results'][0].get('url')
+                if first_url:
+                    content = fetch_content_with_trafilatura(first_url)
+                    return f"Here's what I found about '{query}':\n{content}\n\n[Source: {first_url}]"
+                else:
+                    print("No URL found in search results.")
+                    return "No relevant results found."
+            else:
+                print("No relevant results found for the query.")
+                return "No relevant results found."
