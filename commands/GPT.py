@@ -19,11 +19,6 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
 
-API_PROMPT = ("You're a helpful Discord bot, designed to provide useful and concise "
-              "answers. Remember to limit your responses to 2000 characters or less, "
-              "focusing on delivering clear and relevant information in a friendly and "
-              "engaging manner.")
-
 async def download_image(image_url):
     print(f"Downloading image from URL: {image_url}")
     uid = str(uuid.uuid4())
