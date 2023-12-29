@@ -7,17 +7,28 @@ import requests
 import aiohttp
 from commands import GPT
 
-nltk.download('averaged_perceptron_tagger')
-nltk.download('punkt')
-nltk.download('maxent_ne_chunker')
-nltk.download('words')
-nltk.download('stopwords')
-
 def setup_nltk():
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('corpora/stopwords')
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger')
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger')
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt')
+    try:
+        nltk.data.find('chunkers/maxent_ne_chunker')
+    except LookupError:
+        nltk.download('maxent_ne_chunker')
+    try:
+        nltk.data.find('corpora/words')
+    except LookupError:
+        nltk.download('words')
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        nltk.download('stopwords')
     print("NLTK setup complete.")
-
 setup_nltk()
 
 def extract_keywords(text):
