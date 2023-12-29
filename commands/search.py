@@ -8,6 +8,7 @@ import trafilatura
 import requests
 import aiohttp
 from commands import GPT
+from googlesearch import search
 
 def setup_nltk():
     try:
@@ -57,38 +58,25 @@ def estimate_confidence(response):
     print(f"Confidence estimated: {'High' if confidence else 'Low'}")
     return confidence
 
-async def google_custom_search(query):
-    print(f"Performing Google Custom Search for query: {query}")
-    api_key = os.getenv("SEARCH_API_KEY")
-    search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
-    url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={search_engine_id}&q={query}"
+def search_google(query):
     try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            search_results = response.json()
-            if 'items' in search_results and search_results['items']:
-                first_url = search_results['items'][0].get('link')
-                print(f"First URL found: {first_url}")
-                return first_url
-        print("Error or no results in Google Custom Search.")
+        results = search(query, num_results=1, advanced=True)
+        for result in results:
+            print(f"First URL found: {result.url}")
+            return result.url
     except Exception as e:
-        print(f"Error during Google Custom Search: {e}")
+        print(f"Error during Google search: {e}")
     return None
 
 async def handle_query(query):
     print(f"Handling query: {query}")
     initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
     if estimate_confidence(initial_response):
-        print("Confident response obtained from GPT.")
         return initial_response
     else:
-        print("Fetching additional information for the query.")
-        search_url = await google_custom_search(query)
+        search_url = search_google(query)
         if search_url:
             content = fetch_content_with_trafilatura(search_url)
-            if content:
-                return f"Here's what I found about '{query}':\n{content}\n\n[Source: {search_url}]"
-            else:
-                return "Error fetching or processing content from the URL."
+            return f"Here's what I found about '{query}':\n{content}\n\n[Source: {search_url}]"
         else:
             return "No relevant results found for the query."
