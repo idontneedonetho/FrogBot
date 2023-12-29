@@ -86,7 +86,7 @@ Contributions to FrogBot are welcome! Follow these steps to contribute:
 5. Submit a pull request to the main repository.
 
 ## 📞 Contact
-For support and questions, join our Discord server: [FrogBot Discord](https://l.linklyhq.com/l/1t3Il)
+For support and questions, join our Discord server: [FrogPilot Discord](https://l.linklyhq.com/l/1t3Il)
 
 ## 🙌 Acknowledgments
 ### Thanks-
