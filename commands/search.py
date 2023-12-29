@@ -60,7 +60,6 @@ async def google_custom_search(query):
     api_key = os.getenv("SEARCH_API_KEY")
     search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
     url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={search_engine_id}&q={query}"
-
     try:
         response = requests.get(url)
         if response.status_code == 200:
@@ -74,27 +73,20 @@ async def google_custom_search(query):
         print(f"Error during Google Custom Search: {e}")
     return None
 
-async def handle_query(query, is_image=False):
+async def handle_query(query):
     print(f"Handling query: {query}")
-    if is_image:
-        print("Received an image. Skipping internet search.")
-        return "Image processing is not supported for internet search queries."
+    initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
+    if estimate_confidence(initial_response):
+        print("Confident response obtained from GPT.")
+        return initial_response
     else:
-        initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
-        if estimate_confidence(initial_response):
-            print("Confident response obtained from GPT.")
-            return initial_response
-        else:
-            print("Fetching additional information for the query.")
-            search_results = await google_custom_search(query)
-            if search_results and 'web' in search_results and search_results['web']['results']:
-                first_url = search_results['web']['results'][0].get('url')
-                if first_url:
-                    content = fetch_content_with_trafilatura(first_url)
-                    return f"Here's what I found about '{query}':\n{content}\n\n[Source: {first_url}]"
-                else:
-                    print("No URL found in search results.")
-                    return "No relevant results found."
+        print("Fetching additional information for the query.")
+        search_url = await google_custom_search(query)
+        if search_url:
+            content = fetch_content_with_trafilatura(search_url)
+            if content:
+                return f"Here's what I found about '{query}':\n{content}\n\n[Source: {search_url}]"
             else:
-                print("No relevant results found for the query.")
-                return "No relevant results found."
+                return "Error fetching or processing content from the URL."
+        else:
+            return "No relevant results found for the query."
