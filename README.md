@@ -9,7 +9,7 @@
 ## Table of Contents
 - [Branches](#branches)
 - [🚀 Current Features](#-current-features)
-- [🛠️ Installation](#-installation)
+- [🛠️ Installation](#%EF%B8%8F-installation)
 - [💬 Usage Examples](#-usage-examples)
 - [🤝 Contributing](#-contributing)
 - [📞 Contact](#-contact)
