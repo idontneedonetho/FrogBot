@@ -1,5 +1,12 @@
 # FrogBot
-This has become a colabrative effor between a few of us to create the best bot we possibly can. The bot is still in a very rough state as it is. Things are constently breaking as it is.
+This has become a colabrative effor between a few of us to create the best bot we possibly can. The bot is still in a very rough state, things are constently breaking as it is.
+
+Branches:
+- Beta: This is the most updated branch and is constently being udpated and breaking.
+- Dev: A go to point for PR's and anything else, it's the more stable of the newer branches. But not immune to breaking.
+- Old: This is the first revision of the bot, there are a few broken things with it, wouldn't recommend using it.
+
+I understand that Dev would normally be the one that's broken more than beta, however, for my work flow, I'd rather have the starting point for most people be "Dev", as it's mostly for PR's and IMO, PR's should be for the most stable branch.
 
 So far features include:
 - Automatic role assignment based on points
