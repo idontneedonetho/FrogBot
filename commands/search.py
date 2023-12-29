@@ -11,6 +11,7 @@ nltk.download('averaged_perceptron_tagger')
 nltk.download('punkt')
 nltk.download('maxent_ne_chunker')
 nltk.download('words')
+nltk.download('stopwords')
 
 def setup_nltk():
     nltk.data.find('tokenizers/punkt')
