@@ -113,4 +113,4 @@ FrogBot relies on the following external libraries and tools to power its functi
 
 These external libraries and tools are essential for enabling FrogBot's features and capabilities. Make sure to review their documentation for further details on usage and functionality.
 
-*Disclaimer this README file was written mostly by ChatGPT 3.5 Turbo.
+*Disclaimer this README file was written mostly by ChatGPT 3.5 Turbo.*
