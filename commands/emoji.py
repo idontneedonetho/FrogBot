@@ -16,7 +16,7 @@ async def process_reaction(bot, payload, user_points):
 
     emoji_responses = {
         "🐞": "their bug report",
-        "📜": "an error log",
+        "📜": "submitting an error log",
         "📹": "footage",
         "💡": "a feature request",
         "🧠": "a well-thought-out feature request",
