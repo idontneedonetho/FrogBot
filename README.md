@@ -38,7 +38,7 @@
 To set up **FrogBot**, follow these steps:
 
 ### Prerequisites
-- [Python](https://www.python.org/downloads/) (3.7+ recommended)
+- [Python](https://www.python.org/downloads/) (3.10+ recommended)
 - [Git](https://git-scm.com/downloads)
 
 ### Clone the Repository
