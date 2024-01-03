@@ -64,7 +64,7 @@ OTHER_CONFIG_KEY=OTHER_CONFIG_VALUE
 ```
 python bot.py
 ```
-Please note that installation instructions may, be wrong as I might have forgotten something, or differ for the **Beta branch**. Check the branch-specific instructions for Beta if you're using that branch.
+*Please note that installation instructions may be wrong as I might have forgotten something, or differ for the **Beta branch**.*
 
 The bot should now be up and running, ready to serve your Discord server! Customize it further to suit your needs.
 
