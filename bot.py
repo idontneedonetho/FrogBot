@@ -177,10 +177,10 @@ async def on_message(message):
                 user_request_times[message.author.id] = current_time
                 async with message.channel.typing():
                     context, uids = await fetch_reply_chain(message, max_tokens=4096)
-                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
+                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content))
                     content_for_gpt_dict = {'content': f"{message.author.display_name}: {content}", 'role': 'user'}
                     if is_image:
-                        image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
+                        image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content).group()
                         uid = await GPT.download_image(image_url)
                         if uid:
                             content_for_gpt_dict['content'] += f"\n> Image UID: {uid}"
