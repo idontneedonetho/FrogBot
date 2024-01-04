@@ -51,7 +51,7 @@ cd FrogBot
 2. Install Python dependencies:
 ```bash
 pip install discord.py discord.ext asyncio aiohttp nltk trafilatura requests
-pip install googlesearch-python python-dotenv google openai pillow
+pip install googlesearch-python python-dotenv google-generativeai googlesearch-python openai pillow
 ```
 ### Configure Your Bot
 3. Create a `.env` file in the root directory of the bot and add your bot token and other configuration details:
