@@ -7,9 +7,6 @@ import asyncio
 from commands import GPT
 from googlesearch import search
 
-nltk.download("punkt")
-nltk.download("stopwords")
-
 def setup_nltk():
     nltk_packages = [
         ('averaged_perceptron_tagger', 'taggers/averaged_perceptron_tagger'),
