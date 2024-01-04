@@ -22,6 +22,13 @@ openai.api_key = OPENAI_API_KEY
 
 last_request_time = 0
 
+safety_settings = {
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+    "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
+}
+
 def rate_limited_request():
     global last_request_time
     current_time = time.time()
@@ -68,7 +75,7 @@ async def process_image_with_google_api(temp_file_path):
     def process_image():
         print(f"Processing image with Google API: {temp_file_path}")
         image = Image.open(temp_file_path)
-        model = genai.GenerativeModel(model_name="gemini-pro-vision")
+        model = genai.GenerativeModel(model_name="gemini-pro-vision", safety_settings=safety_settings)
         return model.generate_content([image]).text
     return await asyncio.to_thread(process_image)
 
@@ -108,7 +115,7 @@ async def ask_gpt(input_messages, is_image=False, context_uids=[], retry_attempt
                 else:
                     print("No valid UID found in the message.")
                     return "No valid UID found."
-            model = genai.GenerativeModel(model_name="gemini-pro")
+            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
             chat = model.start_chat()
             print(f"Sending text to Google AI: {combined_messages}")
             response = chat.send_message(combined_messages)
