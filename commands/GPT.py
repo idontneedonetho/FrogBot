@@ -40,7 +40,7 @@ async def download_image(image_url):
             if response.status == 200:
                 image_data = await response.read()
                 image = Image.open(io.BytesIO(image_data))
-                image = compress_image(image, max_size=4*1024*1024)
+                image = compress_image(image, max_size=1*1024*1024)
                 image.save(file_path, quality=85, optimize=True)
                 print(f"Image downloaded and compressed as: {file_path}")
                 return uid
