@@ -4,26 +4,11 @@ import re
 import nltk
 import trafilatura
 import asyncio
-import spacy
 from commands import GPT
 from googlesearch import search
-from spacy.matcher import PhraseMatcher
 
-nlp = spacy.load("en_core_web_sm")
-
-matcher = PhraseMatcher(nlp.vocab)
-
-fresh_info_keywords = ["latest", "newest", "current", "update", "now", "recent", "today"]
-code_related_keywords = ["code", "programming", "algorithm", "syntax", "code sample"]
-creative_writing_keywords = ["write", "story", "poem", "creative", "imagination"]
-
-fresh_info_patterns = [nlp.make_doc(text) for text in fresh_info_keywords]
-code_related_patterns = [nlp.make_doc(text) for text in code_related_keywords]
-creative_writing_patterns = [nlp.make_doc(text) for text in creative_writing_keywords]
-
-matcher.add("FreshInfo", fresh_info_patterns)
-matcher.add("CodeRelated", code_related_patterns)
-matcher.add("CreativeWriting", creative_writing_patterns)
+nltk.download("punkt")
+nltk.download("stopwords")
 
 def setup_nltk():
     nltk_packages = [
@@ -64,17 +49,20 @@ def estimate_confidence(response):
     return not any(phrase in response for phrase in uncertain_phrases)
 
 def determine_information_type(query):
-    doc = nlp(query.lower())
-    matches = matcher(doc)
-    for match_id, start, end in matches:
-        rule_id = nlp.vocab.strings[match_id]
-        if rule_id == "FreshInfo":
+    fresh_info_keywords = ["latest", "newest", "current", "update", "now", "recent", "today"]
+    code_related_keywords = ["code", "programming", "algorithm", "syntax", "code sample"]
+    creative_writing_keywords = ["write", "story", "poem", "creative", "imagination"]
+    query_lower = query.lower()
+    for keyword in fresh_info_keywords:
+        if keyword in query_lower:
             return "Fresh Information"
-        elif rule_id == "CodeRelated":
+    for keyword in code_related_keywords:
+        if keyword in query_lower:
             return "Code-Related"
-        elif rule_id == "CreativeWriting":
+    for keyword in creative_writing_keywords:
+        if keyword in query_lower:
             return "Creative Writing"
-    if any(ent.label_ in ["DATE", "TIME"] and 'recent' in ent.text.lower() for ent in doc.ents):
+    if any(re.search(r'\b\d{4}\b', query)):
         return "Fresh Information"
     return "General Knowledge"
 
