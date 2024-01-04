@@ -178,21 +178,27 @@ async def on_message(message):
                     return
                 user_request_times[message.author.id] = current_time
                 async with message.channel.typing():
-                    context, uids = await fetch_reply_chain(message, max_tokens=4096)
-                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content))
-                    content_for_gpt_dict = {'content': f"{message.author.display_name}: {content}", 'role': 'user'}
-                    if is_image:
-                        image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content).group()
-                        uid = await GPT.download_image(image_url)
-                        if uid:
-                            content_for_gpt_dict['content'] += f"\n> Image UID: {uid}"
-                    combined_messages = [{'content': msg, 'role': 'user'} for msg in context] + [content_for_gpt_dict]
-                    response = await GPT.ask_gpt(combined_messages, is_image=is_image, context_uids=uids)
-                    response = response.replace(bot.user.name + ":", "").strip()
-                    if not search.estimate_confidence(response):
-                        print("Low confidence in response, fetching additional information.")
+                    info_type = search.determine_information_type(content)
+                    if info_type == "Fresh Information":
+                        print("Fetching additional information for fresh queries.")
                         search_response = await search.handle_query(content)
-                        response = search_response if search_response else response
+                        response = search_response if search_response else "No relevant results found for the query."
+                    else:
+                        context, uids = await fetch_reply_chain(message, max_tokens=4096)
+                        is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content))
+                        content_for_gpt_dict = {'content': f"{message.author.display_name}: {content}", 'role': 'user'}
+                        if is_image:
+                            image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content).group()
+                            uid = await GPT.download_image(image_url)
+                            if uid:
+                                content_for_gpt_dict['content'] += f"\n> Image UID: {uid}"
+                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context] + [content_for_gpt_dict]
+                        response = await GPT.ask_gpt(combined_messages, is_image=is_image, context_uids=uids)
+                        if not search.estimate_confidence(response):
+                            print("Fetching additional information for uncertain queries.")
+                            search_response = await search.handle_query(content)
+                            response = search_response if search_response else response
+                    response = response.replace(bot.user.name + ":", "").strip()
                     await send_long_message(message, response)
     else:
         await bot.process_commands(message)
