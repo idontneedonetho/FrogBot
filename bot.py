@@ -109,7 +109,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            message_content = f"{message.author.display_name}: {message.content}\n"
+            message_content = f"{message.content}\n"
             message_tokens = len(message_content) // 4
             # Detect and store UIDs
             uid_match = re.search(r'> Image UID: (\S+)', message_content)
@@ -186,7 +186,7 @@ async def on_message(message):
                     else:
                         context, uids = await fetch_reply_chain(message, max_tokens=4096)
                         is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content))
-                        content_for_gpt_dict = {'content': f"{message.author.display_name}: {content}", 'role': 'user'}
+                        content_for_gpt_dict = {'content': f"{content}", 'role': 'user'}
                         if is_image:
                             image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content).group()
                             uid = await GPT.download_image(image_url)
