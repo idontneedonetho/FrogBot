@@ -165,7 +165,9 @@ async def on_message(message):
         content = message.content.replace(bot.user.mention, '').strip()
         if content:
             ctx = await bot.get_context(message)
-            if not ctx.valid:
+            if ctx.valid:
+                await bot.process_commands(message)
+            else:
                 current_time = datetime.now()
                 last_request_time = user_request_times.get(message.author.id)
                 if last_request_time and current_time - last_request_time < RATE_LIMIT:
