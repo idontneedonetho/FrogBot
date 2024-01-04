@@ -10,6 +10,7 @@ import aiohttp
 import uuid
 import os
 import io
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +19,15 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 genai.configure(api_key=GOOGLE_API_KEY)
 openai.api_key = OPENAI_API_KEY
+
+last_request_time = 0
+
+def rate_limited_request():
+    global last_request_time
+    current_time = time.time()
+    if current_time - last_request_time < 1:
+        time.sleep(1 - (current_time - last_request_time))
+    last_request_time = time.time()
 
 async def download_image(image_url):
     print(f"Downloading image from URL: {image_url}")
@@ -63,15 +73,22 @@ async def process_image_with_google_api(temp_file_path):
     return await asyncio.to_thread(process_image)
 
 async def ask_gpt(input_messages, is_image=False, context_uids=[], retry_attempts=3, delay=1):
-    combined_messages = " " + " ".join(msg['content'] for msg in input_messages if msg['role'] == 'user')
+    formatted_input_messages = []
+    for msg in input_messages:
+        if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
+            formatted_input_messages.append(msg)
+        elif isinstance(msg, str):
+            formatted_input_messages.append({"role": "user", "content": msg})
+    combined_messages = "\n".join(f"{msg['content']}" for msg in formatted_input_messages if msg['role'] == 'user')
     for uid in context_uids:
         image_path = Path('./images') / f'{uid}.jpg'
         if image_path.exists():
             response_text = await process_image_with_google_api(image_path)
-            combined_messages += " " + response_text
+            combined_messages += "\n" + response_text
         else:
             print(f"Image with UID {uid} not found in context.")
     for attempt in range(retry_attempts):
+        rate_limited_request()
         try:
             if is_image:
                 uid = None
