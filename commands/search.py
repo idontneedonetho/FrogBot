@@ -62,7 +62,7 @@ def determine_information_type(query):
     for keyword in creative_writing_keywords:
         if keyword in query_lower:
             return "Creative Writing"
-    if any(re.search(r'\b\d{4}\b', query)):
+    if re.search(r'\b\d{4}\b', query):
         return "Fresh Information"
     return "General Knowledge"
 
