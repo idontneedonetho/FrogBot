@@ -2,28 +2,26 @@
 
 import discord
 import asyncio
+import importlib
 import subprocess
 import sys
 import re
+import os
 from discord.ext import commands
 from dotenv import load_dotenv
-import importlib
 from datetime import datetime, timedelta
 from discord.errors import HTTPException, NotFound
-import os
+
+last_used_responses = {"uwu": None, "owo": None}
 
 user_request_times = {}
 gpt_semaphore = asyncio.Semaphore(1)
 RESTART_FLAG_FILE = 'restart.flag'
 RATE_LIMIT = timedelta(seconds=5)
 
-from commands import uwu, owo
-
 load_dotenv()
-
 TOKEN = os.getenv("DISCORD_TOKEN")
 IMAGE_API_KEY = os.getenv('IMAGE_API_KEY')
-
 if TOKEN is None:
     raise ValueError("Bot token not found in .env file. Please add it.")
 
@@ -36,8 +34,7 @@ intents.guild_messages = True
 intents.reactions = True
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
-modules = ["GPT", "help", "points", "leaderboard", "emoji", "roles", "update", "restart"]
-
+modules = ["GPT", "help", "points", "leaderboard", "emoji", "roles", "update", "restart", "search", "uwu", "owo"]
 for module_name in modules:
     try:
         mod = importlib.import_module(f'commands.{module_name}')
@@ -49,8 +46,6 @@ for module_name in modules:
         print(f"Error importing {module_name}: {e}")
     except Exception as e:
         print(f"Error setting up {module_name}: {e}")
-
-last_used_responses = {"uwu": None, "owo": None}
 
 def get_git_version():
     try:
@@ -80,11 +75,9 @@ async def on_raw_reaction_add(payload):
     guild_id = payload.guild_id
     guild = bot.get_guild(guild_id)
     member = guild.get_member(user_id)
-    
     if member and member.guild_permissions.administrator:
         user = bot.get_user(user_id)
         user_points = points.initialize_points_database(bot, user)
-
         channel = bot.get_channel(payload.channel_id)
         await emoji.process_reaction(bot, payload, user_points)
         await roles.check_user_points(bot)
@@ -107,28 +100,16 @@ async def on_thread_create(thread):
     except Exception as e:
         print(f"Error in on_thread_create: {e}")
 
-def count_tokens(text):
-    return len(text) // 4
-
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
-    uids = []
     tokens_used = 0
-
     current_prompt_tokens = len(message.content) // 4
     max_tokens -= current_prompt_tokens
-
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            message_content = f"{message.author.display_name}: {message.content}"
+            message_content = f"{message.content}\n"
             message_tokens = len(message_content) // 4
-
-            # Detect and store UIDs
-            uid_match = re.search(r'> Image UID: (\S+)', message_content)
-            if uid_match:
-                uids.append(uid_match.group(1))
-
             if tokens_used + message_tokens <= max_tokens:
                 context.append(message_content)
                 tokens_used += message_tokens
@@ -137,9 +118,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
         except Exception as e:
             print(f"Error fetching reply chain message: {e}")
             break
-
-    return context[::-1], uids
-
+    return context[::-1]
 
 async def send_long_message(message, response):
     max_length = 2000
@@ -161,7 +140,6 @@ async def send_long_message(message, response):
 
 @bot.event
 async def on_message(message):
-    content = None
     if message.author == bot.user:
         return
     content_lower = message.content.lower()
@@ -177,11 +155,8 @@ async def on_message(message):
         await message.channel.send('<:coolfrog:1168605051779031060>')
     elif any(keyword in content_lower for keyword in ['primary mod']):
         await message.channel.send(':eyes:')
-    else:
-        content = message.content.strip()
-        if bot.user.mentioned_in(message):
-            content = content.replace(bot.user.mention, '').strip()
-
+    elif bot.user.mentioned_in(message):
+        content = message.content.replace(bot.user.mention, '').strip()
         if content:
             ctx = await bot.get_context(message)
             if ctx.valid:
@@ -196,36 +171,24 @@ async def on_message(message):
                         await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
                     return
                 user_request_times[message.author.id] = current_time
-
                 async with message.channel.typing():
-                    context, uids = await fetch_reply_chain(message, max_tokens=4096)
-
-                    is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content))
-                    if is_image:
-                        image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png)', message.content).group()
-                        uid = await GPT.download_image(image_url)
-                        if uid:
-                            # Reply with Image UID and capture the reply message
-                            uid_reply = await message.reply(f"> Image UID: {uid}")
-                            
-                            # Process and Reply with Image Analysis as a reply to the UID message
-                            content_for_gpt = content + f"\n> Image UID: {uid}"
-                            combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
-                            async with gpt_semaphore:
-                                response = await GPT.ask_gpt(combined_messages, is_image=True)
-                                response = response.replace(bot.user.name + ":", "").strip()
-                                await send_long_message(uid_reply, response)
-                        else:
-                            print("Failed to download or save the image.")
+                    info_type = search.determine_information_type(content)
+                    if info_type == "Fresh Information":
+                        search_response = await search.handle_query(content)
+                        response = search_response if search_response else "No relevant results found for the query."
                     else:
-                        content_for_gpt = content
-                        combined_messages = [{"role": "user", "content": msg} for msg in context] + [{"role": "user", "content": content_for_gpt}]
-                        async with gpt_semaphore:
-                            response = await GPT.ask_gpt(combined_messages, is_image=False)
-                            response = response.replace(bot.user.name + ":", "").strip()
-                            await send_long_message(message, response)
-            return
-    await bot.process_commands(message)
+                        context = await fetch_reply_chain(message)
+                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                        combined_messages.append({'content': content, 'role': 'user'})
+                        response = await GPT.ask_gpt(combined_messages)
+                        if not search.estimate_confidence(response):
+                            print("Fetching additional information for uncertain queries.")
+                            search_response = await search.handle_query(content)
+                            response = search_response if search_response else "I'm sorry, I couldn't find information on that topic."
+                    response = response.replace(bot.user.name + ":", "").strip()
+                    await send_long_message(message, response)
+    else:
+        await bot.process_commands(message)
     
 @bot.event
 async def on_command_error(ctx, error):
