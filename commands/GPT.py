@@ -14,11 +14,8 @@ import time
 from dotenv import load_dotenv
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
-genai.configure(api_key=GOOGLE_API_KEY)
-openai.api_key = OPENAI_API_KEY
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 last_request_time = 0
 
