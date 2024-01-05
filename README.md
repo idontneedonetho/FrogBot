@@ -87,6 +87,7 @@ Contributions to FrogBot are welcome! Follow these steps to contribute:
 
 ## 📞 Contact
 For support and questions, join our Discord server: [FrogPilot Discord](https://l.linklyhq.com/l/1t3Il)
+Just go-to '#development-chat', and join the '#FrogBot Dev' thread!
 
 ## 🙌 Acknowledgments
 ### Thanks-
