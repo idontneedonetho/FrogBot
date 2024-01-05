@@ -102,7 +102,6 @@ async def on_thread_create(thread):
 
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
-    uids = []
     tokens_used = 0
     current_prompt_tokens = len(message.content) // 4
     max_tokens -= current_prompt_tokens
@@ -111,10 +110,6 @@ async def fetch_reply_chain(message, max_tokens=4096):
             message = await message.channel.fetch_message(message.reference.message_id)
             message_content = f"{message.content}\n"
             message_tokens = len(message_content) // 4
-            # Detect and store UIDs
-            uid_match = re.search(r'> Image UID: (\S+)', message_content)
-            if uid_match:
-                uids.append(uid_match.group(1))
             if tokens_used + message_tokens <= max_tokens:
                 context.append(message_content)
                 tokens_used += message_tokens
@@ -123,7 +118,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
         except Exception as e:
             print(f"Error fetching reply chain message: {e}")
             break
-    return context[::-1], uids
+    return context[::-1]
 
 async def send_long_message(message, response):
     max_length = 2000
@@ -145,7 +140,6 @@ async def send_long_message(message, response):
 
 @bot.event
 async def on_message(message):
-    content = None
     if message.author == bot.user:
         return
     content_lower = message.content.lower()
@@ -180,24 +174,17 @@ async def on_message(message):
                 async with message.channel.typing():
                     info_type = search.determine_information_type(content)
                     if info_type == "Fresh Information":
-                        print("Fetching additional information for fresh queries.")
                         search_response = await search.handle_query(content)
                         response = search_response if search_response else "No relevant results found for the query."
                     else:
-                        context, uids = await fetch_reply_chain(message, max_tokens=4096)
-                        is_image = bool(message.attachments or re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content))
-                        content_for_gpt_dict = {'content': f"{content}", 'role': 'user'}
-                        if is_image:
-                            image_url = message.attachments[0].url if message.attachments else re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', message.content).group()
-                            uid = await GPT.download_image(image_url)
-                            if uid:
-                                content_for_gpt_dict['content'] += f"\n> Image UID: {uid}"
-                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context] + [content_for_gpt_dict]
-                        response = await GPT.ask_gpt(combined_messages, is_image=is_image, context_uids=uids)
+                        context = await fetch_reply_chain(message)
+                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                        combined_messages.append({'content': content, 'role': 'user'})
+                        response = await GPT.ask_gpt(combined_messages)
                         if not search.estimate_confidence(response):
                             print("Fetching additional information for uncertain queries.")
                             search_response = await search.handle_query(content)
-                            response = search_response if search_response else response
+                            response = search_response if search_response else "I'm sorry, I couldn't find information on that topic."
                     response = response.replace(bot.user.name + ":", "").strip()
                     await send_long_message(message, response)
     else:
