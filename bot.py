@@ -103,13 +103,13 @@ async def on_thread_create(thread):
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
     tokens_used = 0
-    current_prompt_tokens = len(message.content) // 4
+    current_prompt_tokens = GPT.count_prompt_tokens(message.content)
     max_tokens -= current_prompt_tokens
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
             message_content = f"{message.content}\n"
-            message_tokens = len(message_content) // 4
+            message_tokens = GPT.count_prompt_tokens(message_content)
             if tokens_used + message_tokens <= max_tokens:
                 context.append(message_content)
                 tokens_used += message_tokens
@@ -118,6 +118,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
         except Exception as e:
             print(f"Error fetching reply chain message: {e}")
             break
+    print(f"Total tokens used in context: {tokens_used}")
     return context[::-1]
 
 async def send_long_message(message, response):
