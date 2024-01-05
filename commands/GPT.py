@@ -1,22 +1,18 @@
 # commands/GPT.py
 
-import google.generativeai as genai
+import vertexai
+from vertexai.preview.generative_models import GenerativeModel
 import openai
+import asyncio
 import os
 import time
 from dotenv import load_dotenv
 
 load_dotenv()
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 last_request_time = 0
-safety_settings = {
-    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-    "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
-}
 
 def rate_limited_request():
     global last_request_time
@@ -24,6 +20,12 @@ def rate_limited_request():
     if current_time - last_request_time < 1:
         time.sleep(1 - (current_time - last_request_time))
     last_request_time = time.time()
+
+def count_prompt_tokens(prompt: str):
+    model = GenerativeModel(model_name="gemini-pro")
+    response = model.count_tokens(prompt)
+    token_count = response.total_tokens
+    return token_count
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     formatted_input_messages = []
@@ -36,7 +38,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            model = genai.GenerativeModel(model_name="gemini-pro", safety_settings=safety_settings)
+            model = GenerativeModel(model_name="gemini-pro")
             chat = model.start_chat()
             response = chat.send_message(combined_messages)
             return response.text
