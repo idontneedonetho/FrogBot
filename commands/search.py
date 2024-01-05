@@ -71,7 +71,7 @@ def determine_information_type(query):
 async def handle_query(query):
     print(f"Handling query: {query}")
     info_type = determine_information_type(query)
-    initial_response = await GPT.ask_gpt([{"role": "user", "content": query}], is_image=False)
+    initial_response = await GPT.ask_gpt([{"role": "user", "content": query}])
     if estimate_confidence(initial_response):
         return initial_response
     elif info_type == "Fresh Information" or not estimate_confidence(initial_response):
@@ -81,7 +81,7 @@ async def handle_query(query):
             context = " ".join(content for content in contents if content)
             if context:
                 combined_input = f"{query}\nContext: {context}"
-                extended_response = await GPT.ask_gpt([{"role": "user", "content": combined_input}], is_image=False)
+                extended_response = await GPT.ask_gpt([{"role": "user", "content": combined_input}])
                 source_urls = '\n'.join([f"[Source: {url}]" for url in search_urls])
                 return extended_response + "\n\n" + source_urls
             else:
