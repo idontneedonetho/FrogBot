@@ -30,7 +30,6 @@
 - Respond to different messages
 - Updating via commands
 - AI LLM integration via Google Gemini-pro(-vision) with OpenAI Chat-GPT 3.5 Turbo as a fallback
-- Image recognition via Gemini-pro-vision
 - Reply context chain for the LLM; you can simply reply to the bot's message to continue the conversation
 - Very basic and rough web search
 
@@ -51,7 +50,7 @@ cd FrogBot
 2. Install Python dependencies:
 ```bash
 pip install discord.py discord.ext asyncio aiohttp nltk trafilatura requests
-pip install googlesearch-python python-dotenv google-generativeai googlesearch-python openai pillow
+pip install python-dotenv google-generativeai beautifulsoup4 openai
 ```
 ### Configure Your Bot
 3. Create a `.env` file in the root directory of the bot and add your bot token and other configuration details:
@@ -98,6 +97,7 @@ For support and questions, join our Discord server: [FrogPilot Discord](https://
 - pkp24
 - mike854
 - [frogsgomoo](https://github.com/FrogAi)
+- And all those that help break to test the bot
 
 ## 🙌 Libraries and Tools Used
 FrogBot relies on the following external libraries and tools to power its functionality:
