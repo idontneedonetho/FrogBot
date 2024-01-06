@@ -12,7 +12,7 @@
 - [🛠️ Installation](#%EF%B8%8F-installation)
 - [💬 Usage Examples](#-usage-examples)
 - [🤝 Contributing](#-contributing)
-- [📞 Contact](#-contact)
+- [📞 Connect](#-connect)
 - [🙌 Acknowledgments](#-acknowledgments)
 
 ## Branches
@@ -84,7 +84,7 @@ Contributions to FrogBot are welcome! Follow these steps to contribute:
 4. Push your changes to your forked repository.
 5. Submit a pull request to the main repository.
 
-## 📞 Contact
+## 📞 Connect
 For support and questions, join our Discord server: [FrogPilot Discord](https://l.linklyhq.com/l/1t3Il).
 
 *Just go-to `#development-chat`, and join the `#FrogBot Dev` thread!*
