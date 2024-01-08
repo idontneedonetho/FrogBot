@@ -28,13 +28,16 @@ def count_prompt_tokens(prompt: str):
     return token_count
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
-    formatted_input_messages = []
+    frogbot_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
+    
+    formatted_input_messages = [frogbot_context]
     for msg in input_messages:
         if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
-            formatted_input_messages.append(msg)
+            formatted_input_messages.append(msg['content'])
         elif isinstance(msg, str):
-            formatted_input_messages.append({"role": "user", "content": msg})
-    combined_messages = "\n".join(f"{msg['content']}" for msg in formatted_input_messages if msg['role'] == 'user')
+            formatted_input_messages.append(msg)
+    combined_messages = "\n".join(formatted_input_messages)
+
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
