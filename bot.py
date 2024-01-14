@@ -67,7 +67,7 @@ async def on_ready():
             os.remove(RESTART_FLAG_FILE)
         else:
             print("Channel not found. Make sure the channel ID is correct.")
-    await bot.change_presence(activity=discord.Game(name=f"{frog_version}"))
+    await bot.change_presence(activity=discord.Game(name=f"{frog_version} | @FrogBot help"))
 
 @bot.event
 async def on_raw_reaction_add(payload):
