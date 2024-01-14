@@ -152,28 +152,11 @@ def get_next_threshold(points, thresholds):
             return threshold
     return max(thresholds.keys())
 
-# def create_progress_bar(current, total, length=10):
-#     if total == 0:
-#         total = 1
-#     progress = int((current / total) * length)
-#     num_filled = progress // 3
-#     remainder = progress % 3
-#     filled_char = '█' * num_filled
-#     partial_char = '▓' * (1 if remainder == 1 else 0) + '▒' * (1 if remainder == 2 else 0)
-#     num_remaining = length - num_filled - len(partial_char)
-#     return filled_char + partial_char + '░' * num_remaining
-
 def create_progress_bar(current, total, length=10):
     if total == 0:
         total = 1
     progress = int((current / total) * length)
-    num_filled = progress // 7
-    remainder = progress % 7
-    filled_char = '█' * num_filled
-    partial_char = '▉' * (1 if remainder == 1 else 0) + '▊' * (1 if remainder == 2 else 0) + '▋' * (1 if remainder == 3 else 0) + '▌' * (1 if remainder == 4 else 0) + '▍' * (1 if remainder == 5 else 0) + '▎' * (1 if remainder == 6 else 0) + '▏' * (1 if remainder == 0 and num_filled > 0 else 0)
-    filler_char = '_'
-    num_remaining = length - num_filled - len(partial_char)
-    return filled_char + partial_char + filler_char * num_remaining
+    return '█' * progress + '░' * (length - progress)
 
 @commands.command(name="check")
 async def check_or_rank_command(ctx, *args):
