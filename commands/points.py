@@ -161,7 +161,7 @@ def create_progress_bar(current, total, length=10):
     filled_char = '█' * num_filled
     partial_char = '▓' * (1 if remainder == 1 else 0) + '▒' * (1 if remainder == 2 else 0) + '░' * (1 if remainder == 3 else 0)
     num_remaining = length - num_filled - len(partial_char)
-    return filled_char + partial_char + ' ' * num_remaining
+    return filled_char + partial_char + '░' * num_remaining
 
 @commands.command(name="check")
 async def check_or_rank_command(ctx, *args):
