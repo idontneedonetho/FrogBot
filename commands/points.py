@@ -156,7 +156,9 @@ def create_progress_bar(current, total, length=10):
     if total == 0:
         total = 1
     progress = int((current / total) * length)
-    return '█' * progress + '░' * (length - progress)
+    num_filled = int(progress / 4)
+    num_remaining = length - num_filled
+    return '█' * num_filled + '▓' * (progress % 4) + '▒' * (num_remaining // 2) + '░' * (num_remaining % 2)
 
 @commands.command(name="check")
 async def check_or_rank_command(ctx, *args):
