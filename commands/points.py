@@ -152,7 +152,7 @@ def get_next_threshold(points, thresholds):
             return threshold
     return max(thresholds.keys())
 
-def create_progress_bar(current, total, length=10, fill_symbols='█▉▊▋▌▍▎▏', empty='⠀'):
+def create_progress_bar(current, total, length=10, fill_symbols='█▉▊▋▌▍▎▏', empty=' '):
     progress = int(current / total * length * len(fill_symbols))
     filled_count = progress // len(fill_symbols)
     remainder_fill = int(progress % len(fill_symbols))
