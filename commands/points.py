@@ -100,7 +100,9 @@ def create_points_embed(user, current_points, role_thresholds, action, user_rank
 @commands.command(name="add")
 @is_admin()
 async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_content, user: discord.User):
-    if keyword.lower() == "points":
+    valid_keyword = (keyword.lower() == "points" if points_to_add > 1 else keyword.lower() == "point")
+    
+    if valid_keyword:
         action = "add"
         user_points = initialize_points_database(ctx.bot, user)
 
@@ -113,25 +115,27 @@ async def add_points_command(ctx, points_to_add: int, keyword: commands.clean_co
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
-        await ctx.reply("Invalid syntax. Please use '@bot add <points> points @user'.")
+        await ctx.reply("Invalid syntax. Please use '@bot add <points> point/points @user'.")
 
 @commands.command(name="remove")
 @is_admin()
 async def remove_points_command(ctx, points_to_remove: int, keyword: commands.clean_content, user: discord.User):
-    if keyword.lower() == "points":
+    valid_keyword = (keyword.lower() == "points" if points_to_remove > 1 else keyword.lower() == "point")
+    
+    if valid_keyword:
         action = "remove"
         user_points = initialize_points_database(ctx.bot, user)
 
         user_id = user.id
         current_points = get_user_points(user_id, user_points)
-        new_points = current_points - points_to_remove
+        new_points = max(current_points - points_to_remove, 0)  # Ensure points don't go negative
 
         await update_points(user_id, new_points, ctx.bot)
         user_rank, next_rank_name = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
-        await ctx.reply("Invalid syntax. Please use '@bot remove <points> points @user'.")
+        await ctx.reply("Invalid syntax. Please use '@bot remove <points> point/points @user'.")
 
 role_thresholds = {
     1000: 1178750004869996574,
