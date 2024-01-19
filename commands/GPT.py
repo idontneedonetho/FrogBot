@@ -22,9 +22,9 @@ def rate_limited_request():
     last_request_time = time.time()
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
-    frogbot_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
+    frogbot_context = "You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You are located in the FrogPilot discord and you answer to @FrogsGoMoo and @idnot . You'll keep your responses under 2000 characters. You will also provide snarky responses on occasion. Don't be kinky you weirdo."
     
-    assistant_id = "asst_koj1FbAIY2Y2eKxscCv2QcRV"  # Replace with your actual Assistant ID
+    assistant_id = "asst_koj1FbAIY2Y2eKxscCv2QcRV"
 
     for attempt in range(retry_attempts):
         rate_limited_request()
