@@ -1,9 +1,16 @@
 # commands/GPT.py
 
+import os
 import openai
+import vertexai
 from vertexai.preview.generative_models import GenerativeModel
 import asyncio
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
+vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 last_request_time = 0
 
