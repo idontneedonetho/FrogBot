@@ -67,7 +67,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            for message in reversed(messages.data):
+            for message in messages.data:
                 for content in message.content:
                     if content.type == 'text':
                         response = content.text.value 
