@@ -67,11 +67,10 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            messages = openai.beta.threads.messages.list(thread_id=thread.id)
-            response_json = messages.json()  # This should be a dictionary
+            response_json = messages.json()
 
             if 'data' in response_json and len(response_json['data']) > 0:
-                last_message = response_json['data'][0]  # Accessing the first item in the 'data' list
+                last_message = response_json['data'][0]
                 if 'content' in last_message and len(last_message['content']) > 0:
                     last_assistant_response = last_message['content'][0]['text']['value']
                     return last_assistant_response
