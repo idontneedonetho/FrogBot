@@ -68,7 +68,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
             )
 
             response = messages.data
-            return response[0]['content'][0]['text']['value']
+            return response[0]['content'][0].get('text', {}).get('value', '')
                 
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
