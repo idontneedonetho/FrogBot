@@ -58,7 +58,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                     run_id=run.id
                 )
 
-                if run_status['status'] == "completed":
+                if run_status.status == "completed":
                     break
         
                 time.sleep(1)
@@ -67,18 +67,12 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            last_assistant_response = None
-            for msg in reversed(messages["data"]):
-                if msg["role"] == "assistant" and "content" in msg:
-                    last_assistant_response = msg["content"]
-                    break
-
-                if last_assistant_response:
-                    return last_assistant_response[0]["content"]
-                else:
-                    return "No assistant response found."
-
-            
+            for message in messages.data:
+                for content in message.content:
+                    if content.type == 'text':
+                        response = content.text.value 
+                        return response
+                
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
             if attempt < retry_attempts - 1:
