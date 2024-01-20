@@ -28,7 +28,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            thread = client.beta.threads.create()
+            thread = openai.beta.threads.create()
             assistant = openai.beta.assistants.create(
                 name="FrogBot",
                 instructions="You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You are located in the FrogPilot discord and you answer to @FrogsGoMoo and @idontneedonetho . You'll keep your responses under 2000 characters. You will also provide snarky responses on occasion. You can reference FrogPilot-txt.zip for any FrogPilot questions. Don't be kinky you weirdo.",
@@ -36,24 +36,24 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
             )
             for msg in input_messages:
                 if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
-                    message = client.beta.threads.messages.create(
+                    message = openai.beta.threads.messages.create(
                         thread_id=thread.id,
                         role="user",
                         content=msg['content']
                     )
                 elif isinstance(msg, str):
-                    message = client.beta.threads.messages.create(
+                    message = openai.beta.threads.messages.create(
                         thread_id=thread.id,
                         role="user",
                         content=msg
                     )
-            run = client.beta.threads.runs.create(
+            run = openai.beta.threads.runs.create(
                 thread_id=thread.id,
                 assistant_id=assistant.id,
             )
 
             while True:
-                run_status = client.beta.threads.runs.retrieve(
+                run_status = openai.beta.threads.runs.retrieve(
                     thread_id=thread.id,
                     run_id=run.id
                 )
@@ -63,17 +63,21 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
         
                 time.sleep(1)
                 
-            messages = client.beta.threads.messages.list(
+            messages = openai.beta.threads.messages.list(
                 thread_id=thread.id
             )
 
             last_assistant_response = None
             for msg in reversed(messages["data"]):
-                if msg["role"] == "assistant":
-                    last_assistant_response = msg["content"][0]["text"]["value"]
+                if msg["role"] == "assistant" and "content" in msg:
+                    last_assistant_response = msg["content"]
                     break
 
-                return last_assistant_response
+                if last_assistant_response:
+                    return last_assistant_response[0]["content"]
+                else:
+                    return "No assistant response found."
+
             
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
