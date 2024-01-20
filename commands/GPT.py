@@ -67,16 +67,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            print(messages.json())
-            
-            #last_assistant_response = None
-            #for msg in reversed(messages['data']):
-            #    if msg['role'] == 'assistant':
-            #        if msg['content'] and msg['content'][0]['type'] == 'text':
-            #            last_assistant_response = msg['content'][0]['text']['value']
-            #            break
-
-            #return last_assistant_response
+            return messages.json()['data'][0]['content'][0]['text']['value']
             
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
