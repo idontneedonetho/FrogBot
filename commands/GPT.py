@@ -67,8 +67,8 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            response = json.loads(messages.data))
-            return response["data"][0]["content"][0]["text"]["value"]
+            response = messages.data
+            return response[0]['content'][0]['text']['value']
                 
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
