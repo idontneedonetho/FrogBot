@@ -67,7 +67,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            response = json.loads(messages)
+            response = json.loads(messages.data))
             return response["data"][0]["content"][0]["text"]["value"]
                 
         except Exception as e:
