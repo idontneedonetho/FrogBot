@@ -61,7 +61,6 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                     if content.type == 'text':
                         response = content.text.value 
                         return response
-        
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
             if attempt < retry_attempts - 1:
