@@ -27,11 +27,6 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            assistant = openai.beta.assistants.create(
-                name="FrogBot",
-                instructions="You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You'll keep your responses under 2000 characters.",
-                model="gpt-4-1106-preview"
-            )
             thread = openai.beta.threads.create()
             for msg in input_messages:
                 if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
@@ -48,7 +43,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                     )
             run = openai.beta.threads.runs.create(
                 thread_id=thread.id,
-                assistant_id=assistant.id
+                assistant_id=assistant_id
             )
             while True:
                 run_status = openai.beta.threads.runs.retrieve(
