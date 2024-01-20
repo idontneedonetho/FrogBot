@@ -1,5 +1,6 @@
 # commands/GPT.py
 
+import json
 import os
 import openai
 import vertexai
@@ -24,16 +25,16 @@ def rate_limited_request():
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
     assistant_id = "asst_koj1FbAIY2Y2eKxscCv2QcRV"
-
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            thread = openai.beta.threads.create()
             assistant = openai.beta.assistants.create(
                 name="FrogBot",
-                instructions="You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You are located in the FrogPilot discord and you answer to @FrogsGoMoo and @idontneedonetho . You'll keep your responses under 2000 characters. You will also provide snarky responses on occasion. You can reference FrogPilot-txt.zip for any FrogPilot questions. Don't be kinky you weirdo.",
-                model="gpt-4-1106-preview"
+                instructions="You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You'll keep your responses under 2000 characters.",
+                model="gpt-4-1106-preview",
+                tools=[{"type": "code_interperter"}]
             )
+            thread = openai.beta.threads.create()
             for msg in input_messages:
                 if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
                     message = openai.beta.threads.messages.create(
@@ -51,28 +52,23 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id,
                 assistant_id=assistant.id,
             )
-
             while True:
                 run_status = openai.beta.threads.runs.retrieve(
                     thread_id=thread.id,
                     run_id=run.id
                 )
-
                 if run_status.status == "completed":
                     break
-        
                 time.sleep(1)
-                
             messages = openai.beta.threads.messages.list(
                 thread_id=thread.id
             )
-
             for message in messages.data:
                 for content in message.content:
                     if content.type == 'text':
                         response = content.text.value 
                         return response
-                
+        
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
             if attempt < retry_attempts - 1:
