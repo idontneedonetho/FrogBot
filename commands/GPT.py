@@ -67,7 +67,19 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            return messages.json()['data'][0]['content'][0]['text']['value']
+            messages = openai.beta.threads.messages.list(thread_id=thread.id)
+            response_json = messages.json()  # This should be a dictionary
+
+            if 'data' in response_json and len(response_json['data']) > 0:
+                last_message = response_json['data'][0]  # Accessing the first item in the 'data' list
+                if 'content' in last_message and len(last_message['content']) > 0:
+                    last_assistant_response = last_message['content'][0]['text']['value']
+                    return last_assistant_response
+                else:
+                    return "No content found in the last message."
+            else:
+                return "No data found in the response."
+
             
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
