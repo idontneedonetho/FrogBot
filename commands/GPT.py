@@ -58,7 +58,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                     run_id=run.id
                 )
 
-                if run_status['status'] == "completed":
+                if run_status.status == "completed":
                     break
         
                 time.sleep(1)
