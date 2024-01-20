@@ -1,6 +1,5 @@
 # commands/GPT.py
 
-import json
 import os
 import openai
 import vertexai
@@ -12,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
+assistant_id = os.getenv('ASSISTANT_ID')
 
 last_request_time = 0
 
@@ -24,15 +24,13 @@ def rate_limited_request():
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
-    assistant_id = "asst_koj1FbAIY2Y2eKxscCv2QcRV"
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
             assistant = openai.beta.assistants.create(
                 name="FrogBot",
                 instructions="You are FrogBot, a Discord bot assistant for all questions related to FrogPilot and OpenPilot. You'll keep your responses under 2000 characters.",
-                model="gpt-4-1106-preview",
-                tools=[{"type": "code_interperter"}]
+                model="gpt-4-1106-preview"
             )
             thread = openai.beta.threads.create()
             for msg in input_messages:
@@ -50,7 +48,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                     )
             run = openai.beta.threads.runs.create(
                 thread_id=thread.id,
-                assistant_id=assistant.id,
+                assistant_id=assistant.id
             )
             while True:
                 run_status = openai.beta.threads.runs.retrieve(
