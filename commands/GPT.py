@@ -67,25 +67,25 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 thread_id=thread.id
             )
 
-            response = messages.json()
+            response_json = messages.json()
 
-            if isinstance(response, list) and len(response) > 0:
-                last_message = response[0]  # Assuming the first element is the latest message
+            print("Response JSON:", response_json)
+
+            if 'data' in response_json and len(response_json['data']) > 0:
+                last_message = response_json['data'][0]
+                print("Last Message:", last_message) 
+
                 if 'content' in last_message and len(last_message['content']) > 0:
                     last_assistant_response = last_message['content'][0]['text']['value']
+                    print("Last Assistant Response:", last_assistant_response)  # Debugging print
                     return last_assistant_response
                 else:
-                    return "No content found in the last message."
-            elif isinstance(response, dict) and 'data' in response and len(response['data']) > 0:
-                last_message = response['data'][0]
-                if 'content' in last_message and len(last_message['content']) > 0:
-                    last_assistant_response = last_message['content'][0]['text']['value']
-                    return last_assistant_response
-                else:
+                    print("No content found in the last message.")
                     return "No content found in the last message."
             else:
-                return "Unexpected response format or no data found."
-            
+                print("No data found in the response.")
+                return "No data found in the response."
+                
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
             if attempt < retry_attempts - 1:
