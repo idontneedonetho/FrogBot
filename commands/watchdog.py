@@ -10,10 +10,14 @@ import atexit
 WATCHDOG_PID_FILE = 'watchdog.pid'
 RESTART_FLAG_FILE = 'restart.flag'
 
+def remove_pid_file():
+    if os.path.exists(WATCHDOG_PID_FILE):
+        os.remove(WATCHDOG_PID_FILE)
+atexit.register(remove_pid_file)
+
 def signal_handler(signum, frame):
     remove_pid_file()
     sys.exit("Watchdog exiting due to kill signal.")
-
 signal.signal(signal.SIGTERM, signal_handler)
 
 def write_pid_file():
@@ -41,9 +45,3 @@ while True:
         os.remove(RESTART_FLAG_FILE)
         subprocess.run([sys.executable, 'bot.py'])
     time.sleep(10)
-
-def remove_pid_file():
-    if os.path.exists(WATCHDOG_PID_FILE):
-        os.remove(WATCHDOG_PID_FILE)
-
-atexit.register(remove_pid_file)
