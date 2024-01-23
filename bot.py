@@ -69,6 +69,12 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name=f"@FrogBot help | {frog_version}"))
 
 @bot.event
+async def on_member_join(member):
+    welcome_channel = member.guild.system_channel
+    if welcome_channel:
+        await welcome_channel.send(f"https://cdn3.emoji.gg/emojis/1463-wave.gif")
+
+@bot.event
 async def on_raw_reaction_add(payload):
     user_id = payload.user_id
     guild_id = payload.guild_id
