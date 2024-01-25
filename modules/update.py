@@ -20,7 +20,7 @@ async def git_pull(ctx, branch="beta"):
         if current_branch != branch:
             await ctx.send(f"Switching to branch {branch}")
             subprocess.run(["git", "checkout", branch])
-        await git_stash()
+        await git_stash(ctx)
         process = subprocess.Popen(['git', 'pull', 'origin', branch], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = process.communicate()
         if process.returncode == 0:
