@@ -16,7 +16,7 @@ class ModuleLoader:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 self.modules.append(module)
-                # Call the setup function, passing the bot instance
+                print(f"Loading module: {module_name}")
                 if hasattr(module, 'setup'):
                     module.setup(bot)
 
