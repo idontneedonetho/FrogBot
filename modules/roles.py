@@ -8,7 +8,7 @@ CHANNEL_ID = 1178764276157141093
 cmd = {}
 
 async def check_user_points(client):
-    user_points = db_access_with_retry('SELECT user_id, points FROM user_points')
+    user_points_data = db_access_with_retry('SELECT user_id, points FROM user_points')
     print("Checking user points...")
     guild = client.guilds[0] if client.guilds else None
     if guild is None:
@@ -26,8 +26,10 @@ async def check_user_points(client):
     if notification_channel is None:
         print("Notification channel not found. Make sure the channel ID is correct.")
         return
+    else:
+        pass
     
-    for user_id, points in user_points:
+    for user_id, points in user_points_data:
         member = guild.get_member(user_id)
         if member is None:
             print(f"Member with ID {user_id} not found in guild.")
