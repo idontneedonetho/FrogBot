@@ -37,7 +37,9 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         return
-    elif client.user.mentioned_in(message):
+    for handler in module_loader.get_event_handlers('on_message'):
+        await handler(message)
+    if client.user.mentioned_in(message):
         content = message.content.replace(client.user.mention, '').strip()
         if content:
             ctx = await client.get_context(message)
