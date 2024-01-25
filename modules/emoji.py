@@ -1,6 +1,7 @@
 # FrogBot/modules/emoji.py
 
 from modules.utils.database import db_access_with_retry, initialize_points_database, update_points
+from modules.roles import check_user_points
 import discord
 import datetime
 
@@ -33,7 +34,8 @@ async def process_reaction(bot, payload):
     user_id = payload.user_id  # use user_id directly
     user_points = initialize_points_database(user_id)  # pass user_id instead of user object
     author_id, points_to_add = handle_points(payload, emoji_name, user_points)
-    await update_points(author_id, user_points[author_id])
+    if await update_points(author_id, user_points[author_id]):
+        await check_user_points(bot)
     await manage_bot_response(bot, payload, author_id, points_to_add, emoji_name)
 
 async def validate_reaction(bot, payload):
