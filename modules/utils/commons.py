@@ -44,7 +44,7 @@ def get_git_version():
     try:
         branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()[:7]
-        return f"v2 {branch} {commit}"
+        return f"v2.1 {branch} {commit}"
     except subprocess.CalledProcessError:
-        return "v2 unknown-version"
+        return "v2.1 unknown-version"
 frog_version = get_git_version()
