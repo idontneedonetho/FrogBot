@@ -1,7 +1,7 @@
-# commands/emoji.py
+# FrogBot/modules/emoji.py
 
+from modules.utils.database import db_access_with_retry, initialize_points_database, update_points
 import discord
-import sqlite3
 import datetime
 
 bot_replies = {}
@@ -24,14 +24,16 @@ emoji_responses = {
     "❤️": "being a good frog"
 }
 
-async def process_reaction(bot, payload, user_points):
+async def process_reaction(bot, payload):
     emoji_name = str(payload.emoji)
     if emoji_name not in emoji_points:
         return
     if not await validate_reaction(bot, payload):
         return
+    user_id = payload.user_id  # use user_id directly
+    user_points = initialize_points_database(user_id)  # pass user_id instead of user object
     author_id, points_to_add = handle_points(payload, emoji_name, user_points)
-    store_points(author_id, user_points[author_id])
+    await update_points(author_id, user_points[author_id])
     await manage_bot_response(bot, payload, author_id, points_to_add, emoji_name)
 
 async def validate_reaction(bot, payload):
@@ -45,10 +47,13 @@ def handle_points(payload, emoji_name, user_points):
     user_points[author_id] = user_points.get(author_id, 0) + points_to_add
     return author_id, points_to_add
 
-def store_points(author_id, total_points):
-    with sqlite3.connect('user_points.db') as conn:
-        c = conn.cursor()
-        c.execute('INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, ?)', (author_id, total_points))
+def initialize_points_database(user_id):
+    rows = db_access_with_retry('SELECT points FROM user_points WHERE user_id = ?', (user_id,))
+    if rows:
+        return {user_id: rows[0][0]}
+    else:
+        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user_id, 0))
+        return {user_id: 0}
 
 async def manage_bot_response(bot, payload, author_id, points_to_add, emoji_name):
     channel = bot.get_channel(payload.channel_id)
@@ -83,3 +88,10 @@ def create_points_embed(user, total_points, reasons, emoji_name):
     embed.add_field(name="Total Points", value=f"{total_points}", inline=True)
     embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d')} | @FrogBot check points for more")
     return embed
+
+def setup(bot):
+    @bot.event
+    async def on_raw_reaction_add(payload):
+        if payload.guild_id is None:
+            return
+        await process_reaction(bot, payload)
