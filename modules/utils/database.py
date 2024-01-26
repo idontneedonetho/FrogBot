@@ -20,7 +20,6 @@ async def initialize_database():
 
 def db_access_with_retry(sql_operation, *args, max_attempts=5, delay=1, timeout=10.0):
     for attempt in range(max_attempts):
-        print('attempting to execute sql operation')
         try:
             with sqlite3.connect(DATABASE_FILE, timeout=timeout) as conn:
                 cursor = conn.cursor()
@@ -48,7 +47,6 @@ def initialize_points_database(user):
 
 async def update_points(user_id, points):
     try:
-        print('updating points')
         db_access_with_retry('UPDATE user_points SET points = ? WHERE user_id = ?', (points, user_id))
         return True
     except Exception as e:
