@@ -31,8 +31,8 @@ async def process_reaction(bot, payload):
         return
     if not await validate_reaction(bot, payload):
         return
-    user_id = payload.user_id  # use user_id directly
-    user_points = initialize_points_database(user_id)  # pass user_id instead of user object
+    user_id = payload.user_id
+    user_points = initialize_points_database(user_id)
     author_id, points_to_add = handle_points(payload, emoji_name, user_points)
     if await update_points(author_id, user_points[author_id]):
         await check_user_points(bot)
