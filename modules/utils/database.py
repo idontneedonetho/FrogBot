@@ -1,6 +1,5 @@
 # database.py
 import sqlite3
-import asyncio
 import time
 
 DATABASE_FILE = 'user_points.db'
@@ -38,12 +37,13 @@ def db_access_with_retry(sql_operation, *args, max_attempts=5, delay=1, timeout=
             time.sleep(delay)
 
 def initialize_points_database(user):
-    rows = db_access_with_retry('SELECT points FROM user_points WHERE user_id = ?', (user.id,))
-    if rows:
-        return {user.id: rows[0][0]}
-    else:
-        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user.id, 0))
-        return {user.id: 0}
+    user_points = {}
+    rows = db_access_with_retry('SELECT * FROM user_points')
+    user_points = {user_id: points or 0 for user_id, points in rows}
+    if user.id not in user_points:
+        user_points[user.id] = 0
+        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', user.id, 0)
+    return user_points
 
 async def update_points(user_id, points):
     try:
