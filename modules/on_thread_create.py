@@ -1,6 +1,5 @@
 # commands/thread_create_handler.py
 import asyncio
-cmd = {}  # No specific commands for this module
 
 async def on_thread_create(thread):
     try:
@@ -14,3 +13,6 @@ async def on_thread_create(thread):
             await first_message.add_reaction(emoji)
     except Exception as e:
         print(f"Error in on_thread_create: {e}")
+        
+def setup(bot):
+    bot.event(on_thread_create)
