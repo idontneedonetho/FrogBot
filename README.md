@@ -10,7 +10,7 @@
 - [Branches](#branches)
 - [🚀 Current Features](#-current-features)
 - [💬 Usage Examples](#-usage-examples)
-- [🧱 DLM](#--dlm)
+- [🧱 DLM](#-dlm)
 - [🤝 Contributing](#-contributing)
 - [📞 Connect](#-connect)
 - [🙌 Acknowledgments](#-acknowledgments)
@@ -23,7 +23,7 @@
 *Note: Dev is considered the starting point for most people, as it's primarily for PRs, and we aim to keep it stable.*
 
 ## 🚀 Current Features
-- [DLM](#--dlm)
+- [DLM](#-dlm)
 - Automatic role assignment based on points
 - Points assignment and removal
 - Points tracking
