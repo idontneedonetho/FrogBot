@@ -41,7 +41,7 @@
 - Ask questions or seek information by mentioning the bot in your message: `@{bot name} What's the weather today?`
 - Use `@{bot name} help` for more information on available commands.
 
-<h2 id="dlm">## 🧱 DLM</h2>
+<h2 id="dlm">🧱 DLM</h2>
 Dynamically Loaded Modules, or DLM for short, is a different way to add to the bot. Why use this when discord.py has Cogs? Cogs, for me, seem to be hit or miss, and we needed something more robust, something that wouldn't need us to change any other code to work.
 Now it isn't perfect, but it's the best we can get and allows most modules to be pretty freeform. If you want to add a feature, simply write a new .py file and make it a PR! For now, I'll work directly with devs of modules to make sure DLM works, and works right.
 Hopefully in the future, PR's will be automated to an extent. We'll see... For now, this is where we are.
