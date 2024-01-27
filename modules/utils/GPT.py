@@ -28,7 +28,6 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            modified_input_messages = [gpt_context] + input_messages
             chat_completion = openai.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=modified_input_messages
