@@ -59,6 +59,7 @@ For support and questions, join our Discord server: [FrogPilot Discord](https://
 
 ## 🙌 Acknowledgments
 ### Thanks-
+- Joeslinky - For their GPT 4 API KEY!
 - [twilsonco](https://github.com/twilsonco)
 - nik.olas
 - cone_guy_03312
