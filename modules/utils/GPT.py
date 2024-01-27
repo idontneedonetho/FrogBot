@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
-assistant_id = os.getenv('ASSISTANT_ID')
 
 last_request_time = 0
 
@@ -23,46 +22,22 @@ def rate_limited_request():
     last_request_time = time.time()
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
-    gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
+    context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
+    responses = []
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            thread = openai.beta.threads.create()
             for msg in input_messages:
-                if isinstance(msg, dict) and 'content' in msg and 'role' in msg:
-                    message = openai.beta.threads.messages.create(
-                        thread_id=thread.id,
-                        role="user",
-                        content=msg['content']
-                    )
-                elif isinstance(msg, str):
-                    message = openai.beta.threads.messages.create(
-                        thread_id=thread.id,
-                        role="user",
-                        content=msg
-                    )
-            run = openai.beta.threads.runs.create(
-                thread_id=thread.id,
-                assistant_id=assistant_id
-            )
-            while True:
-                run_status = openai.beta.threads.runs.retrieve(
-                    thread_id=thread.id,
-                    run_id=run.id
+                prompt = context + "\n\n" + (msg['content'] if isinstance(msg, dict) and 'content' in msg else msg)
+                response = openai.Completion.create(
+                    engine="text-davinci-004", 
+                    prompt=prompt, 
+                    max_tokens=8192
                 )
-                if run_status.status == "completed":
-                    break
-                time.sleep(1)
-            messages = openai.beta.threads.messages.list(
-                thread_id=thread.id
-            )
-            for message in messages.data:
-                for content in message.content:
-                    if content.type == 'text':
-                        response = content.text.value 
-                        return response
+                responses.append(response.choices[0].text.strip())
+            return "\n".join(responses)
         except Exception as e:
-            print(f"Error in ask_gpt with OpenAI Assistant API: {e}")
+            print(f"Error in ask_gpt with OpenAI API: {e}")
             if attempt < retry_attempts - 1:
                 await asyncio.sleep(delay)
                 continue
