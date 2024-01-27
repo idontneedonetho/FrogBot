@@ -22,27 +22,25 @@ def rate_limited_request():
     last_request_time = time.time()
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
-    context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
-    responses = []
+    gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
+    gpt_context = {"role": "assistant", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."}
+    modified_input_messages = [gpt_context] + input_messages
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            for msg in input_messages:
-                prompt = context + "\n\n" + (msg['content'] if isinstance(msg, dict) and 'content' in msg else msg)
-                response = openai.Completion.create(
-                    engine="text-davinci-004", 
-                    prompt=prompt, 
-                    max_tokens=8192
-                )
-                responses.append(response.choices[0].text.strip())
-            return "\n".join(responses)
+            modified_input_messages = [gpt_context] + input_messages
+            chat_completion = openai.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=modified_input_messages
+            )
+            return chat_completion.choices[0].message['content']
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI API: {e}")
             if attempt < retry_attempts - 1:
                 await asyncio.sleep(delay)
                 continue
             try:
-                model = GenerativeModel(model_name="gemini-pro")
+                model = GenerativeModel(model_name="Gemini-pro")
                 chat = model.start_chat()
                 gemini_input_messages = [gemini_context]
                 for msg in input_messages:
