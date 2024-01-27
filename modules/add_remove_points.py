@@ -2,17 +2,10 @@
 from modules.utils.database import initialize_points_database, update_points, get_user_points
 from modules.utils.rank_thresholds import role_thresholds
 from modules.utils.progression import calculate_user_rank_and_next_rank_name, create_points_embed
+from modules.utils.commons import is_admin
 from modules.roles import check_user_points
 from discord.ext import commands
 import discord
-
-def is_admin():
-    async def predicate(ctx):
-        author = ctx.message.author
-        is_admin = author.guild_permissions.administrator
-        print(f"Checking admin status for {author} (ID: {author.id}): {is_admin}")
-        return is_admin
-    return commands.check(predicate)
 
 @commands.command(name="add")
 @is_admin()

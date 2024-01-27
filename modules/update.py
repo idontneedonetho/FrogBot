@@ -1,15 +1,8 @@
 # commands/update.py
 
 from discord.ext import commands
+from modules.utils.commons import is_admin_or_user
 import subprocess
-
-def is_admin_or_user(user_id=126123710435295232):
-    async def predicate(ctx):
-        is_admin = ctx.author.guild_permissions.administrator
-        is_specific_user = ctx.author.id == user_id
-        print(f"Admin check: {is_admin}, Specific user check: {is_specific_user}")
-        return is_admin or is_specific_user
-    return commands.check(predicate)
 
 @commands.command(name="update")
 @is_admin_or_user()
