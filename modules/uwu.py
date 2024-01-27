@@ -12,7 +12,7 @@ uwu_responses = [
 
 last_used_uwu = None
 
-async def uwu(message):
+async def send_uwu_response(message):
     global last_used_uwu
 
     last_response = last_used_uwu
@@ -22,3 +22,8 @@ async def uwu(message):
     selected_response = random.choice(available_responses)
     last_used_uwu = selected_response
     await message.channel.send(selected_response)
+
+async def on_message(message):
+    # Trigger the response if a specific keyword is in the message
+    if 'uwu' in message.content.lower():
+        await send_uwu_response(message)

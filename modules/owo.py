@@ -12,7 +12,7 @@ owo_responses = [
 
 last_used_owo = None
 
-async def owo(message):
+async def send_owo_response(message):
     global last_used_owo
 
     last_response = last_used_owo
@@ -22,3 +22,8 @@ async def owo(message):
     selected_response = random.choice(available_responses)
     last_used_owo = selected_response
     await message.channel.send(selected_response)
+
+async def on_message(message):
+    # Trigger the response if a specific keyword is in the message
+    if 'owo' in message.content.lower():
+        await send_owo_response(message)
