@@ -75,12 +75,8 @@ FrogBot relies on the following external libraries and tools to power its functi
 - [nltk](https://www.nltk.org/): The Natural Language Toolkit for Python, used for natural language processing.
 - [trafilatura](https://pypi.org/project/trafilatura/): A Python library for extracting text from web pages.
 - [requests](https://pypi.org/project/requests/): A Python library for making HTTP requests.
-- [googlesearch-python](https://pypi.org/project/googlesearch-python/): A Python library for performing Google searches.
-- [aiohttp](https://docs.aiohttp.org/): An asynchronous HTTP client/server framework.
 - [python-dotenv](https://pypi.org/project/python-dotenv/): A Python library for reading environment variables from a `.env` file.
-- [google](https://github.com/googleapis/google-api-python-client): Google APIs Client Library for Python.
 - [openai](https://pypi.org/project/openai/): Python client library for OpenAI GPT models.
-- [pillow](https://pypi.org/project/Pillow/): The Python Imaging Library, used for image processing.
 
 These external libraries and tools are essential for enabling FrogBot's features and capabilities. Make sure to review their documentation for further details on usage and functionality.
 
