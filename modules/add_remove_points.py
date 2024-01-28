@@ -12,6 +12,15 @@ import discord
 async def add_points_command(ctx, points_to_add: int, keyword: str, user: discord.User):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
+        print(f"Adding points: Keyword: {keyword}, Points: {points_to_add}, User: {user}")
+        if not user:
+            print("User does not exist.")
+            await ctx.reply("User does not exist.")
+            return
+        if points_to_add < 0:
+            print("Invalid points.")
+            await ctx.reply("Points must be a positive number.")
+            return
         action = "add"
         user_points = initialize_points_database(user)
         user_id = user.id
@@ -23,6 +32,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, user: discor
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
+        print("Invalid syntax.")
         await ctx.reply("Invalid syntax. Please use '@bot add <points> point/points @user'.")
 
 @commands.command(name="remove")
@@ -30,6 +40,15 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, user: discor
 async def remove_points_command(ctx, points_to_remove: int, keyword: str, user: discord.User):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
+        print(f"Removing points: Keyword: {keyword}, Points: {points_to_remove}, User: {user}")
+        if not user:
+            print("User does not exist.")
+            await ctx.reply("User does not exist.")
+            return
+        if points_to_remove < 0:
+            print("Invalid points.")
+            await ctx.reply("Points must be a positive number.")
+            return
         action = "remove"
         user_points = initialize_points_database(user)
         user_id = user.id
@@ -41,6 +60,7 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: str, user: 
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
+        print("Invalid syntax.")
         await ctx.reply("Invalid syntax. Please use '@bot remove <points> point/points @user'.")
 
 def setup(client):
