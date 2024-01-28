@@ -15,7 +15,6 @@ async def initialize_database():
         ''')
         conn.commit()
         cursor.close()
-    await initialize_database()
 
 def db_access_with_retry(sql_operation, *args, max_attempts=5, delay=1, timeout=10.0):
     for attempt in range(max_attempts):
