@@ -8,7 +8,7 @@ async def on_raw_reaction_add(payload):
     
     if payload.member and payload.member.guild_permissions.administrator:
         user = payload.member
-        user_points = initialize_points_database(bot, user)
+        user_points = initialize_points_database(user)
         channel = bot.get_channel(payload.channel_id)
         await process_reaction(bot, payload, user_points)
         await check_user_points(bot)
