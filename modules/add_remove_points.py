@@ -2,13 +2,13 @@
 from modules.utils.database import initialize_points_database, update_points, get_user_points
 from modules.utils.rank_thresholds import role_thresholds
 from modules.utils.progression import calculate_user_rank_and_next_rank_name, create_points_embed
-from modules.utils.commons import is_admin
+from modules.utils.commons import is_admin, is_admin_or_user
 from modules.roles import check_user_points
 from discord.ext import commands
 import re
 
 @commands.command(name="add")
-@is_admin()
+@is_admin_or_user()
 async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
@@ -40,7 +40,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str
         await ctx.reply("Invalid syntax. Please use '@bot add <points> point/points @user'.")
 
 @commands.command(name="remove")
-@is_admin()
+@is_admin_or_user()
 async def remove_points_command(ctx, points_to_remove: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
