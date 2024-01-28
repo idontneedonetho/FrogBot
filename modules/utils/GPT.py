@@ -23,16 +23,16 @@ def rate_limited_request():
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."
-    gpt_context = {"role": "assistant", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."}
+    gpt_context = {"role": "system", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters."}
     modified_input_messages = [gpt_context] + input_messages
     for attempt in range(retry_attempts):
         rate_limited_request()
         try:
-            chat_completion = openai.chat.completions.create(
+            response = openai.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=modified_input_messages
             )
-            return chat_completion.choices[0].message['content']
+            response['choices'][0]['message']['content']
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI API: {e}")
             if attempt < retry_attempts - 1:
