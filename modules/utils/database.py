@@ -41,7 +41,7 @@ def initialize_points_database(user):
     user_points = {user_id: points or 0 for user_id, points in rows}
     if user.id not in user_points:
         user_points[user.id] = 0
-        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', user.id, 0)
+        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user.id, 0))
     return user_points
 
 async def update_points(user_id, points):
