@@ -32,7 +32,8 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 model="gpt-4-turbo-preview",
                 messages=modified_input_messages
             )
-            response['choices'][0]['message']['content']
+            response_message = response.choices[0].message.content
+            return response_message
         except Exception as e:
             print(f"Error in ask_gpt with OpenAI API: {e}")
             if attempt < retry_attempts - 1:
