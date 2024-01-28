@@ -31,8 +31,8 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str
         new_points = current_points + points_to_add
         if await update_points(user_id, new_points):
             await check_user_points(ctx.bot)
-        user_rank, next_rank_name, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
-        new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
+        user_rank, next_rank_name, _, _, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        new_embed = create_points_embed(ctx, user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
         print("Invalid syntax.")
@@ -63,8 +63,8 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: str, mentio
         new_points = max(current_points - points_to_remove, 0)
         if await update_points(user_id, new_points):
             await check_user_points(ctx.bot)
-        user_rank, next_rank_name, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
-        new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
+        user_rank, next_rank_name, _, _, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        new_embed = create_points_embed(ctx, user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
         print("Invalid syntax.")
