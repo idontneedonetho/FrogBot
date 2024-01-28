@@ -5,25 +5,29 @@ from modules.utils.progression import calculate_user_rank_and_next_rank_name, cr
 from modules.utils.commons import is_admin
 from modules.roles import check_user_points
 from discord.ext import commands
-import discord
+import re
 
 @commands.command(name="add")
 @is_admin()
-async def add_points_command(ctx, points_to_add: int, keyword: str, user: discord.User):
+async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
-        print(f"Adding points: Keyword: {keyword}, Points: {points_to_add}, User: {user}")
-        if not user:
-            print("User does not exist.")
-            await ctx.reply("User does not exist.")
+        user_id_match = re.match(r'<@!?(\d+)>', mention)
+        if not user_id_match:
+            await ctx.reply("Invalid user mention.")
             return
+        user_id = int(user_id_match.group(1))
+        user = ctx.guild.get_member(user_id)
+        if not user:
+            await ctx.reply("User not found.")
+            return
+        print(f"Adding points: Keyword: {keyword}, Points: {points_to_add}, User: {user}")
         if points_to_add < 0:
             print("Invalid points.")
             await ctx.reply("Points must be a positive number.")
             return
         action = "add"
         user_points = initialize_points_database(user)
-        user_id = user.id
         current_points = get_user_points(user_id, user_points)
         new_points = current_points + points_to_add
         if await update_points(user_id, new_points):
@@ -37,21 +41,25 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, user: discor
 
 @commands.command(name="remove")
 @is_admin()
-async def remove_points_command(ctx, points_to_remove: int, keyword: str, user: discord.User):
+async def remove_points_command(ctx, points_to_remove: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
-        print(f"Removing points: Keyword: {keyword}, Points: {points_to_remove}, User: {user}")
-        if not user:
-            print("User does not exist.")
-            await ctx.reply("User does not exist.")
+        user_id_match = re.match(r'<@!?(\d+)>', mention)
+        if not user_id_match:
+            await ctx.reply("Invalid user mention.")
             return
+        user_id = int(user_id_match.group(1))
+        user = ctx.guild.get_member(user_id)
+        if not user:
+            await ctx.reply("User not found.")
+            return
+        print(f"Removing points: Keyword: {keyword}, Points: {points_to_remove}, User: {user}")
         if points_to_remove < 0:
             print("Invalid points.")
             await ctx.reply("Points must be a positive number.")
             return
         action = "remove"
         user_points = initialize_points_database(user)
-        user_id = user.id
         current_points = get_user_points(user_id, user_points)
         new_points = max(current_points - points_to_remove, 0)
         if await update_points(user_id, new_points):
