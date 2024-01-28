@@ -1,6 +1,6 @@
 # FrogBot/modules/emoji.py
 
-from modules.utils.database import db_access_with_retry, initialize_points_database, update_points, get_user_points
+from modules.utils.database import db_access_with_retry, initialize_points_database, update_points
 from modules.roles import check_user_points
 import discord
 import datetime

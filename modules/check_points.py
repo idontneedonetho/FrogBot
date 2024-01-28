@@ -1,7 +1,6 @@
 # check_points.py
 from modules.utils.database import initialize_points_database
-from modules.utils.rank_thresholds import role_thresholds, get_next_threshold
-from modules.utils.progression import create_progress_bar
+from modules.utils.progression import create_progress_bar, role_thresholds, get_next_threshold
 from discord.ext import commands
 import discord
 import datetime

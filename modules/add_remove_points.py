@@ -1,14 +1,13 @@
 # add_remove_points.py
 from modules.utils.database import initialize_points_database, update_points, get_user_points
-from modules.utils.rank_thresholds import role_thresholds
-from modules.utils.progression import calculate_user_rank_and_next_rank_name, create_points_embed
-from modules.utils.commons import is_admin, is_admin_or_user
+from modules.utils.progression import calculate_user_rank_and_next_rank_name, create_points_embed, role_thresholds
+from modules.utils.commons import is_admin
 from modules.roles import check_user_points
 from discord.ext import commands
 import re
 
 @commands.command(name="add")
-@is_admin_or_user()
+@is_admin()
 async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
@@ -32,7 +31,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str
         new_points = current_points + points_to_add
         if await update_points(user_id, new_points):
             await check_user_points(ctx.bot)
-        user_rank, next_rank_name = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        user_rank, next_rank_name, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
@@ -40,7 +39,7 @@ async def add_points_command(ctx, points_to_add: int, keyword: str, mention: str
         await ctx.reply("Invalid syntax. Please use '@bot add <points> point/points @user'.")
 
 @commands.command(name="remove")
-@is_admin_or_user()
+@is_admin()
 async def remove_points_command(ctx, points_to_remove: int, keyword: str, mention: str):
     keyword = await commands.clean_content().convert(ctx, keyword)
     if keyword:
@@ -64,7 +63,7 @@ async def remove_points_command(ctx, points_to_remove: int, keyword: str, mentio
         new_points = max(current_points - points_to_remove, 0)
         if await update_points(user_id, new_points):
             await check_user_points(ctx.bot)
-        user_rank, next_rank_name = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
+        user_rank, next_rank_name, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
         new_embed = create_points_embed(user, new_points, role_thresholds, action, user_rank, next_rank_name)
         await ctx.reply(embed=new_embed)
     else:
