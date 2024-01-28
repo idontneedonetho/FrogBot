@@ -2,6 +2,7 @@
 
 import discord
 import os
+import traceback
 from datetime import datetime, timedelta
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -84,6 +85,8 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         await ctx.send("Sorry, I didn't understand that command.")
     else:
-        print(f'An error occurred: {error}')
+        tb = traceback.format_exception(type(error), error, error.__traceback__)
+        tb_str = "".join(tb)
+        print(f'An error occurred: {error}\n{tb_str}')
 
 client.run(TOKEN)
