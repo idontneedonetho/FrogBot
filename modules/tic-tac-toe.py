@@ -68,7 +68,7 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     global game
     game = TicTacToe()
     game.set_players(player_x.id, player_o.id)
-    initial_board = " 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9"
+    initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
     await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Use `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
 
 @commands.command(name='ttt move')
@@ -79,7 +79,7 @@ async def make_move(ctx, num: int):
         board_str = game.get_board_str()
         next_player = game.player_x if game.current_turn == "O" else game.player_o
         next_player_mention = ctx.guild.get_member(next_player).mention
-        await ctx.send(f"Board updated:\n{board_str}\nNext turn: {next_player_mention}")
+        await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
         if game.game_over:
             winner_mention = ctx.guild.get_member(game.winner).mention
             await ctx.send(f"Game Over! Winner: {winner_mention}")
