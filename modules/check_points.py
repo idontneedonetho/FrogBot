@@ -1,7 +1,6 @@
 # check_points.py
 from modules.utils.database import initialize_points_database
-from modules.utils.rank_thresholds import role_thresholds, get_next_threshold
-from modules.utils.progression import create_progress_bar
+from modules.utils.progression import create_progress_bar, calculate_user_rank_and_next_rank_name, role_thresholds
 from discord.ext import commands
 import discord
 import datetime
@@ -32,7 +31,6 @@ async def check_or_rank_command(ctx, *args):
         if not ctx.guild:
             await ctx.send("This command can only be used in a guild.")
             return
-        role_id_to_name = {role.id: role.name for role in ctx.guild.roles}
         embed = discord.Embed(
             title="**🏆 Your Current Standing**",
             description="Here's your current points, rank, etc.",
@@ -44,10 +42,10 @@ async def check_or_rank_command(ctx, *args):
             if member is None:
                 continue
             display_name = member.display_name
-            next_role_id = next((threshold_role_id for threshold, threshold_role_id in sorted(role_thresholds.items()) if points < threshold), None)
-            next_rank_name = role_id_to_name.get(next_role_id, "next rank")
-            points_needed = get_next_threshold(points, role_thresholds) - points
-            progress_bar = create_progress_bar(points, get_next_threshold(points, role_thresholds))
+            _, next_rank_name, points_needed, current_threshold, next_threshold = calculate_user_rank_and_next_rank_name(ctx, member, role_thresholds)
+            progress_length = next_threshold - current_threshold
+            progress_current = points - current_threshold
+            progress_bar = create_progress_bar(progress_current, progress_length)
             rank_text = ""
             if index < 3:
                 rank_emoji = ["🥇", "🥈", "🥉"][index]

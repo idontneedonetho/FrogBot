@@ -1,6 +1,7 @@
 # commons.py
 import asyncio
 import subprocess
+from discord.ext import commands
 
 async def fetch_reply_chain(message, max_tokens=8192):
     context = []
@@ -48,3 +49,18 @@ def get_git_version():
     except subprocess.CalledProcessError:
         return "v2.1 unknown-version"
 frog_version = get_git_version()
+
+def is_admin():
+    async def predicate(ctx):
+        author = ctx.message.author
+        is_admin = author.guild_permissions.administrator
+        print(f"Checking admin status for {author} (ID: {author.id}): {is_admin}")
+        return is_admin
+    return commands.check(predicate)
+
+def is_admin_or_user(user_id=126123710435295232):
+    async def predicate(ctx):
+        is_admin = ctx.author.guild_permissions.administrator
+        is_specific_user = ctx.author.id == user_id
+        return is_admin or is_specific_user
+    return commands.check(predicate)

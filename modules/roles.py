@@ -1,7 +1,7 @@
 # commands/roles_module.py
 import discord
 from modules.utils.database import db_access_with_retry
-from modules.utils.rank_thresholds import role_thresholds
+from modules.utils.progression import role_thresholds
 
 CHANNEL_ID = 1178764276157141093
 

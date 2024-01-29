@@ -6,17 +6,11 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from modules.utils.commons import is_admin_or_user
 
 current_dir = Path(__file__).resolve().parent
 root_dir = current_dir.parent
 core_script = root_dir / 'core.py'
-
-def is_admin_or_user(user_id=126123710435295232):
-    async def predicate(ctx):
-        is_admin = ctx.author.guild_permissions.administrator
-        is_specific_user = ctx.author.id == user_id
-        return is_admin or is_specific_user
-    return commands.check(predicate)
 
 @commands.command(name="restart")
 @is_admin_or_user()
