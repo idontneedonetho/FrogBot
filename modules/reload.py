@@ -1,5 +1,5 @@
 from discord.ext import commands
-from modules.utils.commons import is_admin
+from modules.utils.commons import is_admin_or_user
 from module_loader import ModuleLoader
 
 class ReloadCommand:
@@ -19,7 +19,7 @@ class ReloadCommand:
 def setup(client):
     reload_command = ReloadCommand('modules')
     @commands.command(name="reload")
-    @is_admin()
+    @is_admin_or_user()
     async def reload(ctx, module_name):
         await reload_command.reload_module(ctx, module_name)
     client.add_command(reload)
