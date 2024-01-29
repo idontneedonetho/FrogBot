@@ -40,9 +40,10 @@ class TicTacToe:
         if self.check_winner(row, col):
             self.game_over = True
             self.winner = self.current_turn
+            return True, "Player wins."
         else:
             self.current_turn = "O" if self.current_turn == "X" else "X"
-        return True
+            return True, "Valid move :)"
 
     def check_winner(self, row, col):
         if all(self.board[row][i] == self.current_turn for i in range(3)):
@@ -63,15 +64,15 @@ from discord.ext import commands
 
 game = TicTacToe()
 
-@commands.command(name='start')
+@commands.command(name='ttt start')
 async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     global game
     game = TicTacToe()
     game.set_players(player_x.id, player_o.id)
-    initial_board = " 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9"
+    initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
     await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Use `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
 
-@commands.command(name='move')
+@commands.command(name='ttt move')
 async def make_move(ctx, num: int):
     player_id = ctx.author.id
     valid_move, message = game.make_move(player_id, num)
@@ -79,7 +80,7 @@ async def make_move(ctx, num: int):
         board_str = game.get_board_str()
         next_player = game.player_x if game.current_turn == "O" else game.player_o
         next_player_mention = ctx.guild.get_member(next_player).mention
-        await ctx.send(f"Board updated:\n{board_str}\nNext turn: {next_player_mention}")
+        await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
         if game.game_over:
             winner_mention = ctx.guild.get_member(game.winner).mention
             await ctx.send(f"Game Over! Winner: {winner_mention}")
