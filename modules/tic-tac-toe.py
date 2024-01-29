@@ -56,7 +56,7 @@ game = TicTacToe()
 async def start_game(ctx):
     global game
     game = TicTacToe()
-    await ctx.send("New game started! Use `ttt [row] [col]` to make a move.")
+    await ctx.send("New game started! Use `ttt move [row] [col]` to make a move.")
 
 @bot.command(name='move')
 async def make_move(ctx, row: int, col: int):
