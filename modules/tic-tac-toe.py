@@ -40,9 +40,10 @@ class TicTacToe:
         if self.check_winner(row, col):
             self.game_over = True
             self.winner = self.current_turn
+            return True, "Player wins."
         else:
             self.current_turn = "O" if self.current_turn == "X" else "X"
-        return True
+            return True, "Valid move :)"
 
     def check_winner(self, row, col):
         if all(self.board[row][i] == self.current_turn for i in range(3)):
