@@ -19,6 +19,7 @@ class ReloadCommand:
 def setup(client):
     reload_command = ReloadCommand('modules')
     @commands.command(name="reload")
+    @is_admin()
     async def reload(ctx, module_name):
         await reload_command.reload_module(ctx, module_name)
     client.add_command(reload)
