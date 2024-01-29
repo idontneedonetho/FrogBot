@@ -48,7 +48,11 @@ class TicTacToe:
 import discord
 from discord.ext import commands
 
-bot = commands.Bot(command_prefix="ttt ")
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="ttt ", intents=intents)
 
 game = TicTacToe()
 
