@@ -11,21 +11,14 @@ class ModuleLoader:
         for filename in os.listdir(self.directory):
             if filename.endswith('.py'):
                 module_name = filename[:-3]
-                self.load_module(bot, module_name)
-
-    def load_module(self, bot, module_name):
-        filename = f"{module_name}.py"
-        module_path = os.path.join(self.directory, filename)
-        if not os.path.exists(module_path):
-            return None
-        spec = importlib.util.spec_from_file_location(module_name, module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        self.modules.append(module)
-        print(f"Loading module: {module_name}")
-        if hasattr(module, 'setup'):
-            module.setup(bot)
-        return module
+                module_path = os.path.join(self.directory, filename)
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.modules.append(module)
+                print(f"Loading module: {module_name}")
+                if hasattr(module, 'setup'):
+                    module.setup(bot)
 
     def get_command_handlers(self):
         handlers = {}
