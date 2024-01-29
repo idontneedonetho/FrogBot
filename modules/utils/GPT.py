@@ -40,7 +40,7 @@ async def ask_gpt(input_messages, retry_attempts=3, delay=1):
                 await asyncio.sleep(delay)
                 continue
             try:
-                model = GenerativeModel(model_name="Gemini-pro")
+                model = GenerativeModel(model_name="gemini-pro")
                 chat = model.start_chat()
                 gemini_input_messages = [gemini_context]
                 for msg in input_messages:
