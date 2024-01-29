@@ -48,17 +48,15 @@ class TicTacToe:
 import discord
 from discord.ext import commands
 
-bot = commands.Bot(command_prefix="ttt ")
-
 game = TicTacToe()
 
-@bot.command(name='start')
+@commands.command(name='start')
 async def start_game(ctx):
     global game
     game = TicTacToe()
-    await ctx.send("New game started! Use `ttt [row] [col]` to make a move.")
+    await ctx.send("New game started! Use `ttt move [row] [col]` to make a move.")
 
-@bot.command(name='move')
+@commands.command(name='move')
 async def make_move(ctx, row: int, col: int):
     if row < 1 or row > 3 or col < 1 or col > 3:
         await ctx.send("Invalid move. Please choose row and column values between 1 and 3.")
