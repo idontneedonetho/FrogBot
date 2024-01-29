@@ -92,3 +92,8 @@ async def make_move(ctx, num: int):
 def setup(client):
   client.add_command(start_game)
   client.add_command(make_move)
+
+async def on_command_error(ctx, error):
+    user = await client.fetch_user('391783950005305344')
+    error_message = f"An error occurred: {error}"
+    await user.send(error_message)
