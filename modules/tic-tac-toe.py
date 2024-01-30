@@ -1,5 +1,9 @@
 # tic-tac-toe.py
 
+import discord
+from discord.ext import commands
+import asyncio
+
 class TicTacToe:
     def __init__(self):
         self.board = [[" " for _ in range(3)] for _ in range(3)]
@@ -8,6 +12,7 @@ class TicTacToe:
         self.current_turn = "X"
         self.game_over = False
         self.winner = None
+        self.message_id = None
 
     def set_players(self, player_x, player_o):
         self.player_x = player_x
@@ -19,7 +24,7 @@ class TicTacToe:
             for j in range(3):
                 cell = self.board[i][j]
                 if cell == " ":
-                    cell = str(i * 3 + j + 1)  # Display cell number if empty
+                    cell = str(i * 3 + j + 1)
                 board_str += f" {cell} "
                 if j < 2:
                     board_str += "|"
@@ -59,39 +64,62 @@ class TicTacToe:
     def is_full(self):
         return all(self.board[row][col] != " " for row in range(3) for col in range(3))
 
-import discord
-from discord.ext import commands
+    def timeout_game(self):
+        if not self.game_over:
+            self.game_over = True
+            return True
+        return False
 
-game = TicTacToe()
+# Global dictionary to store games
+games = {}
 
 @commands.command(name='ttt_start')
 async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
-    global game
+    global games
     game = TicTacToe()
     game.set_players(player_x.id, player_o.id)
     initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
-    await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Use `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
+    game_message = await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Reply to this message with `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
+    games[game_message.id] = game
+    game.message_id = game_message.id
+
+    async def game_timeout():
+        await asyncio.sleep(3600)
+        if game.timeout_game():
+            await ctx.send("Game Over! The game has timed out after 1 hour.")
+
+    asyncio.create_task(game_timeout())
 
 @commands.command(name='ttt_move')
 async def make_move(ctx, num: int):
+    global games
+    if ctx.message.reference is None or ctx.message.reference.message_id not in games:
+        await ctx.send("Please reply to the game message to make a move.")
+        return
+
+    game_message_id = ctx.message.reference.message_id
+    game = games[game_message_id]
     player_id = ctx.author.id
     valid_move, message = game.make_move(player_id, num)
     if valid_move:
-        board_str = game.get_board_str()
-        next_player = game.player_x if game.current_turn == "O" else game.player_o
-        next_player_mention = ctx.guild.get_member(next_player).mention
-        await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
         if game.game_over:
             winner_mention = ctx.guild.get_member(game.winner).mention
             await ctx.send(f"Game Over! Winner: {winner_mention}")
-        elif game.is_full():
-            await ctx.send("Game Over! It's a draw.")
+            del games[game_message_id]
+        else:
+            board_str = game.get_board_str()
+            next_player = game.player_o if game.current_turn == "O" else game.player_x
+            next_player_mention = ctx.guild.get_member(next_player).mention
+            await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
+            if game.is_full():
+                await ctx.send("Game Over! It's a draw.")
+                del games[game_message_id]
     else:
         await ctx.send(message)
 
 def setup(client):
-  client.add_command(start_game)
-  client.add_command(make_move)
+    client.add_command(start_game)
+    client.add_command(make_move)
 
 async def on_command_error(ctx, error):
     user = await client.fetch_user('391783950005305344')
