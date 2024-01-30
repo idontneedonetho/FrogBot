@@ -33,6 +33,17 @@ async def on_ready():
     await check_user_points(client)
     await client.change_presence(activity=discord.Game(name=f"@FrogBot help | {frog_version}"))
     print(f'Logged in as {client.user.name}')
+    try:
+        with open("restart_channel_id.txt", "r") as file:
+            channel_id = int(file.read().strip())
+            channel = bot.get_channel(channel_id)
+            if channel:
+                await channel.send("I'm back online!")
+            os.remove("restart_channel_id.txt")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Error sending restart message: {e}")
 
 @client.event
 async def on_message(message):
