@@ -89,42 +89,45 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 
     asyncio.create_task(game_timeout())
 
-@commands.command(name='ttt_move')
-async def make_move(ctx, num: int):
+async def on_message(message):
     global games
-    if ctx.message.reference is None or ctx.message.reference.message_id not in games:
-        await ctx.send("Please reply to the latest game message to make a move.")
-        return
+    if message.reference and message.reference.message_id in games:
+        game_message_id = message.reference.message_id
+        game = games[game_message_id]
 
-    game_message_id = ctx.message.reference.message_id
-    game = games[game_message_id]
-    player_id = ctx.author.id
-    valid_move, message = game.make_move(player_id, num)
+        if message.content.startswith("ttt_move"):
+            try:
+                _, num_str = message.content.split()
+                num = int(num_str)
+                player_id = message.author.id
+                valid_move, response_message = game.make_move(player_id, num)
 
-    if valid_move:
-        board_str = game.get_board_str()
-        if game.game_over:
-            winner_mention = ctx.guild.get_member(game.winner).mention
-            new_message = await ctx.send(f"Game Over! Winner: {winner_mention}\n```{board_str}```")
-            del games[game_message_id]
-        else:
-            next_player = game.player_o if game.current_turn == "O" else game.player_x
-            next_player_mention = ctx.guild.get_member(next_player).mention
-            new_message = await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
-            if game.is_full():
-                await ctx.send("Game Over! It's a draw.")
-                del games[game_message_id]
-            else:
-                # Update the game message ID with the ID of the new message
-                games.pop(game_message_id)
-                game.message_id = new_message.id
-                games[game.message_id] = game
-    else:
-        await ctx.send(message)
+                if valid_move:
+                    board_str = game.get_board_str()
+                    if game.game_over:
+                        winner_mention = message.guild.get_member(game.winner).mention
+                        new_message = await message.channel.send(f"Game Over! Winner: {winner_mention}\n```{board_str}```")
+                        del games[game_message_id]
+                    else:
+                        next_player = game.player_o if game.current_turn == "O" else game.player_x
+                        next_player_mention = message.guild.get_member(next_player).mention
+                        new_message = await message.channel.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
+                        if game.is_full():
+                            await message.channel.send("Game Over! It's a draw.")
+                            del games[game_message_id]
+                        else:
+                            games.pop(game_message_id)
+                            game.message_id = new_message.id
+                            games[game.message_id] = game
+                else:
+                    await message.channel.send(response_message)
+            except (ValueError, IndexError):
+                await message.channel.send("Invalid command format. Use 'ttt_move [number]'.")
+
+    await client.process_commands(message)
 
 def setup(client):
     client.add_command(start_game)
-    client.add_command(make_move)
 
 async def on_command_error(ctx, error):
     user = await client.fetch_user('391783950005305344')
