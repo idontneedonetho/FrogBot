@@ -89,7 +89,6 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 
     asyncio.create_task(game_timeout())
 
-@client.event
 async def on_message(message):
     global games
     if message.reference and message.reference.message_id in games:
@@ -129,7 +128,6 @@ async def on_message(message):
 
 def setup(client):
     client.add_command(start_game)
-    client.add_command(make_move)
 
 async def on_command_error(ctx, error):
     user = await client.fetch_user('391783950005305344')
