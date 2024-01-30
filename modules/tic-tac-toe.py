@@ -70,7 +70,6 @@ class TicTacToe:
             return True
         return False
 
-# Global dictionary to store games
 games = {}
 
 @commands.command(name='ttt_start')
@@ -79,7 +78,7 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     game = TicTacToe()
     game.set_players(player_x.id, player_o.id)
     initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
-    game_message = await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Reply to this message with `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
+    game_message = await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Reply to this message with `ttt_move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
     games[game_message.id] = game
     game.message_id = game_message.id
 
@@ -94,26 +93,32 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 async def make_move(ctx, num: int):
     global games
     if ctx.message.reference is None or ctx.message.reference.message_id not in games:
-        await ctx.send("Please reply to the game message to make a move.")
+        await ctx.send("Please reply to the latest game message to make a move.")
         return
 
     game_message_id = ctx.message.reference.message_id
     game = games[game_message_id]
     player_id = ctx.author.id
     valid_move, message = game.make_move(player_id, num)
+
     if valid_move:
+        board_str = game.get_board_str()
         if game.game_over:
             winner_mention = ctx.guild.get_member(game.winner).mention
-            await ctx.send(f"Game Over! Winner: {winner_mention}")
+            new_message = await ctx.send(f"Game Over! Winner: {winner_mention}\n```{board_str}```")
             del games[game_message_id]
         else:
-            board_str = game.get_board_str()
             next_player = game.player_o if game.current_turn == "O" else game.player_x
             next_player_mention = ctx.guild.get_member(next_player).mention
-            await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
+            new_message = await ctx.send(f"Board updated:\n```{board_str}```\nNext turn: {next_player_mention}")
             if game.is_full():
                 await ctx.send("Game Over! It's a draw.")
                 del games[game_message_id]
+            else:
+                # Update the game message ID with the ID of the new message
+                games.pop(game_message_id)
+                game.message_id = new_message.id
+                games[game.message_id] = game
     else:
         await ctx.send(message)
 
