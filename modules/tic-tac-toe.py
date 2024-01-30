@@ -97,6 +97,7 @@ async def on_command_error(ctx, error):
     error_message = f"An error occurred: {error}"
     await user.send(error_message)
 
+@client.event
 async def on_message(message):
     global games
     if message.reference and message.reference.message_id in games:
