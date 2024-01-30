@@ -89,6 +89,10 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 
     asyncio.create_task(game_timeout())
 
+def setup(client):
+    client.add_command(start_game)
+
+@client.event
 async def on_message(message):
     global games
     if message.reference and message.reference.message_id in games:
@@ -125,11 +129,3 @@ async def on_message(message):
                 await message.channel.send("Invalid command format. Use 'ttt_move [number]'.")
 
     await client.process_commands(message)
-
-def setup(client):
-    client.add_command(start_game)
-
-async def on_command_error(ctx, error):
-    user = await client.fetch_user('391783950005305344')
-    error_message = f"An error occurred: {error}"
-    await user.send(error_message)
