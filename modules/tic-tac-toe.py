@@ -64,7 +64,7 @@ from discord.ext import commands
 
 game = TicTacToe()
 
-@commands.command(name='ttt start')
+@commands.command(name='ttt_start')
 async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     global game
     game = TicTacToe()
@@ -72,7 +72,7 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
     await ctx.send(f"New game started between {player_x.mention} (X) and {player_o.mention} (O)! Use `ttt move [number]` to make a move. {player_x.mention} goes first.\n{initial_board}")
 
-@commands.command(name='ttt move')
+@commands.command(name='ttt_move')
 async def make_move(ctx, num: int):
     player_id = ctx.author.id
     valid_move, message = game.make_move(player_id, num)
