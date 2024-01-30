@@ -16,6 +16,8 @@ core_script = root_dir / 'core.py'
 @is_admin_or_user()
 async def restart_bot(ctx):
     await ctx.send("Restarting bot, please wait...")
+    if os.path.exists("restart_channel_id.txt"):
+        os.remove("restart_channel_id.txt")
     with open("restart_channel_id.txt", "w") as file:
         file.write(str(ctx.channel.id))
     for cmd in list(ctx.bot.all_commands.keys()):
