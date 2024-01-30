@@ -92,11 +92,6 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 def setup(client):
     client.add_command(start_game)
 
-async def on_command_error(ctx, error):
-    user = await client.fetch_user('391783950005305344')
-    error_message = f"An error occurred: {error}"
-    await user.send(error_message)
-
 @client.event
 async def on_message(message):
     global games
