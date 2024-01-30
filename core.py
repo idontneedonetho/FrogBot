@@ -36,7 +36,7 @@ async def on_ready():
     try:
         with open("restart_channel_id.txt", "r") as file:
             channel_id = int(file.read().strip())
-            channel = bot.get_channel(channel_id)
+            channel = client.get_channel(channel_id)
             if channel:
                 await channel.send("I'm back online!")
             os.remove("restart_channel_id.txt")
