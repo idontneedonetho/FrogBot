@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 import asyncio
 
-client = commands.Bot(command_prefix=None)
+client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 class TicTacToe:
     def __init__(self):
