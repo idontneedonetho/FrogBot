@@ -47,7 +47,7 @@ def search_internet(query):
         return []
 
 def estimate_confidence(response):
-    uncertain_phrases = ["do not have access to", "do not have the ability to access real-time information", "do not have real-time capabilities", "cannot provide", "I'm not sure", "I think", "possibly", "maybe", "it seems", "suggest using a search engine"]
+    uncertain_phrases = ["knowledge cutoff is April 2023", "unable to access real-time information", "lack the capacity to access external websites", "do not have access to", "do not have the ability to access real-time information", "do not have real-time capabilities", "cannot provide", "I'm not sure", "I think", "possibly", "maybe", "it seems", "suggest using a search engine"]
     return not any(phrase in response for phrase in uncertain_phrases)
 
 def determine_information_type(query):
