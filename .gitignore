@@ -12,3 +12,4 @@ bot_started.flag
 leaderboard_message_id.txt
 watchdog.pid
 client_secret.json
+restart_channel_id.txt
