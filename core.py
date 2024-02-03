@@ -58,7 +58,11 @@ async def on_message(message):
                     if i != 0:
                         command_text = f'<@!{client.user.id}> {command_text}'
                     message.content = command_text
-                    await client.process_commands(message)
+                    try:
+                        await client.process_commands(message)
+                    except Exception as e:
+                        print(f"Error processing command: {e}")
+                        await process_message_with_llm(message, client)
         else:
             await process_message_with_llm(message, client)
     else:
