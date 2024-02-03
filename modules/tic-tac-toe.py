@@ -156,7 +156,7 @@ async def on_reaction_add(reaction, user):
     if result:
         await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
         if game.game_over and not game.message_sent:
-            await reaction.message.channel.send(f"Game Over!\n{response}")
+            #await reaction.message.channel.send(f"Game Over!\n{response}")
             game.message_sent = True
             del games[message_id]
         else:
@@ -167,7 +167,7 @@ async def on_reaction_add(reaction, user):
                 if result:
                     await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
                     if game.game_over and not game.message_sent:
-                        await reaction.message.channel.send(f"Game Over!\n{response}")
+                        #await reaction.message.channel.send(f"Game Over!\n{response}")
                         game.message_sent = True
                         del games[message_id]
 
