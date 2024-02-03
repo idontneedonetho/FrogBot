@@ -3,19 +3,15 @@
 import discord
 import os
 import traceback
-from datetime import datetime, timedelta
 from discord.ext import commands
 from dotenv import load_dotenv
 from module_loader import ModuleLoader
 from modules.roles import check_user_points
-from modules.utils.commons import frog_version, fetch_reply_chain, send_long_message
-from modules.utils.GPT import ask_gpt
-from modules.utils.search import estimate_confidence, determine_information_type, handle_query
+from modules.utils.commons import frog_version
+from modules.utils.GPT import process_message_with_llm
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-user_request_times = {}
-RATE_LIMIT = timedelta(seconds=5)
+TOKEN = os.getenv("DISCORD_TOKEN")\
 
 intents = discord.Intents.default()
 intents.members = True
@@ -52,37 +48,11 @@ async def on_message(message):
     for handler in module_loader.get_event_handlers('on_message'):
         await handler(message)
     if client.user.mentioned_in(message):
-        content = message.content.replace(client.user.mention, '').strip()
-        if content:
-            ctx = await client.get_context(message)
-            if ctx.valid:
-                await client.process_commands(message)
-            else:
-                current_time = datetime.now()
-                last_request_time = user_request_times.get(message.author.id)
-                if last_request_time and current_time - last_request_time < RATE_LIMIT:
-                    try:
-                        await message.reply("You are sending messages too quickly. Please wait a moment before trying again.")
-                    except discord.HTTPException:
-                        await message.channel.send("Could not send the rate limit message; the original message might have been deleted.")
-                    return
-                user_request_times[message.author.id] = current_time
-                async with message.channel.typing():
-                    info_type = determine_information_type(content)
-                    if info_type == "Fresh Information":
-                        search_response = await handle_query(content)
-                        response = search_response if search_response else "No relevant results found for the query."
-                    else:
-                        context = await fetch_reply_chain(message)
-                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                        combined_messages.append({'content': content, 'role': 'user'})
-                        response = await ask_gpt(combined_messages)
-                        if not estimate_confidence(response):
-                            print("Fetching additional information for uncertain queries.")
-                            search_response = await handle_query(content)
-                            response = search_response if search_response else "I'm sorry, I couldn't find information on that topic."
-                    response = response.replace(client.user.name + ":", "").strip()
-                    await send_long_message(message, response)
+        ctx = await client.get_context(message)
+        if ctx.valid:
+            await client.process_commands(message)
+        else:
+            await process_message_with_llm(message, client)
     else:
         await client.process_commands(message)
 

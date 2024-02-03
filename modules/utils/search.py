@@ -5,7 +5,6 @@ import nltk
 import trafilatura
 import asyncio
 import requests
-from modules.utils.GPT import rate_limited_request, ask_gpt
 from bs4 import BeautifulSoup
 
 def setup_nltk():
@@ -35,7 +34,6 @@ async def fetch_content_with_trafilatura(url):
 
 def search_internet(query):
     try:
-        rate_limited_request()
         url = f"https://duckduckgo.com/html/?q={query}"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
         response = requests.get(url, headers=headers)
@@ -71,20 +69,19 @@ def determine_information_type(query):
 async def handle_query(query):
     print(f"Handling query: {query}")
     info_type = determine_information_type(query)
-    initial_response = await ask_gpt([{"role": "user", "content": query}])
-    if estimate_confidence(initial_response):
-        return initial_response
-    elif info_type == "Fresh Information" or not estimate_confidence(initial_response):
+    initial_response = {"role": "user", "content": query}
+    if info_type == "Fresh Information" or not estimate_confidence(initial_response):
         search_urls = search_internet(query)
         if search_urls:
             contents = await asyncio.gather(*(fetch_content_with_trafilatura(url) for url in search_urls))
             context = " ".join(content for content in contents if content)
             if context:
                 combined_input = f"{query}\nContext: {context}"
-                extended_response = await ask_gpt([{"role": "user", "content": combined_input}])
+                extended_response = {"role": "user", "content": combined_input}
                 source_urls = '\n'.join([f"[Source: {url}]" for url in search_urls])
-                return extended_response + "\n\n" + source_urls
+                return extended_response, source_urls
             else:
-                return "I couldn't find any relevant information for your query."
+                return {"role": "user", "content": "I couldn't find any relevant information for your query."}, None
         else:
-            return "No relevant results found for the query."
+            return {"role": "user", "content": "No relevant results found for the query."}, None
+    return initial_response, None

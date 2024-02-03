@@ -5,28 +5,45 @@ import openai
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
 import asyncio
-import time
 from dotenv import load_dotenv
+from modules.utils.search import handle_query, determine_information_type, estimate_confidence
+from modules.utils.commons import send_long_message, fetch_reply_chain
 
 load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-last_request_time = 0
-
-def rate_limited_request():
-    global last_request_time
-    current_time = time.time()
-    if current_time - last_request_time < 1:
-        time.sleep(1 - (current_time - last_request_time))
-    last_request_time = time.time()
+async def process_message_with_llm(message, client):
+    content = message.content.replace(client.user.mention, '').strip()
+    if content:
+        async with message.channel.typing():
+            info_type = determine_information_type(content)
+            if info_type == "Fresh Information":
+                search_response, source_urls = await handle_query(content)
+                response = await ask_gpt([search_response])
+                if source_urls:
+                    response += "\n\n" + source_urls
+                response = response if response else "No relevant results found for the query."
+            else:
+                context = await fetch_reply_chain(message)
+                combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                combined_messages.append({'content': content, 'role': 'user'})
+                response = await ask_gpt(combined_messages)
+                if not estimate_confidence(response):
+                    print("Fetching additional information for uncertain queries.")
+                    search_response, source_urls = await handle_query(content)
+                    response = await ask_gpt([search_response])
+                    if source_urls:
+                        response += "\n\n" + source_urls
+                    response = response if response else "I'm sorry, I couldn't find information on that topic."
+            response = response.replace(client.user.name + ":", "").strip()
+            await send_long_message(message, response)
 
 async def ask_gpt(input_messages, retry_attempts=3, delay=1, bit_flip=0):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by Gemini-Pro"
     gpt_context = {"role": "system", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by GPT-4 Turbo."}
     modified_input_messages = [gpt_context] + input_messages
     for attempt in range(retry_attempts):
-        rate_limited_request()
         try:
             if bit_flip:
                 response = openai.chat.completions.create(
