@@ -74,6 +74,10 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
     game = TicTacToe(player_x, player_o, message)
     games[message.id] = game
     asyncio.create_task(game_timeout(ctx, message.id, 3600))
+    if player_x.bot:
+        result, response = await game.ai_make_move()
+        if result:
+            await message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
 
 async def game_timeout(ctx, message_id, timeout):
     await asyncio.sleep(timeout)
