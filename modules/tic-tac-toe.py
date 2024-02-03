@@ -1,5 +1,6 @@
 from discord.ext import commands
 import asyncio
+import discord
 from core import client
 
 class TicTacToe:
