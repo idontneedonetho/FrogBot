@@ -108,9 +108,9 @@ async def on_message(message):
                     else:
                         next_player = game.player_o if game.current_turn == "O" else game.player_x
 next_player_mention = message.guild.get_member(next_player).mention
-new_message = await message.channel.send(f”Board updated:\n{board_str}\nNext turn: {next_player_mention}”)
+new_message = await message.channel.send(f"Board updated:\n{board_str}\nNext turn: {next_player_mention}")
 if game.is_full():
-await message.channel.send(“Game Over! It’s a draw.”)
+await message.channel.send("Game Over! It’s a draw.")
 del games[game_message_id]
 else:
 games.pop(game_message_id)
@@ -119,6 +119,6 @@ games[game.message_id] = game
 else:
 await message.channel.send(response_message)
 except (ValueError, IndexError):
-await message.channel.send(“Invalid command format. Use ‘ttt_move [number]’.”)
+await message.channel.send("Invalid command format. Use 'ttt_move [number]'.")
 
 await client.process_commands(message)
