@@ -46,18 +46,17 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         return
-
     for handler in module_loader.get_event_handlers('on_message'):
         await handler(message)
-        
     if client.user.mentioned_in(message):
         ctx = await client.get_context(message)
         if ctx.valid:
             command_texts = message.content.split(';')
-            for command_text in command_texts:
-                # Clean and process each individual command
+            for i, command_text in enumerate(command_texts):
                 command_text = command_text.strip()
                 if command_text:
+                    if i != 0:
+                        command_text = f'<@!{client.user.id}> {command_text}'
                     message.content = command_text
                     await client.process_commands(message)
         else:
