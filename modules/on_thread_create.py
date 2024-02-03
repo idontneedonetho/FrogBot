@@ -15,6 +15,11 @@ async def on_thread_create(thread):
         if first_message:
             for emoji in emojis_to_add:
                 await first_message.add_reaction(emoji)
+                # Add a larger delay if the message has attachments
+                if first_message.attachments:
+                    await asyncio.sleep(0.5)
+                else:
+                    await asyncio.sleep(0.1)
     except Exception as e:
         print(f"Error in on_thread_create: {e}")
         
