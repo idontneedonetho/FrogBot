@@ -1,10 +1,7 @@
-# tic-tac-toe.py
-
-import discord
 from discord.ext import commands
 import asyncio
-
-client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
+import discord
+from core import client
 
 class TicTacToe:
     def __init__(self):
@@ -72,11 +69,8 @@ class TicTacToe:
             return True
         return False
 
-games = {}
-
 @commands.command(name='ttt_start')
 async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
-    global games
     game = TicTacToe()
     game.set_players(player_x.id, player_o.id)
     initial_board = "``` 1 | 2 | 3\n-----------\n 4 | 5 | 6\n-----------\n 7 | 8 | 9```"
@@ -91,12 +85,10 @@ async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
 
     asyncio.create_task(game_timeout())
 
-def setup(client):
-    client.add_command(start_game)
+client.add_command(start_game)
 
 @client.event
 async def on_message(message):
-    global games
     if message.reference and message.reference.message_id in games:
         game_message_id = message.reference.message_id
         game = games[game_message_id]
@@ -112,7 +104,7 @@ async def on_message(message):
                     board_str = game.get_board_str()
                     if game.game_over:
                         winner_mention = message.guild.get_member(game.winner).mention
-                        new_message = await message.channel.send(f"Game Over! Winner: {winner_mention}\n```{board_str}```")
+                        await message.channel.send(f"Game Over! Winner: {winner_mention}\n```{board_str}```")
                         del games[game_message_id]
                     else:
                         next_player = game.player_o if game.current_turn == "O" else game.player_x
@@ -129,5 +121,5 @@ async def on_message(message):
                     await message.channel.send(response_message)
             except (ValueError, IndexError):
                 await message.channel.send("Invalid command format. Use 'ttt_move [number]'.")
-
+                
     await client.process_commands(message)
