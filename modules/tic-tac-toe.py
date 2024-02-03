@@ -4,6 +4,9 @@ import discord
 from discord.ext import commands
 import asyncio
 
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
 client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 class TicTacToe:
