@@ -5,6 +5,7 @@ from discord.ext import commands
 async def advanced_help(ctx, bot_name):
     help_message = (
         f'>>> *For commands below, the user must have admin privileges.*\n\n'
+        f'Multi-commands work as follows: **"@{bot_name} [command 1], [command 2]"** etc.\n\n'
         f'**"@{bot_name} add [amount] points @user"** - Add points to a user.\n'
         f'**"@{bot_name} remove [amount] points @user"** - Remove points from a user.\n'
         f'**"@{bot_name} check points @user"** - Check points for a user.\n'

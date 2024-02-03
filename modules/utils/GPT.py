@@ -7,7 +7,7 @@ from vertexai.preview.generative_models import GenerativeModel
 import asyncio
 from dotenv import load_dotenv
 from modules.utils.search import handle_query, determine_information_type, estimate_confidence
-from modules.utils.commons import send_long_message, fetch_reply_chain
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link
 
 load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
@@ -17,13 +17,22 @@ async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
     if content:
         async with message.channel.typing():
-            info_type = determine_information_type(content)
-            if info_type == "Fresh Information":
-                search_response, source_urls = await handle_query(content)
-                response = await ask_gpt([search_response])
-                if source_urls:
-                    response += "\n\n" + source_urls
-                response = response if response else "No relevant results found for the query."
+            if content.startswith('https://discord.com/channels/'):
+                linked_message = await fetch_message_from_link(client, content)
+                if linked_message:
+                    context = await fetch_reply_chain(linked_message)
+                    combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                    combined_messages.append({'content': linked_message.content, 'role': 'user'})
+                    response = await ask_gpt(combined_messages)
+                    if not estimate_confidence(response):
+                        print("Fetching additional information for uncertain queries.")
+                        search_response, source_urls = await handle_query(linked_message.content)
+                        response = await ask_gpt([search_response])
+                        if source_urls:
+                            response += "\n\n" + source_urls
+                        response = response if response else "I'm sorry, I couldn't find information on that topic."
+                else:
+                    response = "I couldn't fetch the message from the link."
             else:
                 context = await fetch_reply_chain(message)
                 combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
