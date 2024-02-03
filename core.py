@@ -3,8 +3,7 @@
 import discord
 import os
 import traceback
-import asyncio
-import copy
+import shlex
 from discord.ext import commands
 from dotenv import load_dotenv
 from module_loader import ModuleLoader
@@ -47,17 +46,20 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         return
+
     for handler in module_loader.get_event_handlers('on_message'):
         await handler(message)
+        
     if client.user.mentioned_in(message):
         ctx = await client.get_context(message)
         if ctx.valid:
-            commands = message.content.split(',')
-            for command in commands:
-                new_message = copy.copy(message)
-                new_message.content = command.strip()
-                await client.process_commands(new_message)
-                await asyncio.sleep(1)
+            command_texts = message.content.split(';')
+            for command_text in command_texts:
+                # Clean and process each individual command
+                command_text = command_text.strip()
+                if command_text:
+                    message.content = command_text
+                    await client.process_commands(message)
         else:
             await process_message_with_llm(message, client)
     else:
