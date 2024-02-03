@@ -39,7 +39,7 @@ async def process_message_with_llm(message, client):
             response = response.replace(client.user.name + ":", "").strip()
             await send_long_message(message, response)
 
-async def ask_gpt(input_messages, retry_attempts=3, delay=1, bit_flip=0):
+async def ask_gpt(input_messages, retry_attempts=3, delay=1, bit_flip=1):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by Gemini-Pro"
     gpt_context = {"role": "system", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by GPT-4 Turbo."}
     modified_input_messages = [gpt_context] + input_messages

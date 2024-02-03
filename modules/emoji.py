@@ -110,9 +110,9 @@ def create_points_embed(user, total_points, reasons, emoji_name):
     embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d')} | @FrogBot check points for more")
     return embed
 
-def setup(bot):
-    @bot.event
+def setup(client):
+    @client.event
     async def on_raw_reaction_add(payload):
         if payload.guild_id is None:
             return
-        await process_reaction(bot, payload)
+        await process_reaction(client, payload)

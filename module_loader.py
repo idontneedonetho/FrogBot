@@ -7,7 +7,7 @@ class ModuleLoader:
         self.directory = directory
         self.modules = []
 
-    def load_modules(self, bot):
+    def load_modules(self, client):
         for filename in os.listdir(self.directory):
             if filename.endswith('.py'):
                 module_name = filename[:-3]
@@ -19,7 +19,7 @@ class ModuleLoader:
                     self.modules.append(module)
                     print(f"Loading module: {module_name}")
                     if hasattr(module, 'setup'):
-                        module.setup(bot)
+                        module.setup(client)
                 except Exception as e:
                     print(f"Failed to load module: {module_name}. Error: {e}")
 

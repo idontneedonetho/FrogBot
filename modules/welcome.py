@@ -30,5 +30,5 @@ async def on_member_join(member):
             except Exception as e:
                 print(f"Failed to send alternative welcome message: {e}")
 
-def setup(bot):
-    bot.event(on_member_join)
+def setup(client):
+    client.event(on_member_join)

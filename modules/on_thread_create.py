@@ -14,5 +14,5 @@ async def on_thread_create(thread):
     except Exception as e:
         print(f"Error in on_thread_create: {e}")
         
-def setup(bot):
-    bot.event(on_thread_create)
+def setup(client):
+    client.event(on_thread_create)

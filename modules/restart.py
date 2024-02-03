@@ -42,6 +42,6 @@ async def shutdown_bot(ctx):
     except asyncio.TimeoutError:
         await ctx.send("Bot shutdown canceled.")
 
-def setup(bot):
-    bot.add_command(restart_bot)
-    bot.add_command(shutdown_bot)
+def setup(client):
+    client.add_command(restart_bot)
+    client.add_command(shutdown_bot)

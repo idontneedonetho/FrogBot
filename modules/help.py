@@ -2,13 +2,13 @@
 
 from discord.ext import commands
 
-async def advanced_help(ctx):
+async def advanced_help(ctx, bot_name):
     help_message = (
-        '>>> *For commands below, the user must have admin privileges.*\n\n'
-        '**"@FrogBot add [amount] points @user"** - Add points to a user.\n'
-        '**"@FrogBot remove [amount] points @user"** - Remove points from a user.\n'
-        '**"@FrogBot check points @user"** - Check points for a user.\n'
-        '**"@FrogBot shutdown"** - Shutdown the bot, needs confirmation.\n'
+        f'>>> *For commands below, the user must have admin privileges.*\n\n'
+        f'**"@{bot_name} add [amount] points @user"** - Add points to a user.\n'
+        f'**"@{bot_name} remove [amount] points @user"** - Remove points from a user.\n'
+        f'**"@{bot_name} check points @user"** - Check points for a user.\n'
+        f'**"@{bot_name} shutdown"** - Shutdown the bot, needs confirmation.\n'
     )
     await ctx.send(help_message)
     
@@ -37,26 +37,27 @@ async def points_help(ctx):
     await ctx.send(help_message)
 
 async def custom_help_command(ctx, category=None):
+    bot_name = ctx.me.display_name  # Get the bot's display name
     if category:
         if category.lower() == 'advanced':
-            await advanced_help(ctx)
+            await advanced_help(ctx, bot_name)
         elif category.lower() == 'points':
             await points_help(ctx)
         # Add more categories as needed
     else:
-        general_help_message = (
-            '>>> *Keywords for bot reactions will not be listed*\n\n'
-            '**"@FrogBot [question]"** - Ask ChatGPT a question. This has a 15 second cooldown. '
+        general_help_message = (f'>>> *Keywords for bot reactions will not be listed*\n\n'
+            f'**"@{bot_name} [question]"** - Ask ChatGPT a question. This has a 15 second cooldown. '
             'To continue conversations, you must reply to the bot\'s message.\n\n'
-            '**"@FrogBot help points"** - Displays the points help message.\n'
-            '**"@FrogBot check points"** - Check your points and rank.\n'
+            f'**"@{bot_name} help points"** - Displays the points help message.\n'
+            f'**"@{bot_name} check points"** - Check your points and rank.\n'
             '**":frog:"** - :frog:\n'
-            '**"@FrogBot help"** - Display this help message.\n\n'
+            f'**"@{bot_name} ttt_start"** - Start a game of Tic-Tac-Toe.\n'
+            f'**"@{bot_name} help"** - Display this help message.\n\n'
             '__*Commands below need Admin permissions*__\n'
-            '**"@FrogBot help advanced"** - Displays advanced commands.'
+            f'**"@{bot_name} help advanced"** - Displays advanced commands.'
         )
         await ctx.send(general_help_message)
 
-def setup(bot):
-    bot.remove_command("help")
-    bot.add_command(commands.Command(custom_help_command, name="help"))
+def setup(client):
+    client.remove_command("help")
+    client.add_command(commands.Command(custom_help_command, name="help"))
