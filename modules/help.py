@@ -46,12 +46,11 @@ async def custom_help_command(ctx, category=None):
         # Add more categories as needed
     else:
         general_help_message = (f'>>> *Keywords for bot reactions will not be listed*\n\n'
-            f'**"@{bot_name} [question]"** - Ask ChatGPT a question. This has a 15 second cooldown. '
+            f'**"@{bot_name} [question]"** - Ask ChatGPT a question.\n'
             'To continue conversations, you must reply to the bot\'s message.\n\n'
             f'**"@{bot_name} help points"** - Displays the points help message.\n'
             f'**"@{bot_name} check points"** - Check your points and rank.\n'
-            '**":frog:"** - :frog:\n'
-            f'**"@{bot_name} ttt_start"** - Start a game of Tic-Tac-Toe.\n'
+            f'**"@{bot_name} ttt_start @[user 1] @[user 2]"** - Start a game of Tic-Tac-Toe.\n'
             f'**"@{bot_name} help"** - Display this help message.\n\n'
             '__*Commands below need Admin permissions*__\n'
             f'**"@{bot_name} help advanced"** - Displays advanced commands.'

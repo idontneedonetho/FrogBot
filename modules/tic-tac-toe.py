@@ -1,6 +1,70 @@
 import discord
 from discord.ext import commands
 import asyncio
+import random
+
+class TicTacToeAI:
+    def __init__(self):
+        self.best_move = None
+
+    def minimax(self, board, depth, is_maximizing, player, opponent):
+        score = self.evaluate(board, player, opponent)
+        if score == 10:
+            return score - depth
+        if score == -10:
+            return score + depth
+        if not any(' ' in row for row in board):
+            return 0
+        if is_maximizing:
+            best = -1000
+            for i in range(3):
+                for j in range(3):
+                    if board[i][j] == ' ':
+                        board[i][j] = player
+                        value = self.minimax(board, depth + 1, not is_maximizing, player, opponent)
+                        board[i][j] = ' '
+                        if value > best:
+                            best = value
+                            if depth == 0:
+                                self.best_move = (i, j)
+            return best
+        else:
+            best = 1000
+            for i in range(3):
+                for j in range(3):
+                    if board[i][j] == ' ':
+                        board[i][j] = opponent
+                        value = self.minimax(board, depth + 1, not is_maximizing, player, opponent)
+                        board[i][j] = ' '
+                        if value < best:
+                            best = value
+                            if depth == 0:
+                                self.best_move = (i, j)
+            return best
+
+    def evaluate(self, b, player, opponent):
+        for row in range(3):
+            if b[row][0] == b[row][1] == b[row][2]:
+                if b[row][0] == player:
+                    return 10
+                elif b[row][0] == opponent:
+                    return -10
+        for col in range(3):
+            if b[0][col] == b[1][col] == b[2][col]:
+                if b[0][col] == player:
+                    return 10
+                elif b[0][col] == opponent:
+                    return -10
+        if b[0][0] == b[1][1] == b[2][2] or b[0][2] == b[1][1] == b[2][0]:
+            if b[1][1] == player:
+                return 10
+            elif b[1][1] == opponent:
+                return -10
+        return 0
+
+    def find_best_move(self, board, player, opponent):
+        self.minimax(board, 0, True, player, opponent)
+        return self.best_move if self.best_move else (random.randint(0, 2), random.randint(0, 2))
 
 class TicTacToe:
     def __init__(self, player_x, player_o, message):
@@ -11,6 +75,8 @@ class TicTacToe:
         self.game_over = False
         self.winner = None
         self.message = message
+        self.ai = TicTacToeAI() if player_o.bot else None
+        self.message_sent = False
 
     def get_board_str(self):
         board_str = "```\n"
@@ -85,18 +151,25 @@ async def on_reaction_add(reaction, user):
     }
     move = emoji_to_num.get(str(reaction.emoji))
     if move is None or user.id not in [game.player_x.id, game.player_o.id]:
-        await reaction.remove(user)
         return
-
     result, response = game.make_move(user, move)
     if result:
         await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
-        await reaction.message.clear_reaction(reaction.emoji)
-        if game.game_over:
+        if game.game_over and not game.message_sent:
             await reaction.message.channel.send(f"Game Over!\n{response}")
+            game.message_sent = True
             del games[message_id]
-    else:
-        await reaction.remove(user)
+        else:
+            # If it's AI's turn and the game is not over, let the AI make a move.
+            if game.current_turn.bot and not game.game_over:
+                row, col = game.ai.find_best_move(game.board, 'O', 'X')
+                result, response = game.make_move(game.current_turn, row * 3 + col + 1)
+                if result:
+                    await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
+                    if game.game_over and not game.message_sent:
+                        await reaction.message.channel.send(f"Game Over!\n{response}")
+                        game.message_sent = True
+                        del games[message_id]
 
 def setup(client):
     client.add_command(start_game)
