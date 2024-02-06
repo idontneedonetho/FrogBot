@@ -8,7 +8,7 @@ from llama_index import (
     load_index_from_storage,
     StorageContext
 )
-from llama_index.embeddings import HuggingFaceEmbedding
+from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import OpenAI
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
@@ -21,7 +21,8 @@ vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 llm = OpenAI(model="gpt-4-turbo-preview")
-service_context = ServiceContext.from_defaults(llm=llm, chunk_size=256)
+embed_model = OpenAIEmbedding()
+service_context = ServiceContext.from_defaults(llm=llm, embed_model=embed_model, chunk_size=256)
 
 index_loaded = False
 chat_engine = None
