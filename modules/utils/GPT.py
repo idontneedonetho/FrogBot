@@ -1,53 +1,87 @@
-# commands/GPT.py
+# GPT.py
 
-import os
-import openai
+import asyncio
+from modules.utils.search import handle_query, estimate_confidence
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link
+from llama_index import (
+    ServiceContext,
+    load_index_from_storage,
+    StorageContext
+)
+from llama_index.embeddings import HuggingFaceEmbedding
+from llama_index.llms import OpenAI
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
-import asyncio
+import openai
+import os
 from dotenv import load_dotenv
-from modules.utils.search import handle_query, determine_information_type, estimate_confidence
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link
 
 load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+llm = OpenAI(model="gpt-4-turbo-preview")
+embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+service_context = ServiceContext.from_defaults(llm=llm, embed_model=embed_model, chunk_size=256)
+
+index_loaded = False
+chat_engine = None
+try:
+    storage_context = StorageContext.from_defaults(persist_dir="indexed-data")
+    index = load_index_from_storage(storage_context, service_context=service_context)
+    index_loaded = True
+    print("Index loaded")
+    chat_engine = index.as_chat_engine(chat_mode="best", verbose=True)
+except:
+    print("Index not loaded, falling back to Vertex AI API LLM.")
+
 async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
     if content:
         async with message.channel.typing():
-            if content.startswith('https://discord.com/channels/'):
-                linked_message = await fetch_message_from_link(client, content)
-                if linked_message:
-                    context = await fetch_reply_chain(linked_message)
-                    combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                    combined_messages.append({'content': linked_message.content, 'role': 'user'})
-                    response = await ask_gpt(combined_messages)
-                    if not estimate_confidence(response):
-                        print("Fetching additional information for uncertain queries.")
-                        search_response, source_urls = await handle_query(linked_message.content)
-                        response = await ask_gpt([search_response])
-                        if source_urls:
-                            response += "\n\n" + source_urls
-                        response = response if response else "I'm sorry, I couldn't find information on that topic."
+            if index_loaded and chat_engine is not None:
+                chat_response = chat_engine.chat(content)
+                if chat_response:
+                    response_text = chat_response.response
+                    if response_text:
+                        await send_long_message(message, response_text)
+                    else:
+                        await message.channel.send("I didn't get a response.")
                 else:
-                    response = "I couldn't fetch the message from the link."
+                    await message.channel.send("There was an error processing the message.")
             else:
-                context = await fetch_reply_chain(message)
-                combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                combined_messages.append({'content': content, 'role': 'user'})
-                response = await ask_gpt(combined_messages)
-                if not estimate_confidence(response):
-                    print("Fetching additional information for uncertain queries.")
-                    search_response, source_urls = await handle_query(content)
-                    response = await ask_gpt([search_response])
-                    if source_urls:
-                        response += "\n\n" + source_urls
-                    response = response if response else "I'm sorry, I couldn't find information on that topic."
-            response = response.replace(client.user.name + ":", "").strip()
-            await send_long_message(message, response)
-
+                async with message.channel.typing():
+                    if content.startswith('https://discord.com/channels/'):
+                        linked_message = await fetch_message_from_link(client, content)
+                        if linked_message:
+                            context = await fetch_reply_chain(linked_message)
+                            combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                            combined_messages.append({'content': linked_message.content, 'role': 'user'})
+                            response = await ask_gpt(combined_messages)
+                            if not estimate_confidence(response):
+                                print("Fetching additional information for uncertain queries.")
+                                search_response, source_urls = await handle_query(linked_message.content)
+                                response = await ask_gpt([search_response])
+                                if source_urls:
+                                    response += "\n\n" + source_urls
+                                response = response if response else "I'm sorry, I couldn't find information on that topic."
+                        else:
+                            response = "I couldn't fetch the message from the link."
+                    else:
+                        context = await fetch_reply_chain(message)
+                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                        combined_messages.append({'content': content, 'role': 'user'})
+                        response = await ask_gpt(combined_messages)
+                        if not estimate_confidence(response):
+                            print("Fetching additional information for uncertain queries.")
+                            search_response, source_urls = await handle_query(content)
+                            response = await ask_gpt([search_response])
+                            if source_urls:
+                                response += "\n\n" + source_urls
+                            response = response if response else "I'm sorry, I couldn't find information on that topic."
+                    response = response.replace(client.user.name + ":", "").strip()
+                    await send_long_message(message, response)
+                              
 async def ask_gpt(input_messages, retry_attempts=3, delay=1, bit_flip=1):
     gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by Gemini-Pro"
     gpt_context = {"role": "system", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by GPT-4 Turbo."}
