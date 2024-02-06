@@ -21,8 +21,7 @@ vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 llm = OpenAI(model="gpt-4-turbo-preview")
-embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-service_context = ServiceContext.from_defaults(llm=llm, embed_model=embed_model, chunk_size=256)
+service_context = ServiceContext.from_defaults(llm=llm, chunk_size=256)
 
 index_loaded = False
 chat_engine = None
@@ -57,7 +56,7 @@ async def process_message_with_llm(message, client):
                             context = await fetch_reply_chain(linked_message)
                             combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
                             combined_messages.append({'content': linked_message.content, 'role': 'user'})
-                            response = await ask_gpt(combined_messages)
+                            response = await ask_gpt(client, combined_messages)
                             if not estimate_confidence(response):
                                 print("Fetching additional information for uncertain queries.")
                                 search_response, source_urls = await handle_query(linked_message.content)
@@ -71,7 +70,7 @@ async def process_message_with_llm(message, client):
                         context = await fetch_reply_chain(message)
                         combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
                         combined_messages.append({'content': content, 'role': 'user'})
-                        response = await ask_gpt(combined_messages)
+                        response = await ask_gpt(client, combined_messages)
                         if not estimate_confidence(response):
                             print("Fetching additional information for uncertain queries.")
                             search_response, source_urls = await handle_query(content)
@@ -82,9 +81,14 @@ async def process_message_with_llm(message, client):
                     response = response.replace(client.user.name + ":", "").strip()
                     await send_long_message(message, response)
                               
-async def ask_gpt(input_messages, retry_attempts=3, delay=1, bit_flip=1):
-    gemini_context = "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by Gemini-Pro"
-    gpt_context = {"role": "system", "content": "I am FrogBot, your assistant for all questions related to FrogPilot and OpenPilot. I'll keep my responses under 2000 characters. I am powered by GPT-4 Turbo."}
+async def ask_gpt(client, input_messages, retry_attempts=3, delay=1, bit_flip=1):
+    bot_name = client.user.name
+    context = f"I am {bot_name}, a Discord bot. I can interact with users via text, and provide assistance with various tasks and queries. I am aware of the text-based functionalities of Discord and can perform actions accordingly, while keeping my responses concise and under 2000 characters."
+    gemini_context = context + " I am powered by Gemini-Pro."
+    gpt_context = {
+        "role": "system", 
+        "content": context + " I am powered by GPT-4 Turbo."
+    }
     modified_input_messages = [gpt_context] + input_messages
     for attempt in range(retry_attempts):
         try:
