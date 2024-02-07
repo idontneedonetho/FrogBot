@@ -3,16 +3,16 @@
 import discord
 import os
 import traceback
-import shlex
 from discord.ext import commands
 from dotenv import load_dotenv
 from module_loader import ModuleLoader
 from modules.roles import check_user_points
 from modules.utils.commons import frog_version
 from modules.utils.GPT import process_message_with_llm
+from modules.utils.memory_check import MemoryMonitor
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")\
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -22,8 +22,15 @@ intents.message_content = True
 intents.guild_messages = True
 intents.reactions = True
 client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
+
 module_loader = ModuleLoader('modules')
 module_loader.load_modules(client)
+
+try:
+    memory_monitor = MemoryMonitor(interval=60)
+except Exception as e:
+    print(f"Error initializing MemoryMonitor: {e}")
+    memory_monitor = None
 
 @client.event
 async def on_ready():
@@ -82,4 +89,8 @@ async def on_command_error(ctx, error):
         tb_str = "".join(tb)
         print(f'An error occurred: {error}\n{tb_str}')
 
-client.run(TOKEN)
+try:
+    client.run(TOKEN)
+finally:
+    memory_monitor.stop()
+    print("Memory monitor stopped")

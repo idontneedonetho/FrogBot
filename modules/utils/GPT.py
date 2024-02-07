@@ -5,10 +5,12 @@ from modules.utils.search import handle_query, estimate_confidence
 from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link
 from llama_index import (
     ServiceContext,
-    load_index_from_storage,
-    StorageContext
+    VectorStoreIndex,
+    StorageContext,
+    SimpleDirectoryReader,
 )
-from llama_index.embeddings import OpenAIEmbedding
+from llama_index.vector_stores import QdrantVectorStore
+from qdrant_client import QdrantClient
 from llama_index.llms import OpenAI
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
@@ -20,20 +22,27 @@ load_dotenv()
 vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-llm = OpenAI(model="gpt-4-turbo-preview")
-embed_model = OpenAIEmbedding()
-service_context = ServiceContext.from_defaults(llm=llm, embed_model=embed_model, chunk_size=256)
-
 index_loaded = False
 chat_engine = None
 try:
-    storage_context = StorageContext.from_defaults(persist_dir="indexed-data")
-    index = load_index_from_storage(storage_context, service_context=service_context)
+    print("Initializing Qdrant client and loading documents...")
+    client = QdrantClient(
+        os.getenv('QDRANT_URL'),
+        api_key=os.getenv('QDRANT_API'),
+    )
+    documents = SimpleDirectoryReader("data").load_data()
+    print("Setting up vector store and initializing OpenAI model...")
+    vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
+    llm = OpenAI(model="gpt-4-turbo-preview")
+    print("Setting up storage and service context...")
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    service_context = ServiceContext.from_defaults(llm=llm)
+    print("Creating vector store index and chat engine...")
+    index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
     index_loaded = True
-    print("Index loaded")
-    chat_engine = index.as_chat_engine(chat_mode="best", verbose=True)
-except:
-    print("Index not loaded, falling back to Vertex AI API LLM.")
+    chat_engine = index.as_chat_engine(chat_mode="best")
+except Exception as e:
+    print("Index not loaded, falling back to Vertex AI API LLM.", e)
 
 async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
