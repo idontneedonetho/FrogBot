@@ -3,6 +3,7 @@ import asyncio
 import subprocess
 from discord.ext import commands
 import re
+from enum import Enum
 from discord.utils import get
 
 async def fetch_message_from_link(client, link):
@@ -20,6 +21,16 @@ async def fetch_message_from_link(client, link):
                     print(f"Error fetching message from link: {e}")
     return None
 
+class Role(Enum):
+    USER = 'user'
+    ASSISTANT = 'assistant'
+
+class ChatMessage:
+    def __init__(self, content, role, additional_kwargs=None):
+        self.content = content
+        self.role = role
+        self.additional_kwargs = additional_kwargs if additional_kwargs else {}
+
 async def fetch_reply_chain(message, max_tokens=4096):
     context = []
     tokens_used = 0
@@ -28,10 +39,10 @@ async def fetch_reply_chain(message, max_tokens=4096):
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            message_content = f"{message.content}\n"
+            message_content = f"{message.author.name}: {message.content}\n"
             message_tokens = len(message_content) // 4
             if tokens_used + message_tokens <= max_tokens:
-                context.append(message_content)
+                context.append(ChatMessage(message_content, Role.USER if message.author.bot else Role.ASSISTANT))
                 tokens_used += message_tokens
             else:
                 break

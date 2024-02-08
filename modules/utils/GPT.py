@@ -2,7 +2,7 @@
 
 import asyncio
 from modules.utils.search import handle_query, estimate_confidence
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, ChatMessage, Role
 from llama_index import (
     ServiceContext,
     VectorStoreIndex,
@@ -13,6 +13,7 @@ from llama_index.embeddings import OpenAIEmbedding
 from llama_index.vector_stores import QdrantVectorStore
 from qdrant_client import QdrantClient
 from llama_index.llms import OpenAI
+from llama_index.memory import ChatMemoryBuffer
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
 import openai
@@ -24,7 +25,6 @@ vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 index_loaded = False
-query_engine = None
 try:
     print("Initializing Qdrant client and loading documents...")
     client = QdrantClient(
@@ -47,7 +47,6 @@ try:
         print("Failed to load vector store index, creating a new one...", e)
         index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
         index_loaded = True
-    query_engine = index.as_query_engine(response_mode="refine", similarity_top_k=5)
 except Exception as e:
     print("Index not loaded, falling back to Vertex AI API LLM.", e)
 
@@ -55,18 +54,19 @@ async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
     if content:
         async with message.channel.typing():
-            if index_loaded and query_engine is not None:
+            if index_loaded:
+                memory = ChatMemoryBuffer.from_defaults(token_limit=4096)
                 context = await fetch_reply_chain(message)
-                combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                combined_messages.append({'content': content, 'role': 'user'})
-                formatted_messages = []
-                for msg in combined_messages[:-1]:
-                    formatted_messages.append(f"Previous message: {msg['content']}")
-                formatted_messages.append(f"Current message: {combined_messages[-1]['content']}")
-                combined_messages_str = ' '.join(formatted_messages)
-                query_response = query_engine.query(combined_messages_str)
-                if query_response:
-                    response_text = query_response.response
+                combined_messages = [ChatMessage(msg.content, msg.role) for msg in context]
+                combined_messages.append(ChatMessage(f"{message.author.name}: {content}", Role.USER))
+                memory.set(combined_messages)
+                chat_engine = index.as_chat_engine(
+                    chat_mode="best",
+                    memory=memory,
+                )
+                chat_response = chat_engine.chat(content)
+                if chat_response:
+                    response_text = chat_response.response
                     if response_text:
                         await send_long_message(message, response_text)
                     else:
@@ -79,13 +79,13 @@ async def process_message_with_llm(message, client):
                         linked_message = await fetch_message_from_link(client, content)
                         if linked_message:
                             context = await fetch_reply_chain(linked_message)
-                            combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                            combined_messages.append({'content': linked_message.content, 'role': 'user'})
+                            combined_messages = context
+                            combined_messages.append(ChatMessage(linked_message.content, Role.USER))
                             response = await ask_gpt(client, combined_messages)
                             if not estimate_confidence(response):
                                 print("Fetching additional information for uncertain queries.")
                                 search_response, source_urls = await handle_query(linked_message.content)
-                                response = await ask_gpt([search_response])
+                                response = await ask_gpt([ChatMessage(search_response, Role.USER)])
                                 if source_urls:
                                     response += "\n\n" + source_urls
                                 response = response if response else "I'm sorry, I couldn't find information on that topic."
@@ -93,13 +93,13 @@ async def process_message_with_llm(message, client):
                             response = "I couldn't fetch the message from the link."
                     else:
                         context = await fetch_reply_chain(message)
-                        combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
-                        combined_messages.append({'content': content, 'role': 'user'})
+                        combined_messages = context
+                        combined_messages.append(ChatMessage(content, Role.USER))
                         response = await ask_gpt(client, combined_messages)
                         if not estimate_confidence(response):
                             print("Fetching additional information for uncertain queries.")
                             search_response, source_urls = await handle_query(content)
-                            response = await ask_gpt([search_response])
+                            response = await ask_gpt([ChatMessage(search_response, Role.USER)])
                             if source_urls:
                                 response += "\n\n" + source_urls
                             response = response if response else "I'm sorry, I couldn't find information on that topic."
@@ -110,17 +110,14 @@ async def ask_gpt(client, input_messages, retry_attempts=3, delay=1, bit_flip=1)
     bot_name = client.user.name
     context = f"I am {bot_name}, a Discord bot. I can interact with users via text, and provide assistance with various tasks and queries. I am aware of the text-based functionalities of Discord and can perform actions accordingly, while keeping my responses concise and under 2000 characters."
     gemini_context = context + " I am powered by Gemini-Pro."
-    gpt_context = {
-        "role": "system", 
-        "content": context + " I am powered by GPT-4 Turbo."
-    }
+    gpt_context = ChatMessage(context + " I am powered by GPT-4 Turbo.", Role.SYSTEM)
     modified_input_messages = [gpt_context] + input_messages
     for attempt in range(retry_attempts):
         try:
             if bit_flip:
                 response = openai.chat.completions.create(
                     model="gpt-4-turbo-preview",
-                    messages=modified_input_messages
+                    messages=[message.__dict__ for message in modified_input_messages]
                 )
                 response_message = response.choices[0].message.content
             else:
@@ -128,10 +125,7 @@ async def ask_gpt(client, input_messages, retry_attempts=3, delay=1, bit_flip=1)
                 chat = model.start_chat()
                 gemini_input_messages = [gemini_context]
                 for msg in input_messages:
-                    if isinstance(msg, dict) and 'content' in msg:
-                        gemini_input_messages.append(msg['content'])
-                    elif isinstance(msg, str):
-                        gemini_input_messages.append(msg)
+                    gemini_input_messages.append(msg.content)
                 gemini_input_messages = [str(msg) for msg in gemini_input_messages]
                 gemini_input_message_str = "\n".join(gemini_input_messages)
                 response = chat.send_message(gemini_input_message_str)
@@ -148,10 +142,7 @@ async def ask_gpt(client, input_messages, retry_attempts=3, delay=1, bit_flip=1)
                     chat = model.start_chat()
                     gemini_input_messages = [gemini_context]
                     for msg in input_messages:
-                        if isinstance(msg, dict) and 'content' in msg:
-                            gemini_input_messages.append(msg['content'])
-                        elif isinstance(msg, str):
-                            gemini_input_messages.append(msg)
+                        gemini_input_messages.append(msg.content)
                     gemini_input_messages = [str(msg) for msg in gemini_input_messages]
                     gemini_input_message_str = "\n".join(gemini_input_messages)
                     response = chat.send_message(gemini_input_message_str)
@@ -159,7 +150,7 @@ async def ask_gpt(client, input_messages, retry_attempts=3, delay=1, bit_flip=1)
                 else:
                     response = openai.chat.completions.create(
                         model="gpt-4-turbo-preview",
-                        messages=modified_input_messages
+                        messages=[message.__dict__ for message in modified_input_messages]
                     )
                     response_message = response.choices[0].message.content
                 return response_message

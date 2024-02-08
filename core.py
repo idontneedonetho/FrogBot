@@ -9,7 +9,6 @@ from module_loader import ModuleLoader
 from modules.roles import check_user_points
 from modules.utils.commons import frog_version
 from modules.utils.GPT import process_message_with_llm
-from modules.utils.memory_check import MemoryMonitor
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -26,7 +25,8 @@ client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, c
 module_loader = ModuleLoader('modules')
 module_loader.load_modules(client)
 
-try:
+try:  
+    from modules.utils.memory_check import MemoryMonitor
     memory_monitor = MemoryMonitor(interval=60)
 except Exception as e:
     print(f"Error initializing MemoryMonitor: {e}")
