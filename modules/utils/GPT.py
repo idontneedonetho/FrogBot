@@ -38,7 +38,7 @@ try:
     llm = OpenAI(model="gpt-4-turbo-preview")
     print("Setting up storage and service context...")
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm)
+    service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=15, chunk_size=512)
     print("Attempting to load vector store index...")
     try:
         index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
@@ -63,6 +63,7 @@ async def process_message_with_llm(message, client):
                 chat_engine = index.as_chat_engine(
                     chat_mode="best",
                     memory=memory,
+                    similarity_top_k=5,
                 )
                 chat_response = chat_engine.chat(content)
                 if chat_response:
