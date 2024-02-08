@@ -9,6 +9,7 @@ from llama_index import (
     StorageContext,
     SimpleDirectoryReader,
 )
+from llama_index.embeddings import OpenAIEmbedding
 from llama_index.vector_stores import QdrantVectorStore
 from qdrant_client import QdrantClient
 from llama_index.llms import OpenAI
@@ -23,7 +24,7 @@ vertexai.init(project=os.getenv('VERTEX_PROJECT_ID'))
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 index_loaded = False
-chat_engine = None
+query_engine = None
 try:
     print("Initializing Qdrant client and loading documents...")
     client = QdrantClient(
@@ -33,14 +34,20 @@ try:
     documents = SimpleDirectoryReader("data").load_data()
     print("Setting up vector store and initializing OpenAI model...")
     vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
+    embed_model = OpenAIEmbedding(model="text-embedding-3-small")
     llm = OpenAI(model="gpt-4-turbo-preview")
     print("Setting up storage and service context...")
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    service_context = ServiceContext.from_defaults(llm=llm)
-    print("Creating vector store index and chat engine...")
-    index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
-    index_loaded = True
-    chat_engine = index.as_chat_engine(chat_mode="best")
+    service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm)
+    print("Attempting to load vector store index...")
+    try:
+        index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
+        index_loaded = True
+    except Exception as e:
+        print("Failed to load vector store index, creating a new one...", e)
+        index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
+        index_loaded = True
+    query_engine = index.as_query_engine(response_mode="refine", similarity_top_k=5)
 except Exception as e:
     print("Index not loaded, falling back to Vertex AI API LLM.", e)
 
@@ -48,10 +55,18 @@ async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
     if content:
         async with message.channel.typing():
-            if index_loaded and chat_engine is not None:
-                chat_response = chat_engine.chat(content)
-                if chat_response:
-                    response_text = chat_response.response
+            if index_loaded and query_engine is not None:
+                context = await fetch_reply_chain(message)
+                combined_messages = [{'content': msg, 'role': 'user'} for msg in context]
+                combined_messages.append({'content': content, 'role': 'user'})
+                formatted_messages = []
+                for msg in combined_messages[:-1]:
+                    formatted_messages.append(f"Previous message: {msg['content']}")
+                formatted_messages.append(f"Current message: {combined_messages[-1]['content']}")
+                combined_messages_str = ' '.join(formatted_messages)
+                query_response = query_engine.query(combined_messages_str)
+                if query_response:
+                    response_text = query_response.response
                     if response_text:
                         await send_long_message(message, response_text)
                     else:

@@ -20,7 +20,7 @@ async def fetch_message_from_link(client, link):
                     print(f"Error fetching message from link: {e}")
     return None
 
-async def fetch_reply_chain(message, max_tokens=8192):
+async def fetch_reply_chain(message, max_tokens=4096):
     context = []
     tokens_used = 0
     current_prompt_tokens = len(message.content) // 4
