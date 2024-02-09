@@ -43,6 +43,7 @@ try:
     try:
         index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
         index_loaded = True
+        print("Vector store index loaded successfully.")
     except Exception as e:
         print("Failed to load vector store index, creating a new one...", e)
         index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
