@@ -40,12 +40,13 @@ try:
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
     print("Attempting to load vector store index...")
-    try:
+    bit = 1
+    if bit == 0:
         index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
         index_loaded = True
         print("Vector store index loaded successfully.")
-    except Exception as e:
-        print("Failed to load vector store index, creating a new one...", e)
+    else:
+        print("Failed to load vector store index, creating a new one...")
         index = VectorStoreIndex.from_documents(documents, storage_context, service_context)
         index_loaded = True
 except Exception as e:
