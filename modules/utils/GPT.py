@@ -40,7 +40,7 @@ try:
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
     print("Attempting to load vector store index...")
-    bit = 1
+    bit = 0
     if bit == 0:
         index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
         index_loaded = True
