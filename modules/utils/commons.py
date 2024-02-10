@@ -25,7 +25,7 @@ class Role(Enum):
     USER = 'user'
     ASSISTANT = 'assistant'
 
-class ChatMessage:
+class HistoryChatMessage:
     def __init__(self, content, role, additional_kwargs=None):
         self.content = content
         self.role = role
@@ -42,7 +42,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
             message_content = f"{message.author.name}: {message.content}\n"
             message_tokens = len(message_content) // 4
             if tokens_used + message_tokens <= max_tokens:
-                context.append(ChatMessage(message_content, Role.USER if message.author.bot else Role.ASSISTANT))
+                context.append(HistoryChatMessage(message_content, Role.USER if message.author.bot else Role.ASSISTANT))
                 tokens_used += message_tokens
             else:
                 break

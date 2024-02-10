@@ -9,9 +9,7 @@ from module_loader import ModuleLoader
 from modules.roles import check_user_points
 from modules.utils.commons import frog_version
 from modules.utils.GPT import process_message_with_llm
-
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -90,7 +88,7 @@ async def on_command_error(ctx, error):
         print(f'An error occurred: {error}\n{tb_str}')
 
 try:
-    client.run(TOKEN)
+    client.run(os.getenv("DISCORD_TOKEN"))
 finally:
     memory_monitor.stop()
     print("Memory monitor stopped")
