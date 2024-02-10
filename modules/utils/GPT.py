@@ -41,24 +41,6 @@ try:
 except Exception as e:
     print("Index not loaded, falling back to Vertex AI API LLM.", e)
 
-frogpilot_query_engine = index.as_query_engine(similarity_top_k=5)
-
-query_engine_tools = [
-    QueryEngineTool(
-        query_engine=frogpilot_query_engine,
-        metadata=ToolMetadata(
-            name="FrogPilot_Query_Engine",
-            description="FrogPilot Query Engine for chatbot responses.",
-        ),
-    ),
-]
-
-query_engine = SubQuestionQueryEngine.from_defaults(
-    query_engine_tools=query_engine_tools,
-    service_context=service_context,
-    use_async=True,
-)
-
 async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
     if content:
@@ -72,7 +54,6 @@ async def process_message_with_llm(message, client):
                 retriever=index.as_retriever(),
                 memory=memory,
                 similarity_top_k=5,
-                query_engine=query_engine,
             )
             chat_response = chat_engine.chat(content)
             if chat_response:
