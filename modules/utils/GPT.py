@@ -1,21 +1,17 @@
 # GPT.py
 
-import re
-import openai
-import os
-from dotenv import load_dotenv
-from llama_index import (
-    ServiceContext,
-    VectorStoreIndex,
-    StorageContext,
-)
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage, Role
 from llama_index.chat_engine.condense_plus_context import CondensePlusContextChatEngine
-from llama_index.embeddings import OpenAIEmbedding
+from llama_index import ServiceContext, VectorStoreIndex, StorageContext
 from llama_index.vector_stores import QdrantVectorStore
+from llama_index.embeddings import OpenAIEmbedding
 from llama_index.memory import ChatMemoryBuffer
 from qdrant_client import QdrantClient
 from llama_index.llms import Gemini
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage, Role
+from dotenv import load_dotenv
+import openai
+import re
+import os
 
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
