@@ -27,7 +27,7 @@ try:
     )
     vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
     embed_model = OpenAIEmbedding(model="text-embedding-3-small")
-    llm = Gemini()
+    llm = Gemini(max_tokens=1000)
     #llm = OpenAI(model="gpt-4-turbo-preview")
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
