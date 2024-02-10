@@ -53,22 +53,52 @@ async def fetch_reply_chain(message, max_tokens=4096):
 
 async def send_long_message(message, response):
     max_length = 2000
+    markdown_chars = ['*', '_', '~', '|']
     if len(response) > max_length:
         parts = []
+        code_block_type = None
         while len(response) > max_length:
-            split_index = response.rfind('\n', 0, max_length)
-            if split_index == -1:
-                split_index = max_length
-            parts.append(response[:split_index])
-            response = response[split_index:].strip()
+            split_index = max_length - 1
+            for char in '.!? ':
+                i = response.rfind(char, 0, max_length)
+                if i > -1:
+                    split_index = i
+                    break
+            code_block_start = response.rfind('```', 0, split_index)
+            if code_block_start != -1:
+                newline_after_code_block_start = response.find('\n', code_block_start)
+                if newline_after_code_block_start != -1 and newline_after_code_block_start < split_index:
+                    code_block_type = response[code_block_start+3:newline_after_code_block_start].strip()
+                code_block_end = response.find('```', code_block_start + 3)
+                if code_block_end == -1 or code_block_end > split_index:
+                    if code_block_type:
+                        part = response[:split_index+1] + '```'
+                        response = '```' + code_block_type + '\n' + response[split_index+1:].lstrip()
+                    else:
+                        part = response[:split_index+1] + '```'
+                        response = '```' + response[split_index+1:].lstrip()
+                else:
+                    part = response[:split_index+1]
+                    response = response[split_index+1:].lstrip()
+            else:
+                part = response[:split_index+1]
+                response = response[split_index+1:].lstrip()
+            for char in markdown_chars:
+                if part.count(char) % 2 != 0:
+                    part += char
+                    response = char + response
+            parts.append(part.rstrip())
         parts.append(response)
         last_message = None
         for part in parts:
-            last_message = await (last_message.reply(part) if last_message else message.reply(part))
+            if last_message:
+                last_message = await last_message.reply(part)
+            else:
+                last_message = await message.reply(part)
             await asyncio.sleep(1)
     else:
         await message.reply(response)
-        
+
 def get_git_version():
     try:
         branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
