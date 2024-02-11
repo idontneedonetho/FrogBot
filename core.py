@@ -56,20 +56,18 @@ async def on_message(message):
         ctx = await client.get_context(message)
         if ctx.valid:
             command_texts = message.content.split(';')
-            commands_to_process = []
             for i, command_text in enumerate(command_texts):
                 command_text = command_text.strip()
                 if command_text:
                     if i != 0:
                         command_text = f'<@!{client.user.id}> {command_text}'
-                    commands_to_process.append(command_text)
-            for command_text in commands_to_process:
-                message.content = command_text
-                try:
-                    await client.process_commands(message)
-                except Exception as e:
-                    print(f"Error processing command: {e}")
-                    await process_message_with_llm(message, client)
+                    message.content = command_text
+                    try:
+                        await client.process_commands(message)
+                    except Exception as e:
+                        print(f"Error processing command: {e}")
+                        if not (command_text.startswith('<@!{client.user.id}> update') and ';' in message.content):
+                            await process_message_with_llm(message, client)
         else:
             await process_message_with_llm(message, client)
     else:
