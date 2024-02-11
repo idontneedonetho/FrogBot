@@ -52,11 +52,6 @@ async def fetch_reply_chain(message, max_tokens=4096):
             break
     return context[::-1]
 
-def format_paragraphs(text, sentences_per_paragraph=3):
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    paragraphs = [' '.join(sentences[i:i+sentences_per_paragraph]) for i in range(0, len(sentences), sentences_per_paragraph)]
-    return '\n\n'.join(paragraphs)
-
 async def send_long_message(message, response):
     max_length = 2000
     markdown_chars = ['*', '_', '~', '|']

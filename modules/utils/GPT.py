@@ -1,6 +1,6 @@
 # GPT.py
 
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, format_paragraphs, HistoryChatMessage, Role
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage, Role
 from llama_index.chat_engine.condense_plus_context import CondensePlusContextChatEngine
 from llama_index import ServiceContext, VectorStoreIndex, StorageContext
 from llama_index.vector_stores import QdrantVectorStore
@@ -62,8 +62,7 @@ async def process_message_with_llm(message, client):
         bot_name_prefix = f"{client.user.name}: "
         if response_text.startswith(bot_name_prefix):
             response_text = response_text[len(bot_name_prefix):]
-        formatted_response_text = format_paragraphs(response_text)
-        await send_long_message(message, formatted_response_text)
+        await send_long_message(message, response_text)
         
 async def fetch_context_and_content(message, client, content):
     linked_message = await fetch_message_from_link(client, content) if content.startswith('https://discord.com/channels/') else message
