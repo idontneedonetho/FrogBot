@@ -7,7 +7,7 @@ from llama_index.vector_stores import QdrantVectorStore
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.memory import ChatMemoryBuffer
 from qdrant_client import QdrantClient
-from llama_index.llms import Gemini, OpenAI
+from llama_index.llms import OpenAI
 from dotenv import load_dotenv
 import openai
 import os
@@ -21,7 +21,6 @@ try:
     vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
     embed_model = OpenAIEmbedding(model="text-embedding-3-small")
     llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
-    # llm = Gemini(max_tokens=1000)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
     index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
@@ -41,9 +40,12 @@ async def process_message_with_llm(message, client):
                     memory=memory,
                     similarity_top_k=5,
                     context_prompt=(
-                        f"You are {client.user.name}, an CommaAI OpenPilot-related Chat Assistant."
-                        " Ensure all responses that include a table puts the table into a codeblock in the response."
-                    ),
+                        f"You are {client.user.name}, a discord chatbot, format responses as such."
+                        "\nTopic: OpenPilot and its various forks."
+                        "\n\nRelevant documents for the context:\n"
+                        "{context_str}"
+                        "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
+                    )
                 )
                 chat_response = chat_engine.chat(content)
                 if not chat_response or not chat_response.response:
