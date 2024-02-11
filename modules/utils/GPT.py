@@ -1,6 +1,6 @@
 # GPT.py
 
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage, Role
+from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, format_paragraphs, HistoryChatMessage, Role
 from llama_index.chat_engine.condense_plus_context import CondensePlusContextChatEngine
 from llama_index import ServiceContext, VectorStoreIndex, StorageContext
 from llama_index.vector_stores import QdrantVectorStore
@@ -29,11 +29,6 @@ try:
     index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
 except Exception as e:
     print("Index not loaded, falling back to Vertex AI API LLM.", e)
-
-def format_paragraphs(text, sentences_per_paragraph=3):
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    paragraphs = [' '.join(sentences[i:i+sentences_per_paragraph]) for i in range(0, len(sentences), sentences_per_paragraph)]
-    return '\n\n'.join(paragraphs)
 
 async def process_message_with_llm(message, client):
     content = message.content.replace(client.user.mention, '').strip()
