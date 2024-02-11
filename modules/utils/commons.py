@@ -57,11 +57,9 @@ async def send_long_message(message, response):
         code_block_type = None
         while len(response) > max_length:
             split_index = max_length - 1
-            for char in '.!? ':
-                i = response.rfind(char, 0, max_length)
-                if i > -1:
-                    split_index = i
-                    break
+            i = response.rfind('\n', 0, max_length)
+            if i > -1:
+                split_index = i
             code_block_start = response.rfind('```', 0, split_index)
             if code_block_start != -1:
                 newline_after_code_block_start = response.find('\n', code_block_start)
