@@ -66,8 +66,7 @@ async def on_message(message):
                         await client.process_commands(message)
                     except Exception as e:
                         print(f"Error processing command: {e}")
-                        if not (command_text.startswith('<@!{client.user.id}> update') and ';' in message.content):
-                            await process_message_with_llm(message, client)
+                        await process_message_with_llm(message, client)
         else:
             await process_message_with_llm(message, client)
     else:

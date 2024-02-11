@@ -31,6 +31,7 @@ async def git_pull(ctx, branch="beta"):
     except Exception as e:
         print(f'Error updating the script: {e}')
         await ctx.send(f'Error updating the script: {e}')
+        return
 
 async def git_stash(ctx):
     try:
