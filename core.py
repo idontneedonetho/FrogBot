@@ -27,8 +27,7 @@ try:
     from modules.utils.memory_check import MemoryMonitor
     memory_monitor = MemoryMonitor(interval=60)
 except Exception as e:
-    print(f"Error initializing MemoryMonitor: {e}")
-    memory_monitor = None
+    pass
 
 @client.event
 async def on_ready():
