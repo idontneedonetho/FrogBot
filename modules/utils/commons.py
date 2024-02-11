@@ -1,8 +1,8 @@
 # commons.py
 
+from llama_index.core.llms.types import MessageRole as Role
 from discord.ext import commands
 from discord.utils import get
-from enum import Enum
 import subprocess
 import asyncio
 import re
@@ -21,10 +21,6 @@ async def fetch_message_from_link(client, link):
                 except Exception as e:
                     print(f"Error fetching message from link: {e}")
     return None
-
-class Role(Enum):
-    USER = 'user'
-    ASSISTANT = 'assistant'
 
 class HistoryChatMessage:
     def __init__(self, content, role, additional_kwargs=None):
