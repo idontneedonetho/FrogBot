@@ -10,12 +10,12 @@ from qdrant_client import QdrantClient
 from llama_index.llms import Gemini
 from dotenv import load_dotenv
 import openai
-import re
 import os
 
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+index = None
 try:
     client = QdrantClient(
         os.getenv('QDRANT_URL'),
@@ -28,9 +28,12 @@ try:
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
     index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
 except Exception as e:
-    print("Index not loaded, falling back to Vertex AI API LLM.", e)
+    print("Index not loaded", e)
 
 async def process_message_with_llm(message, client):
+    if index is None:
+        print("Index not found.")
+        return
     content = message.content.replace(client.user.mention, '').strip()
     if not content:
         return
