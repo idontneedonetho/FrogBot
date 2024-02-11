@@ -36,10 +36,11 @@ async def fetch_reply_chain(message, max_tokens=4096):
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            message_content = f"{message.author.name}: {message.content}\n"
+            role = Role.USER if message.author.bot else Role.ASSISTANT
+            message_content = f"{message.content}\n"
             message_tokens = len(message_content) // 4
             if tokens_used + message_tokens <= max_tokens:
-                context.append(HistoryChatMessage(message_content, Role.USER if message.author.bot else Role.ASSISTANT))
+                context.append(HistoryChatMessage(message_content, role))
                 tokens_used += message_tokens
             else:
                 break
