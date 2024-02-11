@@ -1,14 +1,13 @@
 # GPT.py
 
 from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage
-from llama_index.chat_engine.condense_plus_context import CondensePlusContextChatEngine
 from llama_index import ServiceContext, VectorStoreIndex, StorageContext
 from llama_index.core.llms.types import MessageRole as Role
 from llama_index.vector_stores import QdrantVectorStore
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.memory import ChatMemoryBuffer
 from qdrant_client import QdrantClient
-from llama_index.llms import Gemini
+from llama_index.llms import Gemini, OpenAI
 from dotenv import load_dotenv
 import openai
 import os
@@ -18,13 +17,11 @@ load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 try:
-    client = QdrantClient(
-        os.getenv('QDRANT_URL'),
-        api_key=os.getenv('QDRANT_API'),
-    )
+    client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
     vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
     embed_model = OpenAIEmbedding(model="text-embedding-3-small")
-    llm = Gemini(max_tokens=1000)
+    llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
+    # llm = Gemini(max_tokens=1000)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, chunk_overlap=24, chunk_size=1024)
     index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
@@ -39,17 +36,13 @@ async def process_message_with_llm(message, client):
                 memory = ChatMemoryBuffer.from_defaults(token_limit=8000)
                 context = await fetch_context_and_content(message, client, content)
                 memory.set(context + [HistoryChatMessage(f"{message.author.name}: {content}", Role.USER)])
-                chat_engine = CondensePlusContextChatEngine.from_defaults(
-                    retriever=index.as_retriever(),
+                chat_engine = index.as_chat_engine(
+                    chat_mode="condense_plus_context",
                     memory=memory,
                     similarity_top_k=5,
                     context_prompt=(
-                        f"You are {client.user.name}, a discord chatbot capable of interactions and discussions"
-                        " about OpenPilot and its various forks. The conversation should remain mostly about OpenPilot and its forks."
-                        "\n\nRelevant documents for the context:\n"
-                        "{context_str}"
-                        "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
-                        " Ensure your responses are formatted appropriately for easy reading and understanding."
+                        f"You are {client.user.name}, an CommaAI OpenPilot-related Chat Assistant."
+                        " Ensure all responses that include a table puts the table into a codeblock in the response."
                     ),
                 )
                 chat_response = chat_engine.chat(content)
