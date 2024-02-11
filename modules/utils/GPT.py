@@ -45,9 +45,9 @@ async def process_message_with_llm(message, client):
             context = await fetch_context_and_content(message, client, content)
             memory.set(context + [HistoryChatMessage(f"{message.author.name}: {content}", Role.USER)])
             chat_engine = CondensePlusContextChatEngine.from_defaults(
-            retriever=index.as_retriever(),
-            memory=memory,
-            similarity_top_k=5,
+                retriever=index.as_retriever(),
+                memory=memory,
+                similarity_top_k=5,
                 context_prompt=(
                     f"You are {client.user.name}, a discord chatbot capable of interactions and discussions"
                     " about OpenPilot and its various forks. The conversation should remain mostly about OpenPilot and its forks."
