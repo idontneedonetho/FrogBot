@@ -55,6 +55,7 @@ async def process_message_with_llm(message, client):
                     "{context_str}"
                     "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
                     " Ensure your responses are formatted appropriately for easy reading and understanding."
+                    " Make sure all tables are formatted as a discord embed so the table shows up in discord propery."
                 )
             )
             chat_response = chat_engine.chat(content)
