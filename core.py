@@ -53,22 +53,28 @@ async def on_message(message):
     for handler in module_loader.get_event_handlers('on_message'):
         await handler(message)
     if client.user.mentioned_in(message):
-        ctx = await client.get_context(message)
-        if ctx.valid:
-            command_texts = message.content.split(';')
-            for i, command_text in enumerate(command_texts):
-                command_text = command_text.strip()
-                if command_text:
-                    if i != 0:
-                        command_text = f'<@!{client.user.id}> {command_text}'
-                    message.content = command_text
+        command_texts = message.content.split(';')
+        for i, command_text in enumerate(command_texts):
+            command_text = command_text.strip()
+            if command_text:
+                if i != 0:
+                    command_text = f'<@!{client.user.id}> {command_text}'
+                message.content = command_text
+                if not (command_text.startswith(f'<@!{client.user.id}> update') and ';' in message.content):
+                    ctx = await client.get_context(message)
+                    if ctx.valid:
+                        try:
+                            await client.process_commands(message)
+                        except Exception as e:
+                            print(f"Error processing command: {e}")
+                            await process_message_with_llm(message, client)
+                    else:
+                        await process_message_with_llm(message, client)
+                else:
                     try:
                         await client.process_commands(message)
                     except Exception as e:
                         print(f"Error processing command: {e}")
-                        await process_message_with_llm(message, client)
-        else:
-            await process_message_with_llm(message, client)
     else:
         await client.process_commands(message)
 
