@@ -3,7 +3,7 @@ from modules.utils.commons import is_admin_or_user, is_admin_or_rank, send_long_
 from discord.ext import commands
 
 @commands.command(name="whiteboard")
-@is_admin_or_user()
+@is_admin_or_rank()
 async def whiteboard(ctx):
     if not ctx.message.attachments or not ctx.message.attachments[0].filename.endswith('.txt'):
         await ctx.send("Please attach a .txt file.")
