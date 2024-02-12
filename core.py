@@ -64,7 +64,10 @@ async def on_message(message):
                     ctx = await client.get_context(message)
                     if ctx.valid:
                         try:
-                            await client.process_commands(message)
+                            if ctx.command:
+                                await client.process_commands(message)
+                            else:
+                                await process_message_with_llm(message, client)
                         except Exception as e:
                             print(f"Error processing command: {e}")
                             await process_message_with_llm(message, client)

@@ -1,14 +1,13 @@
 # FrogBot/modules/help.py
 
 from discord.ext import commands
-from discord import Embed
 
 async def advanced_help(ctx, bot_name):
     help_message = (
         ">>> **Advanced Help**\n"
         "*For commands below, the user must have admin privileges.*\n"
         f"Prefix all commands with **\"@{bot_name}\"**\n"
-        f"Multi-commands work as follows: **\"@{bot_name} [command 1]; [command 2]\"** etc.\n\n"
+        f"Multi-commands work as follows: **\"@{bot_name} [command 1];; [command 2]\"** etc. Each command must be separated by ';;'.\n\n"
         "**whiteboard**\n"
         "Send a .txt file as a long message.\n\n"
         "**edit**\n"

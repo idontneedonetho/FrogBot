@@ -49,7 +49,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
             break
     return context[::-1]
 
-async def send_long_message(message, response, first_message_is_reply=True):
+async def send_long_message(message, response, should_reply=True):
     response = re.sub(r'(http[s]?://\S+)', r'<\1', response)
     max_length = 2000
     markdown_chars = ['*', '_', '~', '|']
@@ -89,15 +89,17 @@ async def send_long_message(message, response, first_message_is_reply=True):
         parts.append(response)
         last_message = None
         for part in parts:
-            if last_message and first_message_is_reply:
-                last_message = await last_message.reply(part)
-                first_message_is_reply = False
+            if should_reply:
+                if last_message is None:
+                    last_message = await message.reply(part)
+                else:
+                    last_message = await last_message.reply(part)
             else:
                 last_message = await message.channel.send(part)
             messages.append(last_message)
             await asyncio.sleep(1)
     else:
-        if first_message_is_reply:
+        if should_reply:
             last_message = await message.reply(response)
         else:
             last_message = await message.channel.send(response)

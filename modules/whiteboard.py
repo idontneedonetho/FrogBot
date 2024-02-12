@@ -11,7 +11,7 @@ async def whiteboard(ctx):
         return
     file = await ctx.message.attachments[0].read()
     content = file.decode()
-    await send_long_message(ctx.message, content, first_message_is_reply=False)
+    await send_long_message(ctx.message, content, should_reply=False)
     await ctx.message.delete()
 
 @commands.command(name="edit")
@@ -34,7 +34,7 @@ async def edit(ctx):
             await msg.delete()
         else:
             break
-    await send_long_message(ctx.message, content, first_message_is_reply=False)
+    await send_long_message(ctx.message, content, should_reply=False)
     await ctx.message.delete()
 
 def setup(client):
