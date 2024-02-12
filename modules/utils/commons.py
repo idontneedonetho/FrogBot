@@ -50,6 +50,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
     return context[::-1]
 
 async def send_long_message(message, response, first_message_is_reply=True):
+    response = re.sub(r'(http[s]?://\S+)', r'<\1>', response)
     max_length = 2000
     markdown_chars = ['*', '_', '~', '|']
     messages = []
