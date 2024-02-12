@@ -41,12 +41,13 @@ async def points_help(ctx):
         '500,000 points - Never Nourished Fat Frog\n'
         '1,000,000 points - Frog Daddy\n\n'
         'Bug report = 250 points\n'
-        'Error log included += 250 points\n'
-        'Video included += 500 points\n\n'
+        'Error log included = 250 points\n'
+        'Video included = 500 points\n\n'
         'Feature request = 100 points\n'
-        'Detailed/thought out += 250 points\n\n'
+        'Detailed/thought out = 250 points\n\n'
+        'Testing a PR/feature = 1000 points\n'
         'Submitting a PR = 1000 points\n'
-        'PR gets merged += 2500 points\n\n'
+        'PR gets merged = 2500 points\n\n'
         'Helping someone with a question = 100 points\n'
     )
     await ctx.send(help_message)
