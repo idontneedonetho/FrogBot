@@ -16,3 +16,4 @@ restart_channel_id.txt
 memory_check.py
 data/
 test gpt/
+state.json
