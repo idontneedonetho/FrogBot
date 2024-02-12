@@ -66,10 +66,10 @@ async def process_commands_sequentially(message, command_texts):
 async def on_message(message):
     if message.author == client.user or message.author.bot:
         return
+    processed_commands = False
     processed_as_query = False
     if client.user.mentioned_in(message):
         command_texts = [command.strip() for command in message.content.split(';')]
-        processed_commands = False
         for command_text in command_texts:
             if not command_text.startswith(f'<@!{client.user.id}>') and not command_text.startswith(f'<@{client.user.id}>'):
                 command_text = f'<@!{client.user.id}> {command_text}'
