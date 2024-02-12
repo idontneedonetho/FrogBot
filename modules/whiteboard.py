@@ -1,5 +1,6 @@
-# Add this at the top of your file
-from modules.utils.commons import is_admin_or_user, is_admin_or_rank, send_long_message
+# Whiteboard
+
+from modules.utils.commons import is_admin_or_rank, send_long_message
 from discord.ext import commands
 
 @commands.command(name="whiteboard")
