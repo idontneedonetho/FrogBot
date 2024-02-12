@@ -11,7 +11,7 @@ async def advanced_help(ctx, bot_name):
     )
     embed.add_field(name="--Multi-commands--", value=f"Multi-commands work as follows: **\"@{bot_name} [command 1]; [command 2]\"** etc.", inline=False)
     embed.add_field(name="whiteboard", value="Send a .txt file as a long message.", inline=False)
-    embed.add_field(name="edit", value="Reply to the message you want to edit, include **\"edit\"** in your reply, and make sure to attach a .txt file.", inline=False)
+    embed.add_field(name="edit", value="*Reply to the message you want to edit*, include **\"edit\"** in your reply, and make sure to attach a .txt file.", inline=False)
     embed.add_field(name="restart", value="Restart the bot.", inline=False)
     embed.add_field(name="update", value="Update the bot.", inline=False)
     embed.add_field(name="add [amount] points @user", value="Add points to a user.", inline=False)
