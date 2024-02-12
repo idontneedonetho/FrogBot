@@ -1,6 +1,7 @@
 # core.py
 
 import discord
+import copy
 import os
 import traceback
 from discord.ext import commands
@@ -46,6 +47,12 @@ async def on_ready():
     except Exception as e:
         print(f"Error sending restart message: {e}")
 
+async def is_valid_command(message, command_text):
+    temp_message = copy.copy(message)
+    temp_message.content = command_text
+    ctx = await client.get_context(temp_message)
+    return ctx.command is not None
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -53,33 +60,36 @@ async def on_message(message):
     for handler in module_loader.get_event_handlers('on_message'):
         await handler(message)
     if client.user.mentioned_in(message):
-        command_texts = message.content.split(';')
-        for i, command_text in enumerate(command_texts):
+        original_command_texts = message.content.split(';')
+        new_command_texts = []
+        for command_text in original_command_texts:
             command_text = command_text.strip()
+            if command_text:
+                validation_command_text = f'<@!{client.user.id}> {command_text}' if not command_text.startswith(f'<@!{client.user.id}>') else command_text
+                if await is_valid_command(message, validation_command_text):
+                    new_command_texts.append(command_text)
+                else:
+                    if new_command_texts:
+                        new_command_texts[-1] += ';' + command_text
+                    else:
+                        new_command_texts.append(command_text)
+        for i, command_text in enumerate(new_command_texts):
             if command_text:
                 if i != 0:
                     command_text = f'<@!{client.user.id}> {command_text}'
                 message.content = command_text
-                if not (command_text.startswith(f'<@!{client.user.id}> update') and ';' in message.content):
-                    ctx = await client.get_context(message)
-                    if ctx.valid:
-                        try:
-                            if ctx.command:
-                                await client.process_commands(message)
-                            else:
-                                await process_message_with_llm(message, client)
-                        except Exception as e:
-                            print(f"Error processing command: {e}")
-                            await process_message_with_llm(message, client)
-                    else:
-                        await process_message_with_llm(message, client)
-                else:
-                    try:
-                        await client.process_commands(message)
-                    except Exception as e:
-                        print(f"Error processing command: {e}")
+                await process_commands_sequentially(message)
+
+async def process_commands_sequentially(message):
+    ctx = await client.get_context(message)
+    if ctx.valid:
+        try:
+            await client.process_commands(message)
+        except Exception as e:
+            print(f"Error processing command: {e}")
+            await process_message_with_llm(message, client)
     else:
-        await client.process_commands(message)
+        await process_message_with_llm(message, client)
 
 @client.event
 async def on_reaction_add(reaction, user):
