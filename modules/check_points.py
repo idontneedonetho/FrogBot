@@ -14,10 +14,10 @@ async def check_or_rank_command(ctx, *args):
                 try:
                     user = await commands.UserConverter().convert(ctx, args[1])
                 except commands.UserNotFound:
-                    await ctx.send("User not found.")
+                    await ctx.reply("User not found.")
                     return
             else:
-                await ctx.send("You don't have the necessary permissions to check other users' points.")
+                await ctx.reply("You don't have the necessary permissions to check other users' points.")
                 return
         user_points = initialize_points_database(user)
         sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
@@ -29,7 +29,7 @@ async def check_or_rank_command(ctx, *args):
             end_index = min(start_index + 5, len(sorted_users))
         end_index = min(len(sorted_users), start_index + 5)
         if not ctx.guild:
-            await ctx.send("This command can only be used in a guild.")
+            await ctx.reply("This command can only be used in a guild.")
             return
         embed = discord.Embed(
             title="**🏆 Your Current Standing**",
@@ -60,9 +60,9 @@ async def check_or_rank_command(ctx, *args):
                     rank_text = f"#{index + 1} | {display_name}: {points:,} points\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
             embed.add_field(name="\u200b", value=rank_text, inline=False)
         embed.set_footer(text=f"Leaderboard as of {datetime.datetime.now().strftime('%Y-%m-%d')}")
-        await ctx.send(embed=embed)
+        await ctx.reply(embed=embed)
     else:
-        await ctx.send("Invalid syntax. Please use '@bot check points [@user]'.")
+        await ctx.reply("Invalid syntax. Please use '@bot check points [@user]'.")
 
 def setup(client):
     client.add_command(check_or_rank_command)

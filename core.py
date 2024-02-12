@@ -53,43 +53,36 @@ async def is_valid_command(message, command_text):
     ctx = await client.get_context(temp_message)
     return ctx.command is not None
 
+async def process_commands_sequentially(message, command_texts):
+    for command_text in command_texts:
+        message.content = command_text
+        ctx = await client.get_context(message)
+        if ctx.valid:
+            await client.invoke(ctx)
+        else:
+            await process_message_with_llm(message, client)
+            
 @client.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == client.user or message.author.bot:
         return
-    for handler in module_loader.get_event_handlers('on_message'):
-        await handler(message)
+    processed_as_query = False
     if client.user.mentioned_in(message):
-        original_command_texts = message.content.split(';')
-        new_command_texts = []
-        for command_text in original_command_texts:
-            command_text = command_text.strip()
-            if command_text:
-                validation_command_text = f'<@!{client.user.id}> {command_text}' if not command_text.startswith(f'<@!{client.user.id}>') else command_text
-                if await is_valid_command(message, validation_command_text):
-                    new_command_texts.append(command_text)
-                else:
-                    if new_command_texts:
-                        new_command_texts[-1] += ';' + command_text
-                    else:
-                        new_command_texts.append(command_text)
-        for i, command_text in enumerate(new_command_texts):
-            if command_text:
-                if i != 0:
-                    command_text = f'<@!{client.user.id}> {command_text}'
-                message.content = command_text
-                await process_commands_sequentially(message)
-
-async def process_commands_sequentially(message):
-    ctx = await client.get_context(message)
-    if ctx.valid:
-        try:
-            await client.process_commands(message)
-        except Exception as e:
-            print(f"Error processing command: {e}")
-            await process_message_with_llm(message, client)
-    else:
-        await process_message_with_llm(message, client)
+        command_texts = [command.strip() for command in message.content.split(';')]
+        processed_commands = False
+        for command_text in command_texts:
+            if not command_text.startswith(f'<@!{client.user.id}>') and not command_text.startswith(f'<@{client.user.id}>'):
+                command_text = f'<@!{client.user.id}> {command_text}'
+            if await is_valid_command(message, command_text):
+                await process_commands_sequentially(message, [command_text])
+                processed_commands = True
+            else:
+                if not processed_commands:
+                    await process_message_with_llm(message, client)
+                    processed_as_query = True
+                    break
+    if not processed_commands and not processed_as_query:
+        await client.process_commands(message)
 
 @client.event
 async def on_reaction_add(reaction, user):
