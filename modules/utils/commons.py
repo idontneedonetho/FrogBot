@@ -125,3 +125,10 @@ def is_admin_or_user(user_id=126123710435295232):
         is_specific_user = ctx.author.id == user_id
         return is_admin or is_specific_user
     return commands.check(predicate)
+
+def is_admin_or_rank(rank_id=1198482895342411846):
+    async def predicate(ctx):
+        is_admin = ctx.author.guild_permissions.administrator
+        has_rank = any(role.name == rank_id for role in ctx.author.roles)
+        return is_admin or has_rank
+    return commands.check(predicate)

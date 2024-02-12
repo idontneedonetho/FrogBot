@@ -1,5 +1,5 @@
 # Add this at the top of your file
-from modules.utils.commons import is_admin_or_user, send_long_message
+from modules.utils.commons import is_admin_or_user, is_admin_or_rank, send_long_message
 from discord.ext import commands
 
 @commands.command(name="whiteboard")
@@ -14,7 +14,7 @@ async def whiteboard(ctx):
     await ctx.message.delete()
 
 @commands.command(name="edit")
-@is_admin_or_user()
+@is_admin_or_rank()
 async def edit(ctx):
     if ctx.message.reference is None:
         await ctx.send("Please reply to the message you want to edit.")
