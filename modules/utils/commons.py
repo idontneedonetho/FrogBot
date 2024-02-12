@@ -49,9 +49,10 @@ async def fetch_reply_chain(message, max_tokens=4096):
             break
     return context[::-1]
 
-async def send_long_message(message, response):
+async def send_long_message(message, response, first_message_is_reply=True):
     max_length = 2000
     markdown_chars = ['*', '_', '~', '|']
+    messages = []
     if len(response) > max_length:
         parts = []
         code_block_type = None
@@ -87,13 +88,19 @@ async def send_long_message(message, response):
         parts.append(response)
         last_message = None
         for part in parts:
-            if last_message:
+            if last_message and first_message_is_reply:
                 last_message = await last_message.reply(part)
             else:
-                last_message = await message.reply(part)
+                last_message = await message.channel.send(part)
+            messages.append(last_message)
             await asyncio.sleep(1)
     else:
-        await message.reply(response)
+        if first_message_is_reply:
+            last_message = await message.reply(response)
+        else:
+            last_message = await message.channel.send(response)
+        messages.append(last_message)
+    return messages
 
 def get_git_version():
     try:
