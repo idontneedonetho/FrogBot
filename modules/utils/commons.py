@@ -91,6 +91,7 @@ async def send_long_message(message, response, first_message_is_reply=True):
         for part in parts:
             if last_message and first_message_is_reply:
                 last_message = await last_message.reply(part)
+                first_message_is_reply = False
             else:
                 last_message = await message.channel.send(part)
             messages.append(last_message)
