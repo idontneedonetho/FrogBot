@@ -1,4 +1,4 @@
-# FrogBot/modules/help.py
+# modules.help
 
 from discord.ext import commands
 
@@ -11,7 +11,7 @@ async def advanced_help(ctx, bot_name):
         "**whiteboard**\n"
         "Send a .txt file as a long message.\n\n"
         "**edit**\n"
-        "__*Reply to the message you want to edit*__, include **\"edit\"** in your reply, and make sure to attach a .txt file.\n\n"
+        "__*Can only be used while replying to the original whiteboard message*__, make sure to attach a .txt file.\n\n"
         "**restart**\n"
         "Restart the bot.\n\n"
         "**update**\n"

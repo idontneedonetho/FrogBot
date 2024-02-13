@@ -1,4 +1,4 @@
-# commons.py
+# modules.utils.commons
 
 from llama_index.core.llms.types import MessageRole as Role
 from discord.ext import commands
@@ -49,70 +49,61 @@ async def fetch_reply_chain(message, max_tokens=4096):
             break
     return context[::-1]
 
-async def send_long_message(message, response, should_reply=True):
-    response = re.sub(r'(http[s]?://\S+)', r'<\1', response)
+async def send_message(message, content, should_reply):
+    if should_reply:
+        return await message.reply(content)
+    else:
+        return await message.channel.send(content)
+
+def split_message(response):
     max_length = 2000
     markdown_chars = ['*', '_', '~', '|']
-    messages = []
-    if len(response) > max_length:
-        parts = []
-        code_block_type = None
-        while len(response) > max_length:
-            split_index = max_length - 1
-            i = response.rfind('\n', 0, max_length)
-            if i > -1:
-                split_index = i
-            code_block_start = response.rfind('```', 0, split_index)
-            if code_block_start != -1:
-                newline_after_code_block_start = response.find('\n', code_block_start)
-                if newline_after_code_block_start != -1 and newline_after_code_block_start < split_index:
-                    code_block_type = response[code_block_start+3:newline_after_code_block_start].strip()
-                code_block_end = response.find('```', code_block_start + 3)
-                if code_block_end == -1 or code_block_end > split_index:
-                    if code_block_type:
-                        part = response[:split_index+1] + '```'
-                        response = '```' + code_block_type + '\n' + response[split_index+1:].lstrip()
-                    else:
-                        part = response[:split_index+1] + '```'
-                        response = '```' + response[split_index+1:].lstrip()
-                else:
-                    part = response[:split_index+1]
-                    response = response[split_index+1:].lstrip()
+    parts = []
+    code_block_type = None
+    while len(response) > max_length:
+        split_index = response.rfind('\n', 0, max_length)
+        split_index = max_length - 1 if split_index == -1 else split_index
+        code_block_start = response.rfind('```', 0, split_index)
+        if code_block_start != -1:
+            newline_after_code_block_start = response.find('\n', code_block_start)
+            if newline_after_code_block_start != -1 and newline_after_code_block_start < split_index:
+                code_block_type = response[code_block_start+3:newline_after_code_block_start].strip()
+            code_block_end = response.find('```', code_block_start + 3)
+            if code_block_end == -1 or code_block_end > split_index:
+                part = response[:split_index+1] + '```'
+                response = '```' + (code_block_type + '\n' if code_block_type else '') + response[split_index+1:].lstrip()
             else:
                 part = response[:split_index+1]
                 response = response[split_index+1:].lstrip()
-            for char in markdown_chars:
-                if part.count(char) % 2 != 0:
-                    part += char
-                    response = char + response
-            parts.append(part.rstrip())
-        parts.append(response)
-        last_message = None
-        for part in parts:
-            if should_reply:
-                if last_message is None:
-                    last_message = await message.reply(part)
-                else:
-                    last_message = await last_message.reply(part)
-            else:
-                last_message = await message.channel.send(part)
-            messages.append(last_message)
-            await asyncio.sleep(1)
-    else:
-        if should_reply:
-            last_message = await message.reply(response)
         else:
-            last_message = await message.channel.send(response)
+            part = response[:split_index+1]
+            response = response[split_index+1:].lstrip()
+        for char in markdown_chars:
+            if part.count(char) % 2 != 0 and not part.endswith('```'):
+                part += char
+                response = char + response
+        parts.append(part.rstrip())
+    parts.append(response.rstrip())
+    return parts
+
+async def send_long_message(message, response, should_reply=True):
+    response = re.sub(r'(http[s]?://\S+)', r'<\1>', response)
+    messages = []
+    parts = split_message(response)
+    for part in parts:
+        last_message = await send_message(message, part, should_reply)
         messages.append(last_message)
+        message = last_message
+        await asyncio.sleep(1)
     return messages
 
 def get_git_version():
     try:
         branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()[:7]
-        return f"v2.1 {branch} {commit}"
+        return f"v2.2 {branch} {commit}"
     except subprocess.CalledProcessError:
-        return "v2.1 unknown-version"
+        return "unknown-version"
 frog_version = get_git_version()
 
 def is_admin():

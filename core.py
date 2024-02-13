@@ -1,24 +1,25 @@
 # core.py
 
+from modules.utils.GPT import process_message_with_llm
+from modules.utils.commons import frog_version
+from modules.roles import check_user_points
+from module_loader import ModuleLoader
+from discord.ext import commands
+from dotenv import load_dotenv
+import traceback
 import discord
 import copy
 import os
-import traceback
-from discord.ext import commands
-from dotenv import load_dotenv
-from module_loader import ModuleLoader
-from modules.roles import check_user_points
-from modules.utils.commons import frog_version
-from modules.utils.GPT import process_message_with_llm
 load_dotenv()
 
-intents = discord.Intents.default()
-intents.members = True
-intents.guilds = True
-intents.messages = True
-intents.message_content = True
-intents.guild_messages = True
-intents.reactions = True
+intents = discord.Intents(
+    members=True,
+    guilds=True,
+    messages=True,
+    message_content=True,
+    guild_messages=True,
+    reactions=True
+)
 client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
 
 module_loader = ModuleLoader('modules')
@@ -61,7 +62,7 @@ async def process_commands_sequentially(message, command_texts):
             await client.invoke(ctx)
         else:
             await process_message_with_llm(message, client)
-            
+
 @client.event
 async def on_message(message):
     if message.author == client.user or message.author.bot:

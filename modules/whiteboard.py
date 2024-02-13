@@ -1,4 +1,4 @@
-# Whiteboard
+# modules.whiteboard
 
 from modules.utils.commons import is_admin_or_rank, send_long_message
 from discord.ext import commands

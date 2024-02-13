@@ -1,6 +1,9 @@
-import discord
-import datetime
+# modules.utils.progression
+
 from modules.utils.database import initialize_points_database
+from bisect import bisect_right
+import datetime
+import discord
 
 role_thresholds = {
     1000: 1178750004869996574,
@@ -15,25 +18,19 @@ role_thresholds = {
     1000000: 1178752300592922634
 }
 
-def get_next_threshold(points, thresholds):
-    for threshold in sorted(thresholds.keys()):
-        if points < threshold:
-            return threshold
-    return max(thresholds.keys())
+sorted_thresholds = sorted(role_thresholds.keys())
+sorted_roles = [role_thresholds[threshold] for threshold in sorted_thresholds]
 
 def calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds):
     user_points = initialize_points_database(user)
     current_points = user_points.get(user.id, 0)
-    current_threshold = max((points for points in role_thresholds.keys() if points <= current_points), default=0)
-    next_threshold = get_next_threshold(current_points, role_thresholds)
-    next_role_id = next((role_id for points, role_id in sorted(role_thresholds.items()) if current_points < points), None)
-    if next_role_id is not None:
-        next_rank_role = ctx.guild.get_role(next_role_id)
-        next_rank_name = next_rank_role.name if next_rank_role else "Next Rank"
-        points_needed = next_threshold - current_points
-    else:
-        next_rank_name = "Max Rank"
-        points_needed = 0
+    index = bisect_right(sorted_thresholds, current_points)
+    current_threshold = sorted_thresholds[index - 1] if index > 0 else 0
+    next_threshold = sorted_thresholds[index] if index < len(sorted_thresholds) else max(role_thresholds.keys())
+    next_role_id = sorted_roles[index] if index < len(sorted_roles) else None
+    next_rank_role = ctx.guild.get_role(next_role_id) if next_role_id else None
+    next_rank_name = next_rank_role.name if next_rank_role else "Next Rank"
+    points_needed = next_threshold - current_points if next_role_id else 0
     sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
     user_rank = next((index for index, (u_id, _) in enumerate(sorted_users) if u_id == user.id), -1)
     return user_rank, next_rank_name, points_needed, current_threshold, next_threshold
@@ -57,9 +54,9 @@ def create_points_embed(ctx, user, current_points, role_thresholds, action, user
     rank_text = f"**__{rank_emoji} | {user.display_name}: {current_points:,} points__**\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
     embed = discord.Embed(
         title=title,
-        description=f"Here's the current standing of {user.display_name}.",
+        description=f"Here's the current standing of __*{user.display_name}*__.",
         color=discord.Color.green()
     )
     embed.add_field(name="\u200b", value=rank_text, inline=False)
-    embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d')}")
+    embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return embed

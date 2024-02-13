@@ -1,5 +1,7 @@
-import discord
+# modules.tic-tac-toe
+
 from discord.ext import commands
+import discord
 import asyncio
 import random
 

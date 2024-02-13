@@ -1,4 +1,5 @@
-# database.py
+# modules.utils.database
+
 import sqlite3
 import time
 

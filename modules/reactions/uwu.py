@@ -1,4 +1,5 @@
-# commands/uwu.py
+# modules.reactions.uwu
+
 import random
 
 uwu_responses = [
@@ -24,6 +25,10 @@ async def send_uwu_response(message):
     await message.channel.send(selected_response)
 
 async def on_message(message):
-    # Trigger the response if a specific keyword is in the message
+    if message.author.bot:
+        return
     if 'uwu' in message.content.lower():
         await send_uwu_response(message)
+
+def setup(client):
+    client.add_listener(on_message, 'on_message')

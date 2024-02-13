@@ -1,23 +1,20 @@
-# FrogBot/modules/restart.py
+# modules.restart
 
+from modules.utils.commons import is_admin_or_user
 from discord.ext import commands
+from pathlib import Path
 import subprocess
 import asyncio
-import os
 import sys
-from pathlib import Path
-from modules.utils.commons import is_admin_or_user
+import os
 
-current_dir = Path(__file__).resolve().parent
-root_dir = current_dir.parent
+root_dir = Path(__file__).resolve().parent.parent
 core_script = root_dir / 'core.py'
 
 @commands.command(name="restart")
 @is_admin_or_user()
 async def restart_bot(ctx):
     await ctx.send("Restarting bot, please wait...")
-    if os.path.exists("restart_channel_id.txt"):
-        os.remove("restart_channel_id.txt")
     with open("restart_channel_id.txt", "w") as file:
         file.write(str(ctx.channel.id))
     for cmd in list(ctx.bot.all_commands.keys()):
