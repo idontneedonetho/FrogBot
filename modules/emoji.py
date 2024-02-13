@@ -1,9 +1,9 @@
 # FrogBot/modules/emoji.py
 
-from modules.utils.database import db_access_with_retry, initialize_points_database, update_points
+from modules.utils.database import db_access_with_retry, update_points
 from modules.roles import check_user_points
-import discord
 import datetime
+import discord
 
 bot_replies = {}
 
@@ -25,58 +25,29 @@ emoji_responses = {
     "❤️": "being a good frog"
 }
 
-async def on_raw_reaction_add(payload):
-    if payload.guild_id:
-        guild = bot.get_guild(payload.guild_id)
-        bot = guild.me
-        if payload.member and payload.member.guild_permissions.administrator:
-            user = payload.member
-            user_points_dict = initialize_points_database(user)
-            user_points = user_points_dict.get(user.id, 0)
-            await process_reaction(bot, payload, user_points)
-            await check_user_points(bot)
-        else:
-            print(f"{payload.member.display_name} does not have the Administrator permission. Ignoring the reaction.")
-
 async def process_reaction(bot, payload):
+    if payload.guild_id is None:
+        return
     emoji_name = str(payload.emoji)
     if emoji_name not in emoji_points:
         return
-    if not await validate_reaction(bot, payload):
-        return
-    user_id = payload.user_id
-    user_points_dict = initialize_points_database(user_id)
-    user_points = user_points_dict.get(user_id, 0)
-    if not isinstance(user_points_dict, dict):
-        print("user_points_dict is not a dictionary. This should not happen.")
-        return
-    author_id, points_to_add = handle_points(payload, emoji_name, user_points_dict)
-    new_points = user_points + points_to_add
-    if await update_points(author_id, new_points):
-        await check_user_points(bot)
-    await manage_bot_response(bot, payload, author_id, points_to_add, emoji_name)
-
-async def validate_reaction(bot, payload):
     guild = bot.get_guild(payload.guild_id)
     reactor = guild.get_member(payload.user_id)
-    return reactor.guild_permissions.administrator
-
-def handle_points(payload, emoji_name, user_points_dict):
-    author_id = payload.user_id
+    if not reactor.guild_permissions.administrator:
+        return
+    user_id = payload.user_id
+    user_points = get_user_points(user_id)
     points_to_add = emoji_points[emoji_name]
-    current_points = user_points_dict.get(author_id, 0)
-    user_points_dict[author_id] = current_points + points_to_add
-    return author_id, points_to_add
+    new_points = user_points + points_to_add
+    if await update_points(user_id, new_points):
+        await check_user_points(bot)
+    await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
-def initialize_points_database(user_id):
-    rows = db_access_with_retry('SELECT points FROM user_points WHERE user_id = ?', (user_id,))
-    if rows:
-        return {user_id: rows[0][0]}
-    else:
-        db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user_id, 0))
-        return {user_id: 0}
+def get_user_points(user_id):
+    user_points_dict = db_access_with_retry('SELECT * FROM user_points WHERE user_id = ?', (user_id,))
+    return user_points_dict[0][1] if user_points_dict else 0
 
-async def manage_bot_response(bot, payload, author_id, points_to_add, emoji_name):
+async def manage_bot_response(bot, payload, points_to_add, emoji_name):
     channel = bot.get_channel(payload.channel_id)
     message = await channel.fetch_message(payload.message_id)
     bot_reply_info = bot_replies.get(message.id, {'reply_id': None, 'total_points': 0, 'reasons': []})
@@ -88,12 +59,12 @@ async def manage_bot_response(bot, payload, author_id, points_to_add, emoji_name
         try:
             bot_reply_message = await channel.fetch_message(bot_reply_info['reply_id'])
             await bot_reply_message.edit(embed=embed)
-            bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': total_points, 'reasons': bot_reply_info['reasons']}
-        except:
-            pass
-    else:
+        except discord.NotFound:
+            bot_reply_info['reply_id'] = None
+    if not bot_reply_info['reply_id']:
         bot_reply_message = await message.reply(embed=embed)
-        bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': total_points, 'reasons': bot_reply_info['reasons']}
+        bot_reply_info['reply_id'] = bot_reply_message.id
+    bot_replies[message.id] = {'reply_id': bot_reply_message.id, 'total_points': total_points, 'reasons': bot_reply_info['reasons']}
 
 def create_points_embed(user, total_points, reasons, emoji_name):
     title = f"Points Updated: {emoji_name}"
@@ -113,6 +84,4 @@ def create_points_embed(user, total_points, reasons, emoji_name):
 def setup(client):
     @client.event
     async def on_raw_reaction_add(payload):
-        if payload.guild_id is None:
-            return
         await process_reaction(client, payload)
