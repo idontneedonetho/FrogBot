@@ -34,7 +34,7 @@ except Exception as e:
 @client.event
 async def on_ready():
     await check_user_points(client)
-    await client.change_presence(activity=discord.Game(name=f"@FrogBot help | {frog_version}"))
+    await client.change_presence(activity=discord.Game(name=f"@{client.user.name} help | {frog_version}"))
     print(f'Logged in as {client.user.name}')
     try:
         with open("restart_channel_id.txt", "r") as file:
