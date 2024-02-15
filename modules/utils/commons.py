@@ -87,7 +87,8 @@ def split_message(response):
     return parts
 
 async def send_long_message(message, response, should_reply=True):
-    response = re.sub(r'(http[s]?://\S+)', r'<\1>', response)
+    response = re.sub(r'\((http[s]?://\S+)\)', r'(<\1>)', response)
+    response = re.sub(r'(?<![\(<])http[s]?://\S+(?![>\)])', r'<\g<0>>', response)
     messages = []
     parts = split_message(response)
     for part in parts:
