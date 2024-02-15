@@ -1,6 +1,6 @@
 # modules.utils.commons
 
-from llama_index.core.llms.types import MessageRole as Role
+from llama_index.core.llms import MessageRole as Role
 from discord.ext import commands
 from discord.utils import get
 import subprocess
