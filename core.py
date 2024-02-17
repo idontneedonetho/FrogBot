@@ -193,16 +193,20 @@ async def on_message(message):
     if message.author == client.user or message.author.bot:
         return
     if client.user.mentioned_in(message):
-        command = message.content.split()[1] if len(message.content.split()) > 1 else ''
-        if command in ['restart', 'shutdown', 'update'] + list(client.all_commands.keys()):
-            command_texts = re.split(r';(?=(?:[^`]*`[^`]*`)*[^`]*$)', message.content)
-        else:
-            command_texts = [message.content]
-        for command_text in command_texts:
+        command_texts = re.split(r';(?=(?:[^`]*`[^`]*`)*[^`]*$)', message.content)
+        for i, command_text in enumerate(command_texts):
             command_text = command_text.strip()
             if not command_text.startswith(f'<@!{client.user.id}>') and not command_text.startswith(f'<@{client.user.id}>'):
                 command_text = f'<@!{client.user.id}> {command_text}'
-            executor.submit(await process_commands(message, [command_text]))
+            command = command_text.split()[1] if len(command_text.split()) > 1 else ''
+            if command == 'update':
+                await process_commands(message, [command_text])
+                await asyncio.sleep(1)
+            else:
+                if command in ['restart', 'shutdown'] + list(client.all_commands.keys()):
+                    executor.submit(await process_commands(message, [command_text]))
+                else:
+                    await process_message_with_llm(message, client)
     else:
         await client.process_commands(message)
 
