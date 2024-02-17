@@ -35,7 +35,9 @@ async def process_reaction(bot, payload):
     reactor = guild.get_member(payload.user_id)
     if not reactor.guild_permissions.administrator:
         return
-    user_id = payload.user_id
+    channel = bot.get_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+    user_id = message.author.id
     user_points = get_user_points(user_id)
     points_to_add = emoji_points[emoji_name]
     new_points = user_points + points_to_add
