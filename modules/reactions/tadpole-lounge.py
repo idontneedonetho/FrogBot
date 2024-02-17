@@ -14,7 +14,7 @@ async def on_member_join(member):
     try:
         role = discord.utils.get(member.guild.roles, name="tadpole")
         channel = discord.utils.get(member.guild.channels, name="tadpole-lounge")
-        if datetime.utcnow() - member.created_at < timedelta(days=2):
+        if datetime.utcnow().astimezone() - member.created_at.astimezone() < timedelta(days=2):
             await add_role(member, role, channel)
     except Exception as e:
         print(f"Error in on_member_join: {e}")
