@@ -50,13 +50,13 @@ class ModuleLoader:
         return module
 
     def get_command_handlers(self):
-        return {command: getattr(module, handler_name) 
-                for module in self.modules if hasattr(module, 'cmd') 
-                for command, handler_name in module.cmd.items() 
+        return {command: getattr(module, handler_name)
+                for module in self.modules if hasattr(module, 'cmd')
+                for command, handler_name in module.cmd.items()
                 if hasattr(module, handler_name)}
 
     def get_event_handlers(self, event_name):
-        return [getattr(module, event_name) 
+        return [getattr(module, event_name)
                 for module in self.modules if hasattr(module, event_name)]
 
 '''This Python code initializes a Discord bot with specific intents, and uses the ModuleLoader instance to dynamically load modules from the 'modules' directory into the bot.'''
@@ -219,6 +219,22 @@ async def on_command_error(ctx, error):
         tb = traceback.format_exception(type(error), error, error.__traceback__)
         tb_str = "".join(tb)
         print(f'An error occurred: {error}\n{tb_str}')
+
+@bot.event
+async def on_member_join(member):
+    # get the role you want to assign
+    role = discord.utils.get(member.guild.roles, name="tadpole") # change the role name as you like
+    # check if the member account is less than 2 days old
+    if datetime.utcnow() - member.created_at < timedelta(days=2):
+        # assign the role to the member
+        # get the #tadpole-lounge channel
+        channel = discord.utils.get(member.guild.text_channels, name="tadpole-lounge")
+
+        if channel:  # check if the channel was found
+            # send a message to the #tadpole-lounge channel
+            await channel.send(f"Hello {member.name}, welcome to {member.guild.name}! You have been assigned the {role.name} role. Please read the rules and enjoy your stay! You will gain full server access in a little while.")
+        else:
+            print("Channel not found. Make sure the channel name is correct.")
 
 '''This code attempts to run the Discord client with a token retrieved from the environment variables.'''
 try:
