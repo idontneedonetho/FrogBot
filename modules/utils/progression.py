@@ -3,7 +3,7 @@
 from modules.utils.database import initialize_points_database
 from bisect import bisect_right
 import datetime
-import discord
+import disnake
 
 role_thresholds = {
     1000: 1178750004869996574,
@@ -52,10 +52,10 @@ def create_points_embed(ctx, user, current_points, role_thresholds, action, user
     rank_emojis = ["🥇", "🥈", "🥉"]
     rank_emoji = rank_emojis[user_rank] if user_rank < 3 else f"#{user_rank + 1}"
     rank_text = f"**__{rank_emoji} | {user.display_name}: {current_points:,} points__**\nProgress: {progress_bar} ({points_needed:,} pts to {next_rank_name})"
-    embed = discord.Embed(
+    embed = disnake.Embed(
         title=title,
         description=f"Here's the current standing of __*{user.display_name}*__.",
-        color=discord.Color.green()
+        color=disnake.Color.green()
     )
     embed.add_field(name="\u200b", value=rank_text, inline=False)
     embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")

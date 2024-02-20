@@ -1,7 +1,7 @@
 # modules.whiteboard
 
 from modules.utils.commons import is_admin_or_rank, send_long_message
-from discord.ext import commands
+from disnake.ext import commands
 import re
 
 @commands.command(name="whiteboard")
@@ -16,15 +16,16 @@ async def whiteboard(ctx):
 
 @commands.command(name="edit")
 @is_admin_or_rank()
-async def edit(ctx):
-    if ctx.message.reference is None:
-        await ctx.send("Please reply to the message you want to edit.")
+async def edit(ctx, message_id: int):
+    try:
+        message = await ctx.channel.fetch_message(message_id)
+    except:
+        await ctx.send("Invalid message ID.")
         return
     content = extract_content_from_code_block(ctx.message.content)
     if content is None:
         await ctx.send("Please provide content in a code block.")
         return
-    message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
     await message.edit(content=content)
     await ctx.message.delete()
 

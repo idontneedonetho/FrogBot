@@ -3,7 +3,7 @@
 from modules.utils.database import db_access_with_retry, update_points
 from modules.roles import check_user_points
 import datetime
-import discord
+import disnake
 
 bot_replies = {}
 
@@ -61,7 +61,7 @@ async def manage_bot_response(bot, payload, points_to_add, emoji_name):
         try:
             bot_reply_message = await channel.fetch_message(bot_reply_info['reply_id'])
             await bot_reply_message.edit(embed=embed)
-        except discord.NotFound:
+        except disnake.NotFound:
             bot_reply_info['reply_id'] = None
     if not bot_reply_info['reply_id']:
         bot_reply_message = await message.reply(embed=embed)
@@ -73,10 +73,10 @@ def create_points_embed(user, total_points, reasons, emoji_name):
     description = f"{user.display_name} was awarded points for:"
     reason_to_emoji = {reason: emoji for emoji, reason in emoji_responses.items()}
     reasons_text = "\n".join([f"{reason_to_emoji.get(reason, '❓')} for {reason}" for reason in reasons])
-    embed = discord.Embed(
+    embed = disnake.Embed(
         title=title,
         description=description,
-        color=discord.Color.green()
+        color=disnake.Color.green()
     )
     embed.add_field(name="Reasons", value=reasons_text, inline=False)
     embed.add_field(name="Total Points", value=f"{total_points}", inline=True)

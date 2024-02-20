@@ -2,38 +2,38 @@
 
 from modules.utils.progression import create_progress_bar, calculate_user_rank_and_next_rank_name, role_thresholds
 from modules.utils.database import initialize_points_database
-from discord.ext import commands
+from disnake.ext import commands
+from disnake import User
 import datetime
-import discord
+import disnake
 
 async def get_user(ctx, args):
     if len(args) > 1 and ctx.message.author.guild_permissions.administrator:
         try:
             return await commands.UserConverter().convert(ctx, args[1])
         except commands.UserNotFound:
-            await ctx.reply("User not found.")
+            await ctx.send("User not found.")
             return None
     else:
         return ctx.author
 
-@commands.command(name="check")
-async def check_or_rank_command(ctx, *args):
-    if args and args[0].lower() == 'points':
-        user = await get_user(ctx, args)
+@commands.slash_command(description="Check points")
+async def check_points(ctx, user: User = None):
+    if user is None or ctx.author == user or ctx.author.guild_permissions.administrator:
         if user is None:
-            return
+            user = ctx.author
         user_points = initialize_points_database(user)
         sorted_users = sorted(user_points.items(), key=lambda x: x[1], reverse=True)
         user_rank = next((index for index, (u_id, _) in enumerate(sorted_users) if u_id == user.id), -1)
         start_index = max(0, user_rank - 2)
         end_index = min(len(sorted_users), start_index + 5) if start_index < 2 else min(start_index + 5, len(sorted_users))
         if not ctx.guild:
-            await ctx.reply("This command can only be used in a guild.")
+            await ctx.send("This command can only be used in a guild.")
             return
-        embed = discord.Embed(
+        embed = disnake.Embed(
             title="**🏆 Your Current Standing**",
             description="Here's your current points, rank, etc.",
-            color=discord.Color.gold()
+            color=disnake.Color.gold()
         )
         embed_fields = [
             create_embed_field(ctx, user, sorted_users, index)
@@ -43,9 +43,9 @@ async def check_or_rank_command(ctx, *args):
             if field is not None:
                 embed.add_field(name="\u200b", value=field, inline=False)
         embed.set_footer(text=f"Leaderboard as of {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        await ctx.reply(embed=embed)
+        await ctx.send(embed=embed)
     else:
-        await ctx.reply("Invalid syntax. Please use '@bot check points [@user]'.")
+        await ctx.send("Invalid syntax. Please use '/check points [@user]'.")
 
 def create_embed_field(ctx, user, sorted_users, index):
     user_id, points = sorted_users[index]
@@ -66,4 +66,4 @@ def create_embed_field(ctx, user, sorted_users, index):
     return rank_text
 
 def setup(client):
-    client.add_command(check_or_rank_command)
+    client.add_slash_command(check_points)

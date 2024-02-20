@@ -1,8 +1,8 @@
 # modules.utils.commons
 
 from llama_index.core.llms import MessageRole as Role
-from discord.ext import commands
-from discord.utils import get
+from disnake.ext import commands
+from disnake.utils import get
 import subprocess
 import asyncio
 import re
@@ -105,11 +105,11 @@ def get_git_version():
         return f"v2.2 {branch} {commit}"
     except subprocess.CalledProcessError:
         return "unknown-version"
-frog_version = get_git_version()
+bot_version = get_git_version()
 
 def is_admin():
     async def predicate(ctx):
-        author = ctx.message.author
+        author = ctx.user
         is_admin = author.guild_permissions.administrator
         print(f"Checking admin status for {author} (ID: {author.id}): {is_admin}")
         return is_admin

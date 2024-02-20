@@ -2,7 +2,7 @@
 
 from modules.utils.database import db_access_with_retry
 from modules.utils.progression import role_thresholds
-import discord
+import disnake
 
 CHANNEL_ID = 1178764276157141093
 
@@ -46,7 +46,7 @@ async def check_user_points(client):
         is_upgrade = highest_existing_role is None or (appropriate_role and appropriate_role.position > highest_existing_role.position)
         try:
             await manage_roles(member, appropriate_role, is_upgrade, notification_channel)
-        except discord.Forbidden:
+        except disnake.Forbidden:
             print(f"Bot doesn't have permission to manage roles for {member}")
-        except discord.HTTPException as e:
+        except disnake.HTTPException as e:
             print(f"HTTP request failed: {e}")

@@ -1,9 +1,9 @@
 # core.py
 
-from modules.utils.commons import frog_version, is_admin_or_user
+from modules.utils.commons import bot_version, is_admin_or_user
 from modules.utils.GPT import process_message_with_llm
 from modules.roles import check_user_points
-from discord.ext import commands
+from disnake.ext import commands
 from dotenv import load_dotenv
 import concurrent.futures
 from pathlib import Path
@@ -11,10 +11,8 @@ import importlib.util
 import subprocess
 import traceback
 import asyncio
-import discord
-import copy
+import disnake
 import sys
-import re
 import os
 
 load_dotenv()
@@ -60,7 +58,7 @@ class ModuleLoader:
                 for module in self.modules if hasattr(module, event_name)]
 
 '''This Python code initializes a Discord bot with specific intents, and uses the ModuleLoader instance to dynamically load modules from the 'modules' directory into the bot.'''
-intents = discord.Intents(
+intents = disnake.Intents(
     members=True,
     guilds=True,
     messages=True,
@@ -68,7 +66,10 @@ intents = discord.Intents(
     guild_messages=True,
     reactions=True
 )
-client = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, case_insensitive=True)
+
+command_sync_flags = commands.CommandSyncFlags.default()
+command_sync_flags.sync_commands_debug = True
+client = commands.Bot(command_prefix='/', intents=intents, command_sync_flags=command_sync_flags, test_guilds=[698205243103641711])
 
 module_loader = ModuleLoader('modules')
 module_loader.load_modules(client)
@@ -83,9 +84,9 @@ except Exception as e:
 root_dir = Path(__file__).resolve().parent
 core_script = root_dir / 'core.py'
 
-@client.command(name="restart")
+@client.slash_command(description = "Restart the bot.")
 @is_admin_or_user()
-async def restart_bot(ctx):
+async def restart(ctx):
     try:
         await ctx.send("Restarting bot, please wait...")
         with open("restart_channel_id.txt", "w") as file:
@@ -104,23 +105,31 @@ async def restart_bot(ctx):
     except Exception as e:
         await ctx.send(f"An error occurred while trying to restart the bot: {e}")
 
-@client.command(name="shutdown")
+@client.slash_command(description = "Shut down the bot.")
 @is_admin_or_user()
-async def shutdown_bot(ctx):
-    confirmation_message = await ctx.send("Are you sure you want to shut down the bot? React with ✅ to confirm.")
-    await confirmation_message.add_reaction("✅")
-    def check(reaction, user):
-        return user == ctx.author and str(reaction.emoji) == '✅' and reaction.message.id == confirmation_message.id
-    try:
-        await ctx.bot.wait_for('reaction_add', timeout=60.0, check=check)
-        await ctx.send("Shutting down...")
-        await ctx.bot.close()
-    except asyncio.TimeoutError:
-        await ctx.send("Bot shutdown canceled.")
+async def shutdown(ctx: disnake.ApplicationCommandInteraction):
+    await ctx.response.send_message(
+        "Are you sure you want to shut down the bot?",
+        components=[
+            disnake.ui.Button(label="Yes", style=disnake.ButtonStyle.success, custom_id="shutdown_yes"),
+            disnake.ui.Button(label="No", style=disnake.ButtonStyle.danger, custom_id="shutdown_no"),
+        ],
+    )
 
-@client.command(name="update")
+@client.listen("on_button_click")
+async def shutdown_listener(inter: disnake.MessageInteraction):
+    if inter.component.custom_id not in ["shutdown_yes", "shutdown_no"]:
+        return
+
+    if inter.component.custom_id == "shutdown_yes":
+        await inter.response.send_message("Shutting down...")
+        await inter.bot.close()
+    elif inter.component.custom_id == "shutdown_no":
+        await inter.response.send_message("Bot shutdown canceled.")
+
+@client.slash_command(description = "Update the bot from the Git repository.")
 @is_admin_or_user()
-async def git_pull(ctx, branch="beta"):
+async def update(ctx, branch="beta"):
     try:
         await switch_branch(ctx, branch)
         await git_stash(ctx)
@@ -153,16 +162,11 @@ async def git_pull_origin(ctx, branch):
     else:
         raise Exception(stderr.decode())
 
-def setup(client):
-    client.add_command(restart_bot)
-    client.add_command(shutdown_bot)
-    client.add_command(git_pull)
-
 '''This code defines the core functionality of the bot, including event handlers for when the bot is ready, when a message is received, when a reaction is added, and when a command error occurs, as well as a method to process commands.'''
 @client.event
 async def on_ready():
     await check_user_points(client)
-    await client.change_presence(activity=discord.Game(name=f"@{client.user.name} help | {frog_version}"))
+    await client.change_presence(activity=disnake.Game(name=f"@{client.user.name} help | {bot_version}"))
     print(f'Logged in as {client.user.name}')
     try:
         with open("restart_channel_id.txt", "r") as file:
@@ -178,35 +182,12 @@ async def on_ready():
 
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(os.cpu_count(), 4))
 
-async def process_commands(message, command_texts):
-    for command_text in command_texts:
-        temp_message = copy.copy(message)
-        temp_message.content = command_text
-        ctx = await client.get_context(temp_message)
-        if ctx.command is not None:
-            await client.invoke(ctx)
-        else:
-            await process_message_with_llm(temp_message, client)
-
 @client.event
 async def on_message(message):
     if message.author == client.user or message.author.bot:
         return
-    if client.user.mentioned_in(message):
-        command_texts = re.split(r';(?=(?:[^`]*`[^`]*`)*[^`]*$)', message.content)
-        for i, command_text in enumerate(command_texts):
-            command_text = command_text.strip()
-            if not command_text.startswith(f'<@!{client.user.id}>') and not command_text.startswith(f'<@{client.user.id}>'):
-                command_text = f'<@!{client.user.id}> {command_text}'
-            command = command_text.split()[1] if len(command_text.split()) > 1 else ''
-            if command == 'update':
-                await process_commands(message, [command_text])
-                await asyncio.sleep(1)
-            else:
-                if command in ['restart', 'shutdown'] + list(client.all_commands.keys()):
-                    executor.submit(await process_commands(message, [command_text]))
-                else:
-                    await process_message_with_llm(message, client)
+    if client.user in message.mentions:
+        await process_message_with_llm(message, client)
     else:
         await client.process_commands(message)
 
@@ -230,6 +211,5 @@ try:
 finally:
     memory_monitor.stop()
     print("Memory monitor stopped")
-
 
 '''Kaofui was here uwu'''

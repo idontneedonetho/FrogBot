@@ -1,7 +1,7 @@
-# modules.tadpole-lounge
+# modules.reactions.tadpole-lounge
 
 from datetime import datetime, timedelta
-import discord
+import disnake
 
 async def add_role(member, role, channel):
     try:
@@ -12,8 +12,8 @@ async def add_role(member, role, channel):
 
 async def on_member_join(member):
     try:
-        role = discord.utils.get(member.guild.roles, name="tadpole")
-        channel = discord.utils.get(member.guild.channels, name="tadpole-lounge")
+        role = disnake.utils.get(member.guild.roles, name="tadpole")
+        channel = disnake.utils.get(member.guild.channels, name="tadpole-lounge")
         if datetime.utcnow() - member.created_at < timedelta(days=2):
             await add_role(member, role, channel)
     except Exception as e:

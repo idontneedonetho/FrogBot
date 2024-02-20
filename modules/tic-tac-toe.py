@@ -1,121 +1,98 @@
 # modules.tic-tac-toe
 
-from discord.ext import commands
-import discord
+from disnake import User, Interaction, ui, ButtonStyle
+from disnake.ext import commands
 import asyncio
+import disnake
 import random
 
-class TicTacToe:
-    def __init__(self, player_x, player_o, message):
-        self.board = [[" " for _ in range(3)] for _ in range(3)]
-        self.player_x = player_x
-        self.player_o = player_o
-        self.current_turn = player_x
-        self.game_over = False
-        self.winner = None
-        self.message = message
+class TicTacToeButton(ui.Button):
+    def __init__(self, x: int, y: int):
+        super().__init__(style=ButtonStyle.secondary, label="-")
+        self.x = x
+        self.y = y
 
-    async def ai_make_move(self):
-        empty_cells = [(i, j) for i in range(3) for j in range(3) if self.board[i][j] == ' ']
-        if not empty_cells:
-            return False, "No more moves left."
-        row, col = random.choice(empty_cells)
-        move = row * 3 + col + 1
-        return self.make_move(self.current_turn, move)
+    async def callback(self, interaction: Interaction):
+        state: TicTacToe = self.view
+        if state.board[self.x][self.y] != '-':
+            await interaction.response.send_message('This spot is already taken!', ephemeral=True)
+        elif interaction.user != state.current_player:
+            await interaction.response.send_message("It's not your turn!", ephemeral=True)
+        else:
+            state.board[self.x][self.y] = 'X' if state.current_player == state.users[0] else 'O'
+            self.label = state.board[self.x][self.y]
+            self.disabled = True
+            if state.check_winner():
+                await interaction.response.edit_message(content=f"{state.current_player.mention} wins!", view=None)
+                return
+            elif '-' not in [item for sublist in state.board for item in sublist]:
+                await interaction.response.edit_message(content="It's a draw!", view=None)
+                return
+            state.switch_player()
+            await interaction.response.edit_message(content=f"It's {state.current_player.mention}'s turn", view=state)
+            if state.current_player == state.bot:
+                await asyncio.sleep(0.5)
+                await state.bot_move(interaction)
 
-    def get_board_str(self):
-        board_str = "```\n"
-        for i in range(3):
-            for j in range(3):
-                cell = self.board[i][j]
-                board_str += f"{cell if cell != ' ' else i * 3 + j + 1} "
-                if j < 2:
-                    board_str += "| "
-            if i < 2:
-                board_str += "\n---------\n"
-        board_str += "\n```"
-        return board_str
+class TicTacToe(ui.View):
+    def __init__(self, user1: User, user2: User, bot: User):
+        super().__init__(timeout=180.0)
+        self.users = [user1, user2]
+        self.bot = bot
+        self.current_player = user1
+        self.board = [['-' for _ in range(3)] for _ in range(3)]
+        for x in range(3):
+            for y in range(3):
+                self.add_item(TicTacToeButton(x, y))
+                if (x * 3 + y + 1) % 3 == 0 and x * 3 + y + 1 < 9:
+                    self.add_item(ui.Button(style=ButtonStyle.secondary, label="\u200b", disabled=True))
+                    self.add_item(ui.Button(style=ButtonStyle.secondary, label="\u200b", disabled=True))
+    
+    def switch_player(self):
+        self.current_player = self.users[0] if self.current_player == self.users[1] else self.users[1]
 
-    def make_move(self, player, move):
-        if player != self.current_turn or self.game_over:
-            return False, "It's not your turn or the game is already over."
-        row, col = divmod(move - 1, 3)
-        if self.board[row][col] != " ":
-            return False, "Invalid move, the cell is already occupied."
-        self.board[row][col] = 'X' if player == self.player_x else 'O'
-        if self.check_winner(player, row, col):
-            self.game_over = True
-            self.winner = player
-            return True, f"Game Over! {player.mention} wins!\n{self.get_board_str()}"
-        elif all(self.board[i][j] != ' ' for i in range(3) for j in range(3)):
-            self.game_over = True
-            return True, f"Game Over! It's a draw!\n{self.get_board_str()}"
-        self.current_turn = self.player_o if self.current_turn == self.player_x else self.player_x
-        next_player_mention = self.player_o.mention if self.current_turn == self.player_o else self.player_x.mention
-        return True, f"{self.get_board_str()}\n{next_player_mention}, it's your turn!"
+    async def bot_move(self, interaction: Interaction):
+        empty_spots = [(x, y) for x in range(3) for y in range(3) if self.board[x][y] == '-']
+        if empty_spots:
+            x, y = random.choice(empty_spots)
+            self.board[x][y] = 'X' if self.current_player == self.users[0] else 'O'
+            for item in self.children:
+                if isinstance(item, TicTacToeButton) and item.x == x and item.y == y:
+                    item.label = self.board[x][y]
+                    item.disabled = True
+                    break
+            if self.check_winner():
+                await interaction.edit_original_message(content=f"{self.current_player.mention} wins!", view=None)
+                return
+            elif '-' not in [item for sublist in self.board for item in sublist]:
+                await interaction.edit_original_message(content="It's a draw!", view=None)
+                return
+            self.switch_player()
+            await interaction.edit_original_message(content=f"It's {self.current_player.mention}'s turn", view=self)
 
-    def check_winner(self, player, row, col):
-        if all(self.board[row][i] == self.board[row][col] for i in range(3)):
+    def check_winner(self):
+        for row in self.board:
+            if row.count(row[0]) == len(row) and row[0] != '-':
+                return True
+        for col in range(3):
+            check = []
+            for row in self.board:
+                check.append(row[col])
+            if check.count(check[0]) == len(check) and check[0] != '-':
+                return True
+        if self.board[0][0] == self.board[1][1] == self.board[2][2] != '-':
             return True
-        if all(self.board[i][col] == self.board[row][col] for i in range(3)):
-            return True
-        if row == col and all(self.board[i][i] == self.board[row][col] for i in range(3)):
-            return True
-        if row + col == 2 and all(self.board[i][2-i] == self.board[row][col] for i in range(3)):
+        if self.board[0][2] == self.board[1][1] == self.board[2][0] != '-':
             return True
         return False
 
-games = {}
-
-@commands.command(name='ttt_start')
-async def start_game(ctx, player_x: discord.Member, player_o: discord.Member):
-    initial_board = "```\n1 | 2 | 3\n---------\n4 | 5 | 6\n---------\n7 | 8 | 9\n```"
-    message = await ctx.send(f"{player_x.mention} (X) vs {player_o.mention} (O)\n{initial_board}\nReact with the number you want to place your mark on!")
-    for emoji in ('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'):
-        await message.add_reaction(emoji)
-    game = TicTacToe(player_x, player_o, message)
-    games[message.id] = game
-    asyncio.create_task(game_timeout(ctx, message.id, 3600))
-    if player_x.bot:
-        result, response = await game.ai_make_move()
-        if result:
-            await message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
-
-async def game_timeout(ctx, message_id, timeout):
-    await asyncio.sleep(timeout)
-    game = games.get(message_id)
-    if game and not game.game_over:
-        await ctx.reply(f"Game timed out! {game.player_x.mention} vs {game.player_o.mention}")
-        del games[message_id]
-
-async def on_reaction_add(reaction, user):
-    message_id = reaction.message.id
-    game = games.get(message_id)
-    if not game or game.game_over:
+@commands.slash_command()
+async def tictactoe(ctx: disnake.ApplicationCommandInteraction, player2: disnake.User):
+    player1 = ctx.author
+    if player1.id == player2.id:
+        await ctx.send("You cannot play against yourself!")
         return
-    if user == reaction.message.author.bot:
-        return
-    emoji_to_num = {
-        '1️⃣': 1, '2️⃣': 2, '3️⃣': 3,
-        '4️⃣': 4, '5️⃣': 5, '6️⃣': 6,
-        '7️⃣': 7, '8️⃣': 8, '9️⃣': 9
-    }
-    move = emoji_to_num.get(str(reaction.emoji))
-    if move is None or user.id not in [game.player_x.id, game.player_o.id]:
-        return
-    result, response = game.make_move(user, move)
-    if result:
-        await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
-        if game.game_over:
-            return
-        else:
-            if (game.current_turn == game.player_x and game.player_x.bot) or (game.current_turn == game.player_o and game.player_o.bot):
-                result, response = await game.ai_make_move()
-                if result:
-                    await reaction.message.edit(content=f"{game.player_x.mention} (X) vs {game.player_o.mention} (O)\n{response}")
-                    if game.game_over:
-                        return
+    await ctx.send(f"It's {player1.mention}'s turn", view=TicTacToe(player1, player2, ctx.bot.user))
 
 def setup(client):
-    client.add_command(start_game)
-    client.add_listener(on_reaction_add, 'on_reaction_add')
+    client.add_slash_command(tictactoe)
