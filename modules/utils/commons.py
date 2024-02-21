@@ -95,7 +95,6 @@ async def send_long_message(message, response, should_reply=True):
         last_message = await send_message(message, part, should_reply)
         messages.append(last_message)
         message = last_message
-        await asyncio.sleep(1)
     return messages
 
 def get_git_version():
