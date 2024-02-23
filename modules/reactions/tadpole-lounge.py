@@ -13,7 +13,7 @@ async def add_role(member, role, channel):
 async def on_member_join(member):
     try:
         role = disnake.utils.get(member.guild.roles, name="tadpole")
-        channel = disnake.utils.get(member.guild.channels, name="tadpole-lounge")
+        channel = channel = member.guild.get_channel(1208256502645657611)
         utcnow_aware = datetime.utcnow().replace(tzinfo=timezone.utc)
         if utcnow_aware - member.created_at < timedelta(days=2):
             await add_role(member, role, channel)
