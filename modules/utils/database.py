@@ -10,24 +10,12 @@ async def initialize_database():
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_points (
-                user_id INTEGER PRIMARY_KEY,
+                user_id INTEGER PRIMARY KEY,
                 points INTEGER NOT NULL DEFAULT 0
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_roles (
-                user_id INTEGER,
-                role_id INTEGER,
-                PRIMARY KEY(user_id, role_id)
             )
         ''')
         conn.commit()
         cursor.close()
-
-def update_user_roles(user_id, roles):
-    db_access_with_retry('DELETE FROM user_roles WHERE user_id = ?', (user_id,))
-    for role in roles:
-        db_access_with_retry('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)', (user_id, role.id))
 
 def db_access_with_retry(sql_operation, *args, max_attempts=5, delay=1, timeout=10.0):
     for attempt in range(max_attempts):
