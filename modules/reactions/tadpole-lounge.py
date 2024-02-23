@@ -9,23 +9,9 @@ async def add_role(member, role, channel):
     except Exception as e:
         print(f"Error adding role {role.name} to member {member.name}: {e}")
     try:
-        await channel.send(f"Hello blank, welcome to blank! You have been assigned the blank role. Please read the rules and enjoy your stay! You will gain full server access in a little while. If you have any questions feel free to ask them here.")
+        await channel.send(f"Hello {member.mention}, welcome to {member.guild.name}! You have been assigned the {role.mention} role. Please read the rules and enjoy your stay! You will gain full server access in a little while. If you have any questions feel free to ask them here.")
     except Exception as e:
-        print(f"Error sending to channel")
-    try:
-        await channel.send(f"Hello {member.mention}, welcome to blank! You have been assigned the blank role. Please read the rules and enjoy your stay! You will gain full server access in a little while. If you have any questions feel free to ask them here.")
-    except Exception as e:
-        print(f"Error with member mention: {member.mention}")
-    try:
-        await channel.send(f"Hello blank, welcome to {member.guild.name}! You have been assigned the blank role. Please read the rules and enjoy your stay! You will gain full server access in a little while. If you have any questions feel free to ask them here.")
-    except Exception as e:
-        print(f"Error with member.guild.name: {member.guild.name}")
-    try:
-        await channel.send(f"Hello blank, welcome to blank! You have been assigned the {role.mention} role. Please read the rules and enjoy your stay! You will gain full server access in a little while. If you have any questions feel free to ask them here.")
-    except Exception as e:
-        print(f"Error with role mention: {role.mention}")
-        
-        
+        print(f"Error sending message to member {member.name} in {member.guild.name} tadpole lounge channel: {e}")
 
 async def on_member_join(member):
     try:
