@@ -117,10 +117,10 @@ async def shutdown(ctx: disnake.ApplicationCommandInteraction):
     )
 
 @client.listen("on_button_click")
+@is_admin_or_user()
 async def shutdown_listener(inter: disnake.MessageInteraction):
     if inter.component.custom_id not in ["shutdown_yes", "shutdown_no"]:
         return
-
     if inter.component.custom_id == "shutdown_yes":
         await inter.response.send_message("Shutting down...")
         await inter.bot.close()
