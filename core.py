@@ -114,6 +114,7 @@ async def shutdown(ctx: disnake.ApplicationCommandInteraction):
             disnake.ui.Button(label="Yes", style=disnake.ButtonStyle.success, custom_id="shutdown_yes"),
             disnake.ui.Button(label="No", style=disnake.ButtonStyle.danger, custom_id="shutdown_no"),
         ],
+        ephemeral=True
     )
 
 @client.listen("on_button_click")
@@ -122,10 +123,10 @@ async def shutdown_listener(inter: disnake.MessageInteraction):
     if inter.component.custom_id not in ["shutdown_yes", "shutdown_no"]:
         return
     if inter.component.custom_id == "shutdown_yes":
-        await inter.response.send_message("Shutting down...")
+        await inter.response.send_message("Shutting down...", ephemeral=True)
         await inter.bot.close()
     elif inter.component.custom_id == "shutdown_no":
-        await inter.response.send_message("Bot shutdown canceled.")
+        await inter.response.send_message("Bot shutdown canceled.", ephemeral=True)
 
 @client.slash_command(description = "Update the bot from the Git repository.")
 @is_admin_or_user()
