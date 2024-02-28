@@ -36,13 +36,10 @@ async def process_message_with_llm(message, client):
                     chat_mode="condense_plus_context",
                     similarity_top_k=5,
                     memory=memory,
-                    context_prompt=(
-                        f"You are {client.user.name}, a Discord bot, format responses as such."
-                        "\nTopic: OpenPilot and its various forks."
-                        "\n\nRelevant documents for the context:\n"
-                        "{context_str}"
-                        "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
-                        "\nALWAYS provide the link to the source of the information if applicable."
+                    system_prompt=(
+                        f"You are {client.user.name}, a Discord bot. "
+                        "Topic: OpenPilot and its various forks. "
+                        "ALWAYS provide the link to the source of the information if applicable."
                     )
                 )
                 chat_response = await asyncio.to_thread(chat_engine.chat, content)
