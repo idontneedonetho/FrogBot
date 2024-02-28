@@ -18,3 +18,4 @@ data/
 test gpt/
 state.json
 openpilot.wiki
+chroma_db

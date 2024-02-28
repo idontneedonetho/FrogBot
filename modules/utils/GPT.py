@@ -1,7 +1,7 @@
 # modules.utils.GPT
 
 from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage
-from llama_index.core import VectorStoreIndex, StorageContext, Settings
+from llama_index.core import StorageContext, Settings, VectorStoreIndex
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.llms import MessageRole as Role
@@ -17,10 +17,11 @@ import os
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
-vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
 Settings.llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
 embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+print("fetching vector store")
+client = QdrantClient(path="./qdrant_db")
+vector_store = QdrantVectorStore("openpilot_docs", client=client)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
 
@@ -33,7 +34,7 @@ async def process_message_with_llm(message, client):
                 context = await fetch_context_and_content(message, client, content)
                 memory.set(context + [HistoryChatMessage(f"{content}", Role.USER)])
                 chat_engine = index.as_chat_engine(
-                    chat_mode="condense_plus_context",
+                    chat_mode="best",
                     similarity_top_k=5,
                     memory=memory,
                     context_prompt=(

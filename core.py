@@ -2,6 +2,7 @@
 
 from modules.utils.commons import bot_version, is_admin_or_user
 from modules.utils.GPT import process_message_with_llm
+from modules.utils.database import initialize_database
 from modules.roles import check_user_points
 from disnake.ext import commands
 from dotenv import load_dotenv
@@ -166,6 +167,7 @@ async def git_pull_origin(ctx, branch):
 '''This code defines the core functionality of the bot, including event handlers for when the bot is ready, when a message is received, when a reaction is added, and when a command error occurs, as well as a method to process commands.'''
 @client.event
 async def on_ready():
+    await initialize_database()
     await check_user_points(client)
     await client.change_presence(activity=disnake.Game(name=f"@{client.user.name} help | {bot_version}"))
     print(f'Logged in as {client.user.name}')
