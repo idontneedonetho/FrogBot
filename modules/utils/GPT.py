@@ -33,7 +33,7 @@ async def process_message_with_llm(message, client):
                 context = await fetch_context_and_content(message, client, content)
                 memory.set(context + [HistoryChatMessage(f"{content}", Role.USER)])
                 chat_engine = index.as_chat_engine(
-                    chat_mode="best",
+                    chat_mode="condense_plus_context",
                     similarity_top_k=5,
                     memory=memory,
                     context_prompt=(
