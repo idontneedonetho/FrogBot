@@ -38,8 +38,8 @@ async def process_message_with_llm(message, client):
                     memory=memory,
                     system_prompt=(
                         f"You are {client.user.name}, a Discord bot. "
-                        "Topic: OpenPilot and its various forks. "
-                        "ALWAYS provide the link to the source of the information if applicable."
+                        "The topic is OpenPilot and its various forks. "
+                        "Always provide the link to the source of the information, if applicable."
                     )
                 )
                 chat_response = await asyncio.to_thread(chat_engine.chat, content)
