@@ -9,15 +9,15 @@ from disnake import User
 
 @commands.slash_command(description="Add points to a user")
 @is_admin()
-async def add(ctx, points: int, user: User):
-    await handle_points_command(ctx, points, user, "add")
+async def add(ctx, points: int, user: User, reason: str = None):
+    await handle_points_command(ctx, points, user, "add", reason)
 
 @commands.slash_command(description="Remove points from a user")
 @is_admin()
-async def remove(ctx, points: int, user: User):
-    await handle_points_command(ctx, points, user, "remove")
+async def remove(ctx, points: int, user: User, reason: str = None):
+    await handle_points_command(ctx, points, user, "remove", reason)
 
-async def handle_points_command(ctx, points, user, action):
+async def handle_points_command(ctx, points, user, action, reason):
     print(f"{action.capitalize()}ing points: Points: {points}, User: {user}")
     if points < 0:
         print("Invalid points.")
@@ -29,7 +29,7 @@ async def handle_points_command(ctx, points, user, action):
     if await update_points(user.id, new_points):
         await check_user_points(ctx.bot)
     user_rank, next_rank_name, _, _, _ = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
-    new_embed = create_points_embed(ctx, user, new_points, role_thresholds, action, user_rank, next_rank_name)
+    new_embed = create_points_embed(ctx, user, new_points, role_thresholds, action, user_rank, next_rank_name, points, reason)
     await ctx.send(embed=new_embed)
 
 def setup(client):

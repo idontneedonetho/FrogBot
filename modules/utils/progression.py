@@ -43,8 +43,8 @@ def create_progress_bar(current, total, length=10, fill_symbols='█▉▊▋▌
     remainder_fill = progress % len(fill_symbols)
     return (fill_symbols[0] * filled_count) + (fill_symbols[remainder_fill] if remainder_fill > 0 else '') + empty * (length - filled_count - 1)
 
-def create_points_embed(ctx, user, current_points, role_thresholds, action, user_rank, next_rank_name):
-    title = "Points Added ⬆️" if action == "add" else "Points Removed ⬇️"
+def create_points_embed(ctx, user, current_points, role_thresholds, action, user_rank, next_rank_name, points_changed, reason=None):
+    title = f"Points Added ⬆️: {points_changed}" if action == "add" else f"Points Removed ⬇️: {points_changed}"
     user_rank, next_rank_name, points_needed, current_threshold, next_threshold = calculate_user_rank_and_next_rank_name(ctx, user, role_thresholds)
     progress_length = next_threshold - current_threshold
     progress_current = current_points - current_threshold
@@ -58,5 +58,7 @@ def create_points_embed(ctx, user, current_points, role_thresholds, action, user
         color=disnake.Color.green()
     )
     embed.add_field(name="\u200b", value=rank_text, inline=False)
+    if reason:
+        embed.add_field(name="Reason", value=reason, inline=False)
     embed.set_footer(text=f"Updated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return embed
