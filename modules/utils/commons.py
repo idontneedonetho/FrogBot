@@ -86,9 +86,15 @@ def split_message(response):
     parts.append(response.rstrip())
     return parts
 
+def replace_wiki_links(response):
+    response = re.sub(r'openpilot\.wiki', '<https://github.com/commaai/openpilot/wiki', response)
+    response = re.sub(r'\.md', '>', response)
+    return response
+
 async def send_long_message(message, response, should_reply=True):
     response = re.sub(r'\((http[s]?://\S+)\)', r'(<\1>)', response)
     response = re.sub(r'(?<![\(<])http[s]?://\S+(?![>\)])', r'<\g<0>>', response)
+    response = replace_wiki_links(response)
     messages = []
     parts = split_message(response)
     for part in parts:
