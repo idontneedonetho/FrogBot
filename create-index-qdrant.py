@@ -89,8 +89,8 @@ all_docs['local'] = local_docs
 print(f"Local documents loaded successfully and added to all_docs. Current document count: {sum(len(v) for v in all_docs.values())}")
 
 print("Setting up Qdrant and vector store...")
-client = QdrantClient(path="./qdrant_db")
-vector_store = QdrantVectorStore("openpilot_docs", client=client)
+client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
+vector_store = QdrantVectorStore("openpilot-data", client=client)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 all_docs_list = [doc for docs in all_docs.values() for doc in docs]
 index = VectorStoreIndex.from_documents(all_docs_list, storage_context=storage_context, embed_model=embed_model)
