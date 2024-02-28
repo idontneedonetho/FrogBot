@@ -81,7 +81,7 @@ async def general_help(ctx, bot_name):
     help_message = (
         ">>> **General Help**\n"
         "*Keywords for bot reactions will not be listed*\n\n"
-        f"**\"@{bot_name}\" [question]**\n"
+        f"**\@{bot_name}\ [question]**\n"
         "Ask ChatGPT a question. To continue conversations, you must reply to the bot's message.\n\n"
         "**help points**\n"
         "Displays the points help message.\n\n"
