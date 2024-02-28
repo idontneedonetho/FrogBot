@@ -17,11 +17,10 @@ import os
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
+client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
+vector_store = QdrantVectorStore(client=client, collection_name="openpilot-data")
 Settings.llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
 embed_model = OpenAIEmbedding(model="text-embedding-3-small")
-print("fetching vector store")
-client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
-vector_store = QdrantVectorStore("openpilot-data", client=client)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
 
