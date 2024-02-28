@@ -169,7 +169,7 @@ async def git_pull_origin(ctx, branch):
 async def on_ready():
     await initialize_database()
     await check_user_points(client)
-    await client.change_presence(activity=disnake.Game(name=f"@{client.user.name} help | {bot_version}"))
+    await client.change_presence(activity=disnake.Game(name=f"/help | {bot_version}"))
     print(f'Logged in as {client.user.name}')
     try:
         with open("restart_channel_id.txt", "r") as file:
