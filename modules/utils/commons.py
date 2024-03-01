@@ -4,7 +4,6 @@ from llama_index.core.llms import MessageRole as Role
 from disnake.ext import commands
 from disnake.utils import get
 import subprocess
-import asyncio
 import re
 
 async def fetch_message_from_link(client, link):
@@ -56,7 +55,7 @@ async def send_message(message, content, should_reply):
         return await message.channel.send(content)
 
 def split_message(response):
-    max_length = 2000
+    max_length = 1900
     markdown_chars = ['*', '_', '~', '|']
     parts = []
     code_block_type = None
