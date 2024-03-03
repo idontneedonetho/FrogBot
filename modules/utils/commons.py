@@ -60,6 +60,7 @@ def split_message(response):
     markdown_chars = ['*', '_', '~', '|']
     parts = []
     code_block_type = None
+    unbalanced_chars = []
     while len(response) > max_length:
         split_index = response.rfind('\n', 0, max_length)
         split_index = max_length - 1 if split_index == -1 else split_index
@@ -80,22 +81,28 @@ def split_message(response):
             response = response[split_index+1:].lstrip()
         for char in markdown_chars:
             if part.count(char) % 2 != 0 and not part.endswith('```'):
-                part += char
-                response = char + response
+                unbalanced_chars.append(char)
+        for char in unbalanced_chars:
+            if char in part and part.count(char) % 2 != 0:
+                unbalanced_chars.remove(char)
+        for char in unbalanced_chars:
+            part += char
+            response = char + response
         parts.append(part.rstrip())
     parts.append(response.rstrip())
     return parts
 
+def is_inside_code_block(text, index):
+    return text[:index].count('```') % 2 == 1 or text[:index].count('`') % 2 == 1
+
 async def send_long_message(message, response, should_reply=True):
-    response = re.sub(r'\((http[s]?://\S+)\)', r'(<\1>)', response)
-    response = re.sub(r'(?<![\(<])http[s]?://\S+(?![>\)])', r'<\g<0>>', response)
-    messages = []
-    parts = split_message(response)
-    for part in parts:
-        last_message = await send_message(message, part, should_reply)
-        messages.append(last_message)
-        message = last_message
-    return messages
+    for regex in [r'\((http[s]?://\S+)\)', r'(?<![\(<])http[s]?://\S+(?![>\)])']:
+        response = ''.join([
+            '<' + match.group(0).strip('()') + '>' if not is_inside_code_block(response, match.start()) else match.group(0)
+            for match in re.finditer(regex, response)
+        ])
+
+    return [await send_message(message, part, should_reply) for part in split_message(response)]
 
 def get_git_version():
     try:
