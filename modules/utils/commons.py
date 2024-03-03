@@ -88,8 +88,12 @@ def split_message(response):
         for char in unbalanced_chars:
             part += char
             response = char + response
-        parts.append(part.rstrip())
-    parts.append(response.rstrip())
+        part = part.rstrip()
+        if part:
+            parts.append(part)
+    response = response.rstrip()
+    if response:
+        parts.append(response)
     return parts
 
 def is_inside_code_block(text, index):
