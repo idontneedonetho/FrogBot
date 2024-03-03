@@ -19,3 +19,5 @@ test gpt/
 state.json
 openpilot.wiki
 chroma_db
+local_vectors/
+local_docs/

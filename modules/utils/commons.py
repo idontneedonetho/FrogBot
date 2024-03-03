@@ -4,7 +4,6 @@ from llama_index.core.llms import MessageRole as Role
 from disnake.ext import commands
 from disnake.utils import get
 import subprocess
-import asyncio
 import re
 
 async def fetch_message_from_link(client, link):
@@ -113,7 +112,7 @@ def get_git_version():
     try:
         branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()[:7]
-        return f"v2.2 {branch} {commit}"
+        return f"v2.3 {branch} {commit}"
     except subprocess.CalledProcessError:
         return "unknown-version"
 bot_version = get_git_version()
