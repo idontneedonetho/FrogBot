@@ -121,7 +121,7 @@ bm25_retriever = BM25Retriever.from_defaults(docstore=index.docstore, similarity
 retriever = QueryFusionRetriever(
     [vector_retriever, bm25_retriever],
     similarity_top_k=4,
-    num_queries=4,
+    num_queries=1,
     mode="reciprocal_rerank",
     use_async=True,
     verbose=True,
@@ -145,7 +145,6 @@ async def process_message_with_llm(message, client):
                         "\n\nRelevant documents for the context:\n"
                         "{context_str}"
                         "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
-                        "\nALWAYS provide the link to the source of the information if applicable. If you're unable to provide an exact link, try your best."
                     )
                 )
                 chat_response = await asyncio.to_thread(chat_engine.chat, content)
