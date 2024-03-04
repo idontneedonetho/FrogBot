@@ -10,6 +10,7 @@ from llama_index.core.llms import MessageRole as Role
 from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.openai import OpenAI
+from llama_index.llms.gemini import Gemini
 from dotenv import load_dotenv
 from datetime import date
 import asyncio
@@ -19,11 +20,17 @@ import json
 import sys
 import re
 import os
-
+safety_settings = {
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+    "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+    "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+    "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
+}
 load_dotenv()
 openai.api_key = os.getenv('OPENAI_API_KEY')
 github_client = GithubClient(os.getenv('GITHUB_TOKEN'))
-Settings.llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
+Settings.llm = Gemini(model_name="models/gemini-pro", max_tokens=1000, safety_settings=safety_settings)
+# Settings.llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 local_dir = "./local_docs/"
@@ -108,12 +115,12 @@ else:
     index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
     print("Index setup complete.")
 
-vector_retriever = index.as_retriever(similarity_top_k=2)
-bm25_retriever = BM25Retriever.from_defaults(docstore=index.docstore, similarity_top_k=2)
+vector_retriever = index.as_retriever(similarity_top_k=4)
+bm25_retriever = BM25Retriever.from_defaults(docstore=index.docstore, similarity_top_k=4)
 
 retriever = QueryFusionRetriever(
     [vector_retriever, bm25_retriever],
-    similarity_top_k=2,
+    similarity_top_k=4,
     num_queries=4,
     mode="reciprocal_rerank",
     use_async=True,
