@@ -1,11 +1,12 @@
 # modules.utils.GPT
 
-from modules.utils.commons import send_long_message, fetch_reply_chain, fetch_message_from_link, HistoryChatMessage
+from modules.utils.commons import send_long_message, fetch_reply_chain, HistoryChatMessage
 from llama_index.core import StorageContext, Settings, VectorStoreIndex, SimpleDirectoryReader
 from llama_index.readers.github import GithubClient, GithubRepositoryReader
 from llama_index.core.chat_engine import CondensePlusContextChatEngine
 from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.embeddings.gemini import GeminiEmbedding
 from llama_index.core.llms import MessageRole as Role
 from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.memory import ChatMemoryBuffer
@@ -27,11 +28,13 @@ safety_settings = {
     "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE"
 }
 load_dotenv()
-openai.api_key = os.getenv('OPENAI_API_KEY')
+#openai.api_key = os.getenv('OPENAI_API_KEY')
+os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY')
 github_client = GithubClient(os.getenv('GITHUB_TOKEN'))
 Settings.llm = Gemini(model_name="models/gemini-pro", max_tokens=1000, safety_settings=safety_settings)
+Settings.embed_model = GeminiEmbedding(model_name="models/embedding-001")
 # Settings.llm = OpenAI(model="gpt-4-turbo-preview", max_tokens=1000)
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+# Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 local_dir = "./local_docs/"
 persist_dir = "./local_vectors"
@@ -121,7 +124,7 @@ bm25_retriever = BM25Retriever.from_defaults(docstore=index.docstore, similarity
 retriever = QueryFusionRetriever(
     [vector_retriever, bm25_retriever],
     similarity_top_k=4,
-    num_queries=1,
+    num_queries=2,
     mode="reciprocal_rerank",
     use_async=True,
     verbose=True,
@@ -133,7 +136,7 @@ async def process_message_with_llm(message, client):
         try:
             async with message.channel.typing():
                 memory = ChatMemoryBuffer.from_defaults(token_limit=8192)
-                context = await fetch_context_and_content(message, client, content)
+                context = await fetch_reply_chain(message)
                 memory.set(context + [HistoryChatMessage(f"{content}", Role.USER)])
                 chat_engine = CondensePlusContextChatEngine.from_defaults(
                     memory=memory,
@@ -156,8 +159,3 @@ async def process_message_with_llm(message, client):
                 await send_long_message(message, response_text)
         except Exception as e:
             await message.channel.send(f"An error occurred: {str(e)}")
-        
-async def fetch_context_and_content(message, client, content):
-    linked_message = await fetch_message_from_link(client, content) if 'https://discord.com/channels/' in content else message
-    context = await fetch_reply_chain(linked_message)
-    return context

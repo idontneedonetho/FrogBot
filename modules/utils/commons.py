@@ -2,24 +2,8 @@
 
 from llama_index.core.llms import MessageRole as Role
 from disnake.ext import commands
-from disnake.utils import get
 import subprocess
 import re
-
-async def fetch_message_from_link(client, link):
-    match = re.match(r'https://discord.com/channels/(\d+)/(\d+)/(\d+)', link)
-    if match:
-        guild_id, channel_id, message_id = map(int, match.groups())
-        guild = get(client.guilds, id=guild_id)
-        if guild:
-            channel = get(guild.channels, id=channel_id)
-            if channel:
-                try:
-                    message = await channel.fetch_message(message_id)
-                    return message
-                except Exception as e:
-                    print(f"Error fetching message from link: {e}")
-    return None
 
 class HistoryChatMessage:
     def __init__(self, content, role, additional_kwargs=None):
