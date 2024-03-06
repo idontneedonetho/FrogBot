@@ -2,7 +2,7 @@
 
 from modules.utils.database import db_access_with_retry, update_points
 from disnake import Button, ButtonStyle, ActionRow, Interaction
-from disnake import Interaction, ChannelType, Embed
+from disnake import Interaction, Embed
 from modules.roles import check_user_points
 from disnake.ui import Button, ActionRow
 import datetime
@@ -40,6 +40,7 @@ async def process_reaction(bot, payload):
         return
     if emoji_name not in emoji_points:
         if emoji_name == "✅":
+            print("Handling checkmark reaction")
             message = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
             await handle_checkmark_reaction(bot, payload, message.author.id)
         return
@@ -58,6 +59,7 @@ async def process_reaction(bot, payload):
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
 async def handle_checkmark_reaction(bot, payload, original_poster_id):
+    print(f"Handling checkmark reaction for user {original_poster_id}")
     channel = bot.get_channel(payload.channel_id)
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
@@ -72,6 +74,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
         return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
 
     interaction = await bot.wait_for("interaction", check=check)
+    print(f"Interaction received from user {interaction.user.id}")
     if interaction.component.label == "Yes":
         await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
         if isinstance(channel, disnake.Thread) and channel.last_message_id == satisfaction_message.id:
