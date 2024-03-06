@@ -34,13 +34,14 @@ async def process_reaction(bot, payload):
     if payload.guild_id is None:
         return
     emoji_name = str(payload.emoji)
+    guild = bot.get_guild(payload.guild_id)
+    reactor = guild.get_member(payload.user_id)
+    if not (reactor.guild_permissions.administrator or reactor.id == '126123710435295232'):
+        return
     if emoji_name not in emoji_points:
         if emoji_name == "✅":
-            guild = bot.get_guild(payload.guild_id)
-            reactor = guild.get_member(payload.user_id)
-            if not reactor.guild_permissions.administrator:
-                return
-            await handle_checkmark_reaction(bot, payload)
+            message = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
+            await handle_checkmark_reaction(bot, payload, message.author.id)
         return
     guild = bot.get_guild(payload.guild_id)
     reactor = guild.get_member(payload.user_id)
@@ -56,11 +57,8 @@ async def process_reaction(bot, payload):
         await check_user_points(bot)
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
-async def handle_checkmark_reaction(bot, payload):
+async def handle_checkmark_reaction(bot, payload, original_poster_id):
     channel = bot.get_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
-    if payload.user_id != message.author.id:
-        return
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
                   color=0x3498db)
@@ -71,7 +69,7 @@ async def handle_checkmark_reaction(bot, payload):
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
 
     def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id and interaction.user.id == message.author.id
+        return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
 
     interaction = await bot.wait_for("interaction", check=check)
     if interaction.component.label == "Yes":
