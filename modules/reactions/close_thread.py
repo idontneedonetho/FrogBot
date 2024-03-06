@@ -39,7 +39,10 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     if interaction.component.label == "Yes":
         await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
         if ChannelType.forum and channel.last_message_id == satisfaction_message.id:
-            await channel.delete()
+            try:
+                await channel.delete()
+            except Exception as e:
+                print(f"Error occurred while trying to delete channel: {e}")
     else:
         await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
 
