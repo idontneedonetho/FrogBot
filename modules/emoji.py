@@ -36,6 +36,10 @@ async def process_reaction(bot, payload):
     emoji_name = str(payload.emoji)
     if emoji_name not in emoji_points:
         if emoji_name == "✅":
+            guild = bot.get_guild(payload.guild_id)
+            reactor = guild.get_member(payload.user_id)
+            if not reactor.guild_permissions.administrator:
+                return
             await handle_checkmark_reaction(bot, payload)
         return
     guild = bot.get_guild(payload.guild_id)
@@ -53,13 +57,9 @@ async def process_reaction(bot, payload):
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
 async def handle_checkmark_reaction(bot, payload):
-    guild = bot.get_guild(payload.guild_id)
-    reactor = guild.get_member(payload.user_id)
-    if not reactor.guild_permissions.administrator:
-        return
     channel = bot.get_channel(payload.channel_id)
     message = await channel.fetch_message(payload.message_id)
-    if reactor.id != message.author.id:
+    if payload.user_id != message.author.id:
         return
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
