@@ -2,7 +2,9 @@
 
 from modules.utils.database import db_access_with_retry, update_points
 from disnake import Button, ButtonStyle, ActionRow, Interaction
+from disnake import Interaction, ChannelType, Embed
 from modules.roles import check_user_points
+from disnake.ui import Button, ActionRow
 import datetime
 import disnake
 
@@ -27,6 +29,8 @@ emoji_responses = {
 }
 
 async def process_reaction(bot, payload):
+    if payload.user_id == bot.user.id:
+        return
     if payload.guild_id is None:
         return
     emoji_name = str(payload.emoji)
@@ -49,23 +53,26 @@ async def process_reaction(bot, payload):
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
 async def handle_checkmark_reaction(bot, payload):
-    guild = bot.get_guild(payload.guild_id)
     channel = bot.get_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
-    satisfaction_message = await channel.send("Are you satisfied with the solution?")
-    yes_button = Button(style=ButtonStyle.green, label="Yes")
-    no_button = Button(style=ButtonStyle.red, label="No")
+    embed = Embed(title="Resolution of Request/Report",
+                  description="Your request or report is considered resolved. Are you satisfied with the resolution?",
+                  color=0x3498db)
+    embed.set_footer(text="Selecting 'Yes' will close and delete this thread. Selecting 'No' will keep the thread open.")
+    yes_button = Button(style=ButtonStyle.success, label="Yes")
+    no_button = Button(style=ButtonStyle.danger, label="No")
     action_row = ActionRow(yes_button, no_button)
-    await satisfaction_message.edit(components=[action_row])
+    satisfaction_message = await channel.send(embed=embed, components=[action_row])
 
     def check(interaction: Interaction):
         return interaction.message.id == satisfaction_message.id
 
     interaction = await bot.wait_for("interaction", check=check)
     if interaction.component.label == "Yes":
-        await interaction.response.send_message("Great! We're glad you're satisfied.")
+        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+        if channel.type == ChannelType.thread and channel.last_message_id == satisfaction_message.id:
+            await channel.delete()
     else:
-        await interaction.response.send_message("Sorry to hear that. We'll try to improve.")
+        await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
 
 def get_user_points(user_id):
     user_points_dict = db_access_with_retry('SELECT * FROM user_points WHERE user_id = ?', (user_id,))
