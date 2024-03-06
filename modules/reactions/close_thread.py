@@ -2,7 +2,6 @@
 
 from disnake import Button, ButtonStyle, ActionRow, Interaction, Embed, ChannelType
 from disnake.ui import Button, ActionRow
-import disnake
 
 emoji_actions = {
     "✅": "handle_checkmark_reaction"
