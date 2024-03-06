@@ -58,6 +58,9 @@ async def handle_checkmark_reaction(bot, payload):
     if not reactor.guild_permissions.administrator:
         return
     channel = bot.get_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+    if reactor.id != message.author.id:
+        return
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
                   color=0x3498db)
@@ -68,11 +71,12 @@ async def handle_checkmark_reaction(bot, payload):
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
 
     def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id and interaction.user.id == payload.user_id
+        return interaction.message.id == satisfaction_message.id and interaction.user.id == message.author.id
+
     interaction = await bot.wait_for("interaction", check=check)
     if interaction.component.label == "Yes":
         await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-        if channel.type == ChannelType.thread and channel.last_message_id == satisfaction_message.id:
+        if isinstance(channel, disnake.Thread) and channel.last_message_id == satisfaction_message.id:
             await channel.delete()
     else:
         await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
