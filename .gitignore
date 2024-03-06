@@ -21,3 +21,4 @@ openpilot.wiki
 chroma_db
 local_vectors/
 local_docs/
+service_account_key.json

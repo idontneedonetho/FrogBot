@@ -19,7 +19,7 @@ async def fetch_reply_chain(message, max_tokens=4096):
     while message.reference is not None and tokens_used < max_tokens:
         try:
             message = await message.channel.fetch_message(message.reference.message_id)
-            role = Role.USER if message.author.bot else Role.ASSISTANT
+            role = Role.ASSISTANT if message.author.bot else Role.USER
             message_content = f"{message.content}\n"
             message_tokens = len(message_content) // 4
             if tokens_used + message_tokens <= max_tokens:

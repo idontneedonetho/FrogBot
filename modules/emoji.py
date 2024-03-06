@@ -1,6 +1,7 @@
 # modules.emoji
 
 from modules.utils.database import db_access_with_retry, update_points
+from disnake import Button, ButtonStyle, ActionRow, Interaction
 from modules.roles import check_user_points
 import datetime
 import disnake
@@ -30,6 +31,8 @@ async def process_reaction(bot, payload):
         return
     emoji_name = str(payload.emoji)
     if emoji_name not in emoji_points:
+        if emoji_name == "✅":
+            await handle_checkmark_reaction(bot, payload)
         return
     guild = bot.get_guild(payload.guild_id)
     reactor = guild.get_member(payload.user_id)
@@ -44,6 +47,25 @@ async def process_reaction(bot, payload):
     if await update_points(user_id, new_points):
         await check_user_points(bot)
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
+
+async def handle_checkmark_reaction(bot, payload):
+    guild = bot.get_guild(payload.guild_id)
+    channel = bot.get_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+    satisfaction_message = await channel.send("Are you satisfied with the solution?")
+    yes_button = Button(style=ButtonStyle.green, label="Yes")
+    no_button = Button(style=ButtonStyle.red, label="No")
+    action_row = ActionRow(yes_button, no_button)
+    await satisfaction_message.edit(components=[action_row])
+
+    def check(interaction: Interaction):
+        return interaction.message.id == satisfaction_message.id
+
+    interaction = await bot.wait_for("interaction", check=check)
+    if interaction.component.label == "Yes":
+        await interaction.response.send_message("Great! We're glad you're satisfied.")
+    else:
+        await interaction.response.send_message("Sorry to hear that. We'll try to improve.")
 
 def get_user_points(user_id):
     user_points_dict = db_access_with_retry('SELECT * FROM user_points WHERE user_id = ?', (user_id,))
