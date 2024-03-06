@@ -1,10 +1,7 @@
 # modules.emoji
 
 from modules.utils.database import db_access_with_retry, update_points
-from disnake import Button, ButtonStyle, ActionRow, Interaction
-from disnake import Interaction, Embed
 from modules.roles import check_user_points
-from disnake.ui import Button, ActionRow
 import datetime
 import disnake
 
@@ -29,20 +26,10 @@ emoji_responses = {
 }
 
 async def process_reaction(bot, payload):
-    if payload.user_id == bot.user.id:
-        return
     if payload.guild_id is None:
         return
     emoji_name = str(payload.emoji)
-    guild = bot.get_guild(payload.guild_id)
-    reactor = guild.get_member(payload.user_id)
-    if not (reactor.guild_permissions.administrator or reactor.id == '126123710435295232'):
-        return
     if emoji_name not in emoji_points:
-        if emoji_name == "✅":
-            print("Handling checkmark reaction")
-            message = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
-            await handle_checkmark_reaction(bot, payload, message.author.id)
         return
     guild = bot.get_guild(payload.guild_id)
     reactor = guild.get_member(payload.user_id)
@@ -57,30 +44,6 @@ async def process_reaction(bot, payload):
     if await update_points(user_id, new_points):
         await check_user_points(bot)
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
-
-async def handle_checkmark_reaction(bot, payload, original_poster_id):
-    print(f"Handling checkmark reaction for user {original_poster_id}")
-    channel = bot.get_channel(payload.channel_id)
-    embed = Embed(title="Resolution of Request/Report",
-                  description="Your request or report is considered resolved. Are you satisfied with the resolution?",
-                  color=0x3498db)
-    embed.set_footer(text="Selecting 'Yes' will close and delete this thread. Selecting 'No' will keep the thread open.")
-    yes_button = Button(style=ButtonStyle.success, label="Yes")
-    no_button = Button(style=ButtonStyle.danger, label="No")
-    action_row = ActionRow(yes_button, no_button)
-    satisfaction_message = await channel.send(embed=embed, components=[action_row])
-
-    def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
-
-    interaction = await bot.wait_for("interaction", check=check)
-    print(f"Interaction received from user {interaction.user.id}")
-    if interaction.component.label == "Yes":
-        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-        if isinstance(channel, disnake.Thread) and channel.last_message_id == satisfaction_message.id:
-            await channel.delete()
-    else:
-        await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
 
 def get_user_points(user_id):
     user_points_dict = db_access_with_retry('SELECT * FROM user_points WHERE user_id = ?', (user_id,))
