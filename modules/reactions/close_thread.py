@@ -17,7 +17,7 @@ async def process_reaction(bot, payload):
     if emoji_name not in emoji_actions:
         return
     message = await bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
-    if emoji_name == "✅" and ChannelType.forum and payload.member.guild_permissions.administrator:
+    if emoji_name == "✅" and ChannelType.forum and (payload.member.guild_permissions.administrator or payload.user_id == 126123710435295232):
         await handle_checkmark_reaction(bot, payload, message.author.id)
 
 async def handle_checkmark_reaction(bot, payload, original_poster_id):
