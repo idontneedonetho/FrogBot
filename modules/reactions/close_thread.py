@@ -39,7 +39,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     print(f"Interaction received from user {interaction.user.id}")
     if interaction.component.label == "Yes":
         await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-        if isinstance(channel, disnake.Thread) and channel.last_message_id == satisfaction_message.id:
+        if ChannelType.forum and channel.last_message_id == satisfaction_message.id:
             await channel.delete()
     else:
         await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
