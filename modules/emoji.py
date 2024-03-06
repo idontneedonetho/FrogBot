@@ -53,6 +53,10 @@ async def process_reaction(bot, payload):
     await manage_bot_response(bot, payload, points_to_add, emoji_name)
 
 async def handle_checkmark_reaction(bot, payload):
+    guild = bot.get_guild(payload.guild_id)
+    reactor = guild.get_member(payload.user_id)
+    if not reactor.guild_permissions.administrator:
+        return
     channel = bot.get_channel(payload.channel_id)
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
@@ -64,8 +68,7 @@ async def handle_checkmark_reaction(bot, payload):
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
 
     def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id
-
+        return interaction.message.id == satisfaction_message.id and interaction.user.id == payload.user_id
     interaction = await bot.wait_for("interaction", check=check)
     if interaction.component.label == "Yes":
         await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
