@@ -9,7 +9,6 @@ from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.openai import OpenAI
 from qdrant_client import QdrantClient
 from dotenv import load_dotenv
-from datetime import date
 import asyncio
 import openai
 import re
@@ -37,14 +36,11 @@ async def process_message_with_llm(message, client):
                     chat_mode="condense_plus_context",
                     similarity_top_k=5,
                     memory=memory,
-                    context_prompt=(
-                        f"You are {client.user.name}, a Discord bot, format responses as such."
-                        "\nTopic: OpenPilot and its various forks."
-                        f"\nDate: {date.today().isoformat()}"
-                        "\n\nRelevant documents for the context:\n"
-                        "{context_str}"
-                        "\n\nInstruction: Use the previous chat history or the context above to interact and assist the user."
-                        "\nALWAYS provide the link to the source of the information if applicable."
+                    system_prompt=(
+                        f"You are {client.user.name}, a Discord chat bot. "
+                        "The topic is OpenPilot and its various forks.\n"
+                        "Always provide the links to the sources of the information, if applicable. "
+                        "Always give an answer to the best of your abilities."
                     )
                 )
                 chat_response = await asyncio.to_thread(chat_engine.chat, content)
