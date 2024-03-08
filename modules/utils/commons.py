@@ -81,7 +81,7 @@ async def send_long_message(message, response, should_reply=True):
             result += chunk
         else:
             chunk = re.sub(r'\((http[s]?://\S+)\)', r'(<\1>)', chunk)
-            chunk = re.sub(r'(?<![\(<])http[s]?://\S+(?![>\)])', r'<\g<0>>', chunk)
+            chunk = re.sub(r'(?<![\(<`])http[s]?://\S+(?![>\).,`])', r'<\g<0>>', chunk)
             result += chunk
     response = result
     messages = []
