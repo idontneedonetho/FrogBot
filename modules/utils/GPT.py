@@ -45,7 +45,7 @@ async def process_message_with_llm(message, client):
                         "Always provide the links to the sources of the information, if applicable. "
                         "Always give an answer to the best of your abilities."
                     ),
-                    verbose=True,
+                    verbose=False,
                 )
                 chat_response = await asyncio.to_thread(chat_engine.chat, content)
                 if not chat_response or not chat_response.response:
