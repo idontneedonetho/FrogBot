@@ -15,7 +15,6 @@ import re
 import os
 
 load_dotenv()
-os.environ["GOOGLE_API_KEY"] = os.getenv('GOOGLE_API_KEY')
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 client = QdrantClient(os.getenv('QDRANT_URL'), api_key=os.getenv('QDRANT_API'))
