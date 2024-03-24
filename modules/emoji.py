@@ -43,9 +43,11 @@ async def process_close(bot, payload):
     if emoji_name == "✅" and ChannelType.forum and (payload.member.guild_permissions.administrator or payload.user_id == 126123710435295232):
         await handle_checkmark_reaction(bot, payload, message.author.id)
 
-async def handle_checkmark_reaction(bot, payload, original_poster_id):
+async def handle_checkmark_reaction(ctx, bot, payload, original_poster_id):
     print(f"Handling checkmark reaction for user {original_poster_id}")
     channel = bot.get_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+    thread_id = message.thread.id
     embed = Embed(title="Resolution of Request/Report",
                   description="Your request or report is considered resolved. Are you satisfied with the resolution?",
                   color=0x3498db)
@@ -61,13 +63,12 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     interaction = await bot.wait_for("interaction", check=check)
     print(f"Interaction received from user {interaction.user.id}")
     if interaction.component.label == "Yes":
-        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied.")
-        # await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-        # if ChannelType.forum:
-        #     try:
-        #         await channel.delete()
-        #     except Exception as e:
-        #         print(f"Error occurred while trying to delete channel: {e}")
+        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+        thread = disnake.utils.get(ctx.guild.threads, id=thread_id)
+        if thread is not None:
+            await thread.delete()
+        else:
+            await ctx.send(f"No thread found with ID {thread_id}.")
     else:
         await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
 
