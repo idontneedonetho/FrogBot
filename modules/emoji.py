@@ -61,13 +61,12 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     interaction = await bot.wait_for("interaction", check=check)
     print(f"Interaction received from user {interaction.user.id}")
     if interaction.component.label == "Yes":
-        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied.")
-        # await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-        # if ChannelType.forum:
-        #     try:
-        #         await channel.delete()
-        #     except Exception as e:
-        #         print(f"Error occurred while trying to delete channel: {e}")
+        await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+        thread = disnake.utils.get(ctx.guild.threads, id=thread_id)
+        if thread is not None:
+            await thread.delete()
+        else:
+            await ctx.send(f"No thread found with ID {thread_id}.")
     else:
         await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
 
