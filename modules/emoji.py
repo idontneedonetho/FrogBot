@@ -1,3 +1,5 @@
+# modules.emoji
+
 from disnake import Button, ButtonStyle, ActionRow, Interaction, Embed, ChannelType
 from modules.utils.database import db_access_with_retry, update_points
 from modules.roles import check_user_points
@@ -76,9 +78,14 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
                   description=f"<@{original_poster_id}>, your request or report is considered resolved. Are you satisfied with the resolution?",
                   color=0x3498db)
     embed.set_footer(text="Selecting 'Yes' will close and delete this thread. Selecting 'No' will keep the thread open.")
-    action_row = ActionRow(Button(style=ButtonStyle.success, label="Yes"), Button(style=ButtonStyle.danger, label="No"))
+    action_row = ActionRow(Button(style=ButtonStyle.success, label="Yes", custom_id=f"yes_{thread_id}"),
+                           Button(style=ButtonStyle.danger, label="No", custom_id=f"no_{thread_id}"))
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
     
+    # Save the interaction details to the database
+    db_access_with_retry("INSERT INTO interactions (message_id, user_id, thread_id, satisfaction_message_id) VALUES (?, ?, ?, ?)", 
+                         (message.id, original_poster_id, thread_id, satisfaction_message.id))
+
     def check(interaction: Interaction):
         return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
 
@@ -180,3 +187,19 @@ def setup(client):
     @client.event
     async def on_raw_reaction_add(payload):
         await process_reaction(client, payload)
+
+    @client.event
+    async def on_button_click(interaction: Interaction):
+        custom_id = interaction.component.custom_id
+        if custom_id.startswith("yes_") or custom_id.startswith("no_"):
+            thread_id = int(custom_id.split("_")[1])
+            thread = disnake.utils.get(interaction.guild.threads, id=thread_id)
+            if custom_id.startswith("yes_"):
+                await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+                if thread:
+                    await thread.delete()
+            else:
+                await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
+            
+            # Remove the interaction details from the database
+            db_access_with_retry("DELETE FROM interactions WHERE thread_id = ?", (thread_id,))
