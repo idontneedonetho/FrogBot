@@ -84,11 +84,14 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
         "INSERT INTO interactions (message_id, user_id, thread_id, satisfaction_message_id, channel_id) VALUES (?, ?, ?, ?, ?)",
         (message.id, original_poster_id, thread_id, satisfaction_message.id, payload.channel_id)
     )
+
     def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
+        return hasattr(interaction, 'message') and interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
+
     async def send_reminder():
         await asyncio.sleep(43200)
         await channel.send(f"<@{original_poster_id}>, please select an option.")
+
     reminder_task = asyncio.create_task(send_reminder())
 
     try:
@@ -190,7 +193,7 @@ async def resume_interaction(client, message_id, user_id, thread_id, satisfactio
     satisfaction_message = await channel.fetch_message(satisfaction_message_id)
 
     def check(interaction: Interaction):
-        return interaction.message.id == satisfaction_message.id and interaction.user.id == user_id
+        return hasattr(interaction, 'message') and interaction.message.id == satisfaction_message.id and interaction.user.id == user_id
 
     async def send_reminder():
         await asyncio.sleep(43200)
@@ -201,12 +204,15 @@ async def resume_interaction(client, message_id, user_id, thread_id, satisfactio
     try:
         interaction = await client.wait_for("interaction", timeout=86400, check=check)
         thread = disnake.utils.get(channel.guild.threads, id=thread_id)
-        if interaction.component.label == "Yes":
-            await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
-            if thread:
-                await thread.delete()
+        if hasattr(interaction, 'message') and interaction.message.id == satisfaction_message.id:
+            if interaction.component.label == "Yes":
+                await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+                if thread:
+                    await thread.delete()
+            else:
+                await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
         else:
-            await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
+            await interaction.response.send_message(content="We're sorry, there was an error processing your response.")
     except asyncio.TimeoutError:
         await channel.send(f"<@{user_id}>, you did not select an option within 24 hours. This thread will now be closed.")
         if thread:
