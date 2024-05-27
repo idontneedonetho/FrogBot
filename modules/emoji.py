@@ -111,11 +111,11 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
         interaction = await bot.wait_for("interaction", timeout=86400, check=check)
         thread = disnake.utils.get(guild.threads, id=thread_id)
         if interaction.component.label == "Yes":
-            await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+            await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
             if thread:
                 await thread.delete()
         else:
-            await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
+            await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
     except asyncio.TimeoutError:
         await channel.send(f"<@{original_poster_id}>, you did not select an option within 24 hours. This thread will now be closed.")
         if thread:
@@ -234,11 +234,11 @@ async def resume_interaction(bot, message_id, user_id, thread_id, satisfaction_m
         interaction = await bot.wait_for("interaction", timeout=86400, check=check)
         thread = disnake.utils.get(channel.guild.threads, id=thread_id)
         if interaction.component.label == "Yes":
-            await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+            await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
             if thread:
                 await thread.delete()
         else:
-            await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
+            await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
     except asyncio.TimeoutError:
         await channel.send(f"<@{user_id}>, you did not select an option within 24 hours. This thread will now be closed.")
         if thread:
@@ -267,10 +267,10 @@ def setup(client):
             thread_id = int(custom_id.split("_")[1])
             thread = disnake.utils.get(interaction.guild.threads, id=thread_id)
             if custom_id.startswith("yes_"):
-                await interaction.response.send_message("Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
+                await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
                 if thread:
                     await thread.delete()
             else:
-                await interaction.response.send_message("We're sorry to hear that. We'll strive to do better.")
+                await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
             
             db_access_with_retry("DELETE FROM interactions WHERE thread_id = ?", (thread_id,))
