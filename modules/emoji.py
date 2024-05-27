@@ -1,12 +1,13 @@
 # modules.emoji
 
+import disnake
 from disnake import Button, ButtonStyle, ActionRow, Interaction, Embed, ChannelType
+from disnake.ext import commands
 from modules.utils.database import db_access_with_retry, update_points
 from modules.roles import check_user_points
 from disnake.ui import Button, ActionRow
 from contextlib import suppress
 import datetime
-import disnake
 import asyncio
 
 bot_replies = {}
@@ -74,23 +75,30 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     thread_id = message.thread.id
     guild = bot.get_guild(payload.guild_id)
     thread = disnake.utils.get(guild.threads, id=thread_id)
-    embed = Embed(title="Resolution of Request/Report",
-                  description=f"<@{original_poster_id}>, your request or report is considered resolved. Are you satisfied with the resolution?",
-                  color=0x3498db)
+    embed = Embed(
+        title="Resolution of Request/Report",
+        description=f"<@{original_poster_id}>, your request or report is considered resolved. Are you satisfied with the resolution?",
+        color=0x3498db,
+    )
     embed.set_footer(text="Selecting 'Yes' will close and delete this thread. Selecting 'No' will keep the thread open.")
-    action_row = ActionRow(Button(style=ButtonStyle.success, label="Yes"), Button(style=ButtonStyle.danger, label="No"))
+    action_row = ActionRow(
+        Button(style=ButtonStyle.success, label="Yes", custom_id="yes_satisfied"),
+        Button(style=ButtonStyle.danger, label="No", custom_id="no_satisfied")
+    )
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
+
     def check(interaction: Interaction):
         return interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
+
     async def send_reminder():
         await asyncio.sleep(43200)
         await channel.send(f"<@{original_poster_id}>, please select an option.")
+
     reminder_task = asyncio.create_task(send_reminder())
 
     try:
-        interaction = await bot.wait_for("interaction", timeout=86400, check=check)
-        thread = disnake.utils.get(guild.threads, id=thread_id)
-        if interaction.component.label == "Yes":
+        interaction = await bot.wait_for("button_click", timeout=86400, check=check)
+        if interaction.component.custom_id == "yes_satisfied":
             await interaction.response.send_message(content="Excellent! We're pleased to know you're satisfied. This thread will now be closed.")
             if thread:
                 await thread.delete()
