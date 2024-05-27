@@ -86,10 +86,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     )
     embed.set_footer(text="Selecting 'Yes' will close and delete this thread. Selecting 'No' will keep the thread open.")
     
-    action_row = ActionRow(
-        Button(style=ButtonStyle.success, label="Yes", custom_id=f"yes_{thread_id}"),
-        Button(style=ButtonStyle.danger, label="No", custom_id=f"no_{thread_id}")
-    )
+    action_row = ActionRow(Button(style=ButtonStyle.success, label="Yes", custom_id=f"yes_{thread_id}"), Button(style=ButtonStyle.danger, label="No", custom_id=f"no_{thread_id}"))
     satisfaction_message = await channel.send(embed=embed, components=[action_row])
     
     # Save the interaction details to the database
