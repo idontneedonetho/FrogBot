@@ -103,6 +103,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
                 await thread.delete()
         else:
             await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
+            await interaction.message.delete()  # Delete the interaction post when "No" is clicked
     except asyncio.TimeoutError:
         await channel.send(f"<@{original_poster_id}>, you did not select an option within 24 hours. This thread will now be closed.")
         if thread:
@@ -211,6 +212,7 @@ async def resume_interaction(client, message_id, user_id, thread_id, satisfactio
                     await thread.delete()
             else:
                 await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
+                await interaction.message.delete()
         else:
             await interaction.response.send_message(content="We're sorry, there was an error processing your response.")
     except asyncio.TimeoutError:
@@ -242,5 +244,6 @@ def setup(client):
                     await thread.delete()
             else:
                 await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
+                await interaction.message.delete()
             
             db_access_with_retry("DELETE FROM interactions WHERE thread_id = ?", (thread_id,))
