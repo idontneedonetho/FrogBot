@@ -86,7 +86,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
     )
 
     def check(interaction: Interaction):
-        return hasattr(interaction, 'message') and interaction.message.id == satisfaction_message.id and interaction.user.id == original_poster_id
+        return interaction.user.id == original_poster_id
 
     async def send_reminder():
         await asyncio.sleep(43200)
@@ -103,7 +103,7 @@ async def handle_checkmark_reaction(bot, payload, original_poster_id):
                 await thread.delete()
         else:
             await interaction.response.send_message(content="We're sorry to hear that. We'll strive to do better.")
-            await interaction.message.delete()  # Delete the interaction post when "No" is clicked
+            await interaction.message.delete()
     except asyncio.TimeoutError:
         await channel.send(f"<@{original_poster_id}>, you did not select an option within 24 hours. This thread will now be closed.")
         if thread:
@@ -194,7 +194,7 @@ async def resume_interaction(client, message_id, user_id, thread_id, satisfactio
     satisfaction_message = await channel.fetch_message(satisfaction_message_id)
 
     def check(interaction: Interaction):
-        return hasattr(interaction, 'message') and interaction.message.id == satisfaction_message.id and interaction.user.id == user_id
+        return interaction.user.id == original_poster_id
 
     async def send_reminder():
         await asyncio.sleep(43200)
