@@ -75,34 +75,26 @@ async def process_message_with_llm(message, client):
                 chat_history = [ChatMessage(content=msg.content, role=msg.role, user_name=msg.user_name) for msg in reply_chain]
                 channel_prompts = {
                     'bug-reports': (
-                        "In this channel, assist users in writing bug reports by requesting: "
-                        "\n- Detailed issue description."
-                        "\n- Comma-separated Route ID (if available)."
-                        "\n- Installed Branch Name."
-                        "\n- Software update status."
-                        "\n- Car details (year, make, model)."
-                        "\nCompile the information into a report. Encourage the user to copy, edit, and post the report in the #bug-reports channel."
-                        "\nAlso, remind them to backup their settings in the device settings tab for easy restoration."
+                        "Assist with bug reports. Request: issue details, Route ID, installed branch name, software update status, car details. "
+                        "Compile a report for the user to edit and post in #bug-reports. Remind them to backup their settings."
                     ),
                     'default': (
-                        "Consider the server and channel names to provide comprehensive, accurate responses. "
-                        "\nProvide context and related information for well-rounded answers. "
-                        "Use the tools at your disposal to provide the best response. "
-                        "\nMaintain a respectful, helpful demeanor. "
-                        "If an acronym is unknown, use the Discord_Tool to search for it. "
-                        "\nProvide source links when possible."
-                        "\nRemember, you can use multiple tools to gather information and provide a comprehensive response."
+                        "Provide accurate responses using server and channel names. "
+                        "Give context and related information. Use available tools. "
+                        "Maintain respectfulness. Search unknown acronyms with Discord_Tool. "
+                        "Provide source links. Use multiple tools for comprehensive responses."
                     )
                 }
+
                 system_prompt = (
-                    f"Assistant Name: '{client.user}'.\n"
-                    f"Channel: '{message.channel}'.\n"
-                    f"Server: '{message.guild}'.\n"
-                    f"User: '{message.author}'.\n"
-                    "As an OpenPilot community assistant, your role is to provide accurate information and support.\n"
-                    "Remember to check the context of the conversation and provide the best response possible.\n"
-                    "Avoid instructing the user to edit or interact with code unless they're specifically asking about code. However, you should still examine the code to find answers, especially when the settings table is in code and needs to be read to guide users about the GUI.\n"
-                    "Make sure to remind users that you're in alpha, and that if they want to reply to you, to reply to your message directly."
+                    f"Assistant: '{client.user}'. "
+                    f"Channel: '{message.channel}'. "
+                    f"Server: '{message.guild}'. "
+                    f"User: '{message.author}'. "
+                    "Provide accurate information and support as an OpenPilot community assistant. "
+                    "Respond appropriately to the conversation context. "
+                    "Avoid code interaction instructions unless asked. Examine code for answers. "
+                    "Remind users of alpha status and to reply directly to your messages."
                 )
                 bug_reports_forum_channel_id = 1162100167110053888
                 if hasattr(message.channel, 'parent_id'):

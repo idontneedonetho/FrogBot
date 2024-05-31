@@ -45,7 +45,16 @@ async def on_thread_create(thread):
             await asyncio.gather(*(add_reaction(first_non_bot_message, emoji) for emoji in emojis_to_add))
         if thread.parent_id == 1162100167110053888:
             original_message = await thread.fetch_message(thread.id)
-            message = await original_message.reply("Would you like assistance from the bot? If so, please reply to this message with \"yes\".")
+            message = await original_message.reply(
+                "Hello! I see you need help writing a bug report. To assist you better, could you please provide the following details:\n"
+                "- A detailed description of the issue.\n"
+                "- Comma connect Route ID if available.\n"
+                "- The branch name you have installed.\n"
+                "- Is your software fully up to date?\n"
+                "- Your car's year, make, and model?\n"
+                "By the way, you can backup your settings in the device menu, so if something happens and you need to reinstall or your settings reset, you can always restore them easily.\n"
+                "If you'd like additional help from the bot, please *reply* to this message with your question."
+            )
             view = ConfirmationView(message, original_message.author.id)
             await message.edit(view=view)
     except Exception as e:
