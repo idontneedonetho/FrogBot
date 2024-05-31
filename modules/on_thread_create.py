@@ -46,14 +46,14 @@ async def on_thread_create(thread):
         if thread.parent_id == 1162100167110053888:
             original_message = await thread.fetch_message(thread.id)
             message = await original_message.reply(
-                "Hello! I see you need help writing a bug report. To assist you better, could you please provide the following details:\n"
-                "- A detailed description of the issue.\n"
-                "- Comma connect Route ID if available.\n"
-                "- The branch name you have installed.\n"
-                "- Is your software fully up to date?\n"
-                "- Your car's year, make, and model?\n"
-                "By the way, you can backup your settings in the device menu, so if something happens and you need to reinstall or your settings reset, you can always restore them easily.\n"
-                "If you'd like additional help from the bot, please *reply* to this message with your question."
+                "Greetings! It seems you're working on a bug report. To help you more effectively, could you please share the following details:\n"
+                "- A comprehensive description of the problem.\n"
+                "- Comma connect Route ID, if applicable.\n"
+                "- The installed branch name.\n"
+                "- Confirmation that your software is up-to-date.\n"
+                "- The year, make, and model of your car.\n"
+                "Remember, you can backup your settings in the device menu. This way, if you need to reinstall or if your settings are reset, you can restore them easily.\n"
+                "If you've already shared this information, please disregard this message. If you need further assistance from the bot, please *reply* to this message with your question."
             )
             view = ConfirmationView(message, original_message.author.id)
             await message.edit(view=view)
