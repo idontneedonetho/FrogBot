@@ -23,7 +23,7 @@ class ConfirmationView(View):
         super().__init__()
         self.message = message
         self.original_poster_id = original_poster_id
-        no_button = Button(style=disnake.ButtonStyle.red, label="No")
+        no_button = Button(style=disnake.ButtonStyle.green, label="Done!")
         no_button.callback = self.on_no_button_clicked
         self.add_item(no_button)
     async def on_no_button_clicked(self, interaction):
