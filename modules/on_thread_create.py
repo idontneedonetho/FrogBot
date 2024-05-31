@@ -53,7 +53,7 @@ async def on_thread_create(thread):
                 "- Confirmation that your software is up-to-date.\n"
                 "- The year, make, and model of your car.\n"
                 "Remember, you can backup your settings in the device menu. This way, if you need to reinstall or if your settings are reset, you can restore them easily.\n"
-                "If you've already shared this information, please disregard this message. If you need further assistance from the bot, please *reply* to this message with your question."
+                "If you've already shared this information, press \"done!\" or disregard this message. If you need further assistance from the bot, please *reply* to this message with your question."
             )
             view = ConfirmationView(message, original_message.author.id)
             await message.edit(view=view)
