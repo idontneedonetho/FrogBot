@@ -76,8 +76,9 @@ async def process_message_with_llm(message, client):
                 channel_prompts = {
                     'bug-reports': (
                         "Assist with bug reports. Request: issue details, Route ID, installed branch name, software update status, car details. "
-                        "Compile a report for the user to edit and post in #bug-reports. Remind them to backup their settings."
-                        "Remember, comma connect routes must be accessed from the `https://connect.comma.ai` website."
+                        "Compile a report for the user to edit and post in #bug-reports. Remind them to backup their settings. "
+                        "Remember, comma connect routes must be accessed from the `https://connect.comma.ai` website. "
+                        "Routes are stored on the front page of connect."
                     ),
                     'default': (
                         "Provide accurate responses using server and channel names. "
