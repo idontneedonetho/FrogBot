@@ -132,15 +132,23 @@ async def process_message_with_llm(message, client):
             chat_engine = OpenAIAgent.from_tools(query_engine_tools, system_prompt=system_prompt, verbose=True, chat_history=chat_history)
             chat_history.append(ChatMessage(content=content, role="user"))
             chat_response = await asyncio.to_thread(chat_engine.chat, content)
+
             if not chat_response or not chat_response.response:
                 error_message = "There was an error processing the message." if not chat_response else "I didn't get a response."
                 await message.channel.send(error_message)
                 return
+
             chat_history.append(ChatMessage(content=chat_response.response, role="assistant"))
             response_text = [chat_response.response]
-            if not reply_chain:
-                response_text.append(f"\n*Reply directly to {client.user.mention}'s messages to maintain conversation context.*")
-            await send_long_message(message, '\n'.join(response_text))     
+
+            if isinstance(message.channel, disnake.Thread):
+                await send_long_message(message.channel, '\n'.join(response_text))
+            else:
+                thread = await message.create_thread(name=f"FrogBot Conversation: {content[:50]}...")
+                if not reply_chain:
+                    response_text.append(f"\n*Continue the conversation in this thread to maintain context.*")
+                await send_long_message(thread, '\n'.join(response_text))
+
     except Exception as e:
         await message.channel.send(f"An error occurred: {str(e)}")
 
