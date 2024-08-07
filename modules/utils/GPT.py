@@ -143,12 +143,13 @@ async def process_message_with_llm(message, client):
             response_text = [chat_response.response]
 
             if isinstance(message.channel, disnake.Thread):
-                await send_long_message(message.channel, '\n'.join(response_text))
+                response_channel = message.channel
             else:
-                thread = await message.create_thread(name=f"FrogBot Conversation: {content[:50]}...")
+                response_channel = await message.create_thread(name=f"FrogBot Conversation: {content[:50]}...")
                 if not reply_chain:
                     response_text.append(f"\n*Continue the conversation in this thread to maintain context.*")
-                await send_long_message(thread, '\n'.join(response_text))
+
+            await send_long_message(response_channel, '\n'.join(response_text))
 
     except Exception as e:
         await message.channel.send(f"An error occurred: {str(e)}")
