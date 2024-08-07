@@ -146,6 +146,7 @@ async def process_message_with_llm(message, client):
                 response_channel = message.channel
             else:
                 response_channel = await message.create_thread(name=f"FrogBot Conversation: {content[:50]}...")
+                await response_channel.send(f"{message.author.mention} {chat_response.response}")
                 if not reply_chain:
                     response_text.append(f"\n*Continue the conversation in this thread to maintain context.*")
 
