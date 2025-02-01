@@ -321,21 +321,45 @@ class TranslationCog(commands.Cog):
 
     @commands.Cog.listener("on_modal_submit")
     async def on_translate_modal_submit(self, inter: disnake.ModalInteraction):
-        if inter.custom_id != "translate_modal":
-            return
-        await inter.response.defer()
-        text_to_translate = inter.text_values["text_to_translate"]
-        target_lang = inter.text_values["target_language"]
-        _, translations = await self.handle_message_translation(
-            text_to_translate,
-            {target_lang.lower()},
-            inter.channel.id if isinstance(inter.channel, disnake.Thread) else 0,
-            inter.author.display_name,
-            inter.author.id,
-            inter
-        )
-        embed = self.create_translation_embed(inter, text_to_translate, translations, auto=False)
-        await inter.edit_original_response(embed=embed)
+        if inter.custom_id == "translate_modal":
+            await inter.response.defer()
+            text_to_translate = inter.text_values["text_to_translate"]
+            target_lang = inter.text_values["target_language"].lower()
+            _, translations = await self.handle_message_translation(
+                text_to_translate,
+                {target_lang},
+                inter.channel.id if isinstance(inter.channel, disnake.Thread) else 0,
+                inter.author.display_name,
+                inter.author.id,
+                inter
+            )
+            embed = self.create_translation_embed(inter, text_to_translate, translations, auto=False)
+            await inter.edit_original_response(embed=embed)
+        elif inter.custom_id.startswith("context_translate:"):
+            await inter.response.defer()
+            try:
+                message_id = int(inter.custom_id.split(":")[1])
+                target_lang = inter.text_values["target_language"].lower()
+                message = await inter.channel.fetch_message(message_id)
+                if not message.content:
+                    await inter.edit_original_response("The selected message has no text to translate.")
+                    return
+                _, translations = await self.handle_message_translation(
+                    message.content,
+                    {target_lang},
+                    inter.channel.id if isinstance(inter.channel, disnake.Thread) else 0,
+                    message.author.display_name,
+                    message.author.id,
+                    message
+                )
+                if translations:
+                    embed = self.create_translation_embed(message, message.content, translations, auto=False)
+                    await inter.edit_original_response(embed=embed)
+                else:
+                    await inter.edit_original_response("Translation failed or produced no results.")
+            except Exception as e:
+                logging.error(f"Context menu translation error: {e}")
+                await inter.edit_original_response("Failed to translate message. Please try again later.")
 
     @translate_group.sub_command(name="thread", description="Manage thread translation settings")
     async def thread_group(
@@ -461,6 +485,30 @@ class TranslationCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error loading language usage for user {user_id}: {e}")
             self.language_usage[user_id] = defaultdict(int)
+
+    @commands.message_command(name="Translate")
+    async def translate_context_menu(self, inter: disnake.MessageCommandInteraction, message: disnake.Message):
+        if message.author.bot:
+            await inter.response.send_message("Cannot translate bot messages.", ephemeral=True)
+            return
+        if not message.content.strip():
+            await inter.response.send_message("The selected message has no text to translate.", ephemeral=True)
+            return
+        modal = disnake.ui.Modal(
+            title="Translate Message",
+            custom_id=f"context_translate:{message.id}",
+            components=[
+                disnake.ui.TextInput(
+                    label="Target language",
+                    custom_id="target_language",
+                    style=disnake.TextInputStyle.short,
+                    required=True,
+                    max_length=50,
+                    placeholder="e.g., Spanish, French, German..."
+                )
+            ]
+        )
+        await inter.response.send_modal(modal)
 
 def setup(bot):
     bot.add_cog(TranslationCog(bot))

@@ -42,6 +42,12 @@ class WelcomeCog(commands.Cog):
             if random.random() < spawn_probability:
                 selected_gif = random.choices(self.GIF_LINKS, weights=self.GIF_WEIGHTS, k=1)[0]
                 await self.send_welcome_message(welcome_channel, member, selected_gif)
+                if selected_gif == "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExYzhsN3Fnd2c1MG1hcmhwMG00czE5ZHZoZmZsa3k4N3hqcWJya2NwdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5xtDarIELDLO7lSFQJi/giphy.gif":
+                    role = member.guild.get_role(1333890145635799201)
+                    if role:
+                        await member.add_roles(role)
+                    else:
+                        print(f"Role with ID 1333890145635799201 not found.")
             else:
                 non_successful_spawns += 1
                 self.save_state(non_successful_spawns)

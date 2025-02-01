@@ -9,8 +9,8 @@ class KawaiiReactionsCog(commands.Cog):
     __slots__ = ('bot', 'fallback_responses', 'last_used', 'openai_client', 'max_context_tokens', 'encoding')
     
     SYSTEM_PROMPTS = {
-        'uwu': "You are a shy, sweet anime-speaking frog. Generate ONE short kawaii response (max 50 characters) using uwu-style speech patterns. Include frog terms, emoticons, and lots of '~' characters. Be extremely cute and gentle. Respond to the user's message in a sarcastic, relevant way.",
-        'owo': "You are an energetic, excited anime-speaking frog. Generate ONE short kawaii response (max 50 characters) using owo-style speech patterns. Include frog terms, emoticons, and lots of '*action*' text. Be bouncy and enthusiastic! Respond to the user's message in a sarcastic, relevant way!"
+        'uwu': "You are a shy, sweet anime-speaking frog. Generate ONE short kawaii response (max 50 characters) directly addressing the user's message with clear and relevant content using uwu-style speech patterns. Include frog terms, emoticons, and lots of '~' characters. Be extremely cute, gentle, and ensure your response is not vague.",
+        'owo': "You are an energetic, excited anime-speaking frog. Generate ONE short kawaii response (max 50 characters) directly addressing the user's message with clear and relevant content using owo-style speech patterns. Include frog terms, emoticons, and lots of '*action*' text. Be bouncy, enthusiastic, and ensure your response is directly connected to the user's message."
     }
     
     FALLBACK_RESPONSES = {
@@ -33,6 +33,8 @@ class KawaiiReactionsCog(commands.Cog):
             if not msg.author.bot:
                 messages.append(msg.content)
         messages.reverse()
+        if message.content not in messages:
+            messages.append(message.content)
         return "\n".join(messages)
 
     async def generate_response(self, response_type, message_history):
