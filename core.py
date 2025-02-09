@@ -192,12 +192,16 @@ class ModuleLoader:
     @staticmethod
     def get_server_modules(guild_id: int) -> list[str]:
         cfg = config.read()
+        print(f"Reading config for guild {guild_id}. Config has server_modules: {cfg.get('server_modules', {})}")
         server_modules = cfg.get('server_modules', {}).get(str(guild_id))
         if server_modules is None:  
+            print(f"No config found for guild {guild_id}, enabling all modules")
             server_modules = list(ModuleLoader.get_available_modules().keys())
             ModuleLoader.set_server_modules(guild_id, server_modules)
         elif server_modules == []:
+            print(f"Empty module list found for guild {guild_id}, all modules disabled")
             return []
+        print(f"Returning modules for guild {guild_id}: {server_modules}")
         return server_modules
 
     @staticmethod 
@@ -221,9 +225,11 @@ class ModuleLoader:
 
     @classmethod
     def load_all_modules(cls, client: commands.Bot, cogs_dir: Path = CONFIG['COGS_DIR']) -> None:
+        print(f"Loading modules for guilds: {[g.id for g in client.guilds]}")
         guild_modules = {}
         for guild in client.guilds:
             enabled_modules = cls.get_server_modules(guild.id)
+            print(f"Guild {guild.id} enabled modules: {enabled_modules}")
             if enabled_modules:
                 guild_modules[guild.id] = enabled_modules
         for file_path in Path(cogs_dir).rglob("*.py"):
@@ -238,6 +244,7 @@ class ModuleLoader:
                 guild_id for guild_id, modules in guild_modules.items()
                 if module_name in modules
             ]
+            print(f"Module {module_name} will be loaded for guilds: {target_guilds}")
             if target_guilds:
                 cls.load_single_module(client, file_path, module_name, target_guilds)
 
@@ -571,6 +578,7 @@ async def control_panel(ctx):
 async def on_ready():
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
     print(f'Logged in as {client.user.name}')
+    print(f"Connected to guilds: {[g.id for g in client.guilds]}")
     for cog in list(client.cogs.keys()):
         client.remove_cog(cog)
     for module_name in list(sys.modules):
