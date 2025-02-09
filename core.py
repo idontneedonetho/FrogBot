@@ -251,6 +251,7 @@ class ModuleLoader:
     @staticmethod
     def load_single_module(client: commands.Bot, file_path: Path, name: str, target_guilds: list[int]) -> None:
         try:
+            print(f"Loading module {name} for guilds {target_guilds}")
             spec = importlib.util.spec_from_file_location(name, file_path)
             if not spec or not spec.loader:
                 raise ImportError(f"Failed to load spec for {name}")
@@ -266,12 +267,15 @@ class ModuleLoader:
                 attr = getattr(module, attr_name)
                 if isinstance(attr, type) and issubclass(attr, commands.Cog) and attr is not commands.Cog:
                     cog = attr(client)
+                    print(f"Found cog {attr.__name__} in module {name}")
                     for cmd in cog.walk_commands():
                         cmd.guild_ids = target_guilds
+                        print(f"Registered command {cmd.name} for guilds {target_guilds}")
                     if hasattr(cog, 'listeners') and callable(getattr(cog, 'listeners')):
                         original_listeners = cog.listeners()
                         cog._listeners = {}
                         for event_name, old_listener in original_listeners:
+                            print(f"Found listener {event_name} in cog {attr.__name__}")
                             async def wrapped_listener(event_args, old_listener=old_listener):
                                 if hasattr(event_args, 'guild') and event_args.guild:
                                     if event_args.guild.id not in target_guilds:
@@ -282,6 +286,7 @@ class ModuleLoader:
                                 await old_listener(event_args)
                             cog.add_listener(wrapped_listener, event_name)
                     client.add_cog(cog)
+                    print(f"Added cog {attr.__name__} to bot")
         except Exception as e:
             if name in sys.modules:
                 del sys.modules[name]
@@ -586,6 +591,22 @@ async def on_ready():
             del sys.modules[module_name]
     ModuleLoader.load_all_modules(client)
     await bot_manager.handle_restart_message()
+
+@client.event
+async def on_slash_command(inter: disnake.ApplicationCommandInteraction):
+    print(f"Command received: {inter.application_command.name}")
+    print(f"Guild: {inter.guild_id}")
+    print(f"User: {inter.author.id}")
+
+@client.event
+async def on_slash_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
+    print(f"Command error: {str(error)}")
+    print(f"Command: {inter.application_command.name}")
+    print(f"Guild: {inter.guild_id}")
+    if isinstance(error, commands.CheckFailure):
+        await inter.response.send_message("You don't have permission to use this command.", ephemeral=True)
+    else:
+        await inter.response.send_message(f"An error occurred: {str(error)}", ephemeral=True)
 
 def main():
     try:
