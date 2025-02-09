@@ -210,8 +210,12 @@ intents.members = intents.messages = intents.message_content = intents.guild_mes
 client = commands.Bot(
     command_prefix='//||',
     intents=intents,
-    command_sync_flags=commands.CommandSyncFlags.default(),
-    test_guilds=CONFIG['TEST_GUILDS']
+    command_sync_flags=commands.CommandSyncFlags(
+        sync_commands=True,
+        sync_commands_debug=True,
+        allow_command_deletion=True
+    ),
+    # test_guilds=CONFIG['TEST_GUILDS']  # Temporarily disabled
 )
 bot_manager = BotManager(client)
 
@@ -569,6 +573,19 @@ class ControlPanelView(disnake.ui.View):
                     ephemeral=True
                 )
             logging.error(f"Error in show_module_options: {e}")
+
+@client.slash_command(name="force_sync", description="Force sync all commands")
+@is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
+async def force_sync(ctx):
+    await ctx.response.defer(ephemeral=True)
+    try:
+        print("Starting force sync...")
+        await client.sync_all_commands(force=True)
+        print("Force sync complete!")
+        await ctx.followup.send("Successfully synced all commands!", ephemeral=True)
+    except Exception as e:
+        print(f"Error during sync: {e}")
+        await ctx.followup.send(f"Error syncing commands: {e}", ephemeral=True)
 
 @client.slash_command(name="control_panel", description="Open the bot's control panel")
 @is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
