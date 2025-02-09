@@ -70,6 +70,29 @@ async def initialize_database():
                     PRIMARY KEY (user_id, language)
                 )
             ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS scheduled_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    message_id INTEGER,
+                    channel_id INTEGER NOT NULL,
+                    author_id INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    scheduled_time TIMESTAMP NOT NULL,
+                    timezone TEXT NOT NULL DEFAULT 'UTC'
+                )
+            ''')
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN is_whiteboard BOOLEAN NOT NULL DEFAULT 0')
+            except:
+                pass
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN whiteboard_data TEXT')
+            except:
+                pass
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN is_cancelled BOOLEAN NOT NULL DEFAULT 0')
+            except:
+                pass
             await conn.commit()
     except Exception as e:
         logging.error(f"Error initializing database: {e}")
@@ -200,6 +223,71 @@ async def clear_language_usage(user_id: int):
         'DELETE FROM language_usage_stats WHERE user_id = ?',
         (user_id,)
     )
+
+async def schedule_message(channel_id: int, author_id: int, content: str, scheduled_time: str, timezone: str = 'UTC', is_whiteboard: bool = False, whiteboard_data: str = None) -> int:
+    result = await db_access_with_retry(
+        'INSERT INTO scheduled_messages (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
+    )
+    return result[0] if result else None
+
+async def get_scheduled_message(id: int) -> dict:
+    async with aiosqlite.connect(DATABASE_FILE) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                'SELECT * FROM scheduled_messages WHERE id = ? AND is_cancelled = 0',
+                (id,)
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+async def get_user_scheduled_messages(author_id: int = None) -> list:
+    async with aiosqlite.connect(DATABASE_FILE) as conn:
+        conn.row_factory = aiosqlite.Row
+        async with conn.cursor() as cursor:
+            if author_id is None:
+                await cursor.execute(
+                    'SELECT * FROM scheduled_messages WHERE is_cancelled = 0 ORDER BY scheduled_time'
+                )
+            else:
+                await cursor.execute(
+                    'SELECT * FROM scheduled_messages WHERE author_id = ? AND is_cancelled = 0 ORDER BY scheduled_time',
+                    (author_id,)
+                )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows] if rows else []
+
+async def cancel_scheduled_message(id: int) -> bool:
+    await db_access_with_retry(
+        'UPDATE scheduled_messages SET is_cancelled = 1 WHERE id = ?',
+        (id,)
+    )
+    return True
+
+async def update_scheduled_message(id: int, content: str = None, scheduled_time: str = None, timezone: str = None, whiteboard_data: str = None) -> bool:
+    updates = []
+    params = []
+    if content is not None:
+        updates.append('content = ?')
+        params.append(content)
+    if scheduled_time is not None:
+        updates.append('scheduled_time = ?')
+        params.append(scheduled_time)
+    if timezone is not None:
+        updates.append('timezone = ?')
+        params.append(timezone)
+    if whiteboard_data is not None:
+        updates.append('whiteboard_data = ?')
+        params.append(whiteboard_data)
+    if not updates:
+        return False    
+    params.append(id)
+    await db_access_with_retry(
+        f'UPDATE scheduled_messages SET {", ".join(updates)} WHERE id = ?',
+        tuple(params)
+    )
+    return True
 
 class ThreadCleanupManager:
     def __init__(self, bot):
