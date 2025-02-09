@@ -192,13 +192,6 @@ class ModuleLoader:
     def get_server_modules() -> list[str]:
         cfg = config.read()
         server_modules = cfg.get('server_modules', [])
-        # If it's in the old format (dict with guild IDs), convert it
-        if isinstance(server_modules, dict):
-            server_modules = list(server_modules.values())[0] if server_modules else []
-            # Update config to new format
-            cfg['server_modules'] = server_modules
-            config.write(cfg)
-        
         if not server_modules:  
             print("No modules configured, enabling all modules")
             server_modules = list(ModuleLoader.get_available_modules().keys())
@@ -558,7 +551,7 @@ async def on_ready():
             del sys.modules[module_name]
     ModuleLoader.load_all_modules(client)
     await bot_manager.handle_restart_message()
-    await client.sync_application_commands()
+    await client.sync_commands()
 
 @client.event
 async def on_slash_command(inter: disnake.ApplicationCommandInteraction):
