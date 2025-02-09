@@ -577,6 +577,7 @@ async def control_panel(ctx):
 
 @client.event
 async def on_ready():
+    await client.sync_all_commands(force=True)
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
     print(f'Logged in as {client.user.name}')
     await bot_manager.handle_restart_message()
