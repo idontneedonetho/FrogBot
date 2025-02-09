@@ -220,6 +220,7 @@ class ModuleLoader:
     def load_all_modules(cls, client: commands.Bot, cogs_dir: Path = CONFIG['COGS_DIR']) -> None:
         print("Loading modules...")
         enabled_modules = cls.get_server_modules()
+        print(f"Enabled modules: {enabled_modules}")
         
         for file_path in Path(cogs_dir).rglob("*.py"):
             if file_path.stem == "__init__": continue
@@ -557,7 +558,7 @@ async def on_ready():
             del sys.modules[module_name]
     ModuleLoader.load_all_modules(client)
     await bot_manager.handle_restart_message()
-    await client.sync_all_application_commands()
+    await client.sync_application_commands()
 
 @client.event
 async def on_slash_command(inter: disnake.ApplicationCommandInteraction):
