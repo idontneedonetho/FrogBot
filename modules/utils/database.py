@@ -78,12 +78,21 @@ async def initialize_database():
                     author_id INTEGER NOT NULL,
                     content TEXT NOT NULL,
                     scheduled_time TIMESTAMP NOT NULL,
-                    timezone TEXT NOT NULL DEFAULT 'UTC',
-                    is_whiteboard BOOLEAN NOT NULL DEFAULT 0,
-                    whiteboard_data TEXT,
-                    is_cancelled BOOLEAN NOT NULL DEFAULT 0
+                    timezone TEXT NOT NULL DEFAULT 'UTC'
                 )
             ''')
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN is_whiteboard BOOLEAN NOT NULL DEFAULT 0')
+            except:
+                pass
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN whiteboard_data TEXT')
+            except:
+                pass
+            try:
+                await conn.execute('ALTER TABLE scheduled_messages ADD COLUMN is_cancelled BOOLEAN NOT NULL DEFAULT 0')
+            except:
+                pass
             await conn.commit()
     except Exception as e:
         logging.error(f"Error initializing database: {e}")
@@ -216,14 +225,11 @@ async def clear_language_usage(user_id: int):
     )
 
 async def schedule_message(channel_id: int, author_id: int, content: str, scheduled_time: str, timezone: str = 'UTC', is_whiteboard: bool = False, whiteboard_data: str = None) -> int:
-    async with aiosqlite.connect(DATABASE_FILE) as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                'INSERT INTO scheduled_messages (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
-            )
-            await conn.commit()
-            return cursor.lastrowid
+    result = await db_access_with_retry(
+        'INSERT INTO scheduled_messages (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
+    )
+    return result[0] if result else None
 
 async def get_scheduled_message(id: int) -> dict:
     async with aiosqlite.connect(DATABASE_FILE) as conn:
