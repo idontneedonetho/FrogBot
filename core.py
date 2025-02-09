@@ -165,8 +165,7 @@ intents.members = intents.messages = intents.message_content = intents.guild_mes
 client = commands.Bot(
     command_prefix='//||',
     intents=intents,
-    command_sync_flags=commands.CommandSyncFlags.default(),
-    test_guilds=CONFIG['TEST_GUILDS']
+    command_sync_flags=commands.CommandSyncFlags.none()  # Don't sync commands globally
 )
 bot_manager = BotManager(client)
 
@@ -190,48 +189,32 @@ class ModuleLoader:
         return modules
 
     @staticmethod
-    def get_server_modules(guild_id: int) -> list[str]:
+    def get_server_modules() -> list[str]:
         cfg = config.read()
-        print(f"Reading config for guild {guild_id}. Config has server_modules: {cfg.get('server_modules', {})}")
-        server_modules = cfg.get('server_modules', {}).get(str(guild_id))
-        if server_modules is None:  
-            print(f"No config found for guild {guild_id}, enabling all modules")
+        server_modules = cfg.get('server_modules', [])
+        if not server_modules:  
+            print("No modules configured, enabling all modules")
             server_modules = list(ModuleLoader.get_available_modules().keys())
-            ModuleLoader.set_server_modules(guild_id, server_modules)
-        elif server_modules == []:
-            print(f"Empty module list found for guild {guild_id}, all modules disabled")
-            return []
-        print(f"Returning modules for guild {guild_id}: {server_modules}")
+            ModuleLoader.set_server_modules(server_modules)
+        print(f"Enabled modules: {server_modules}")
         return server_modules
 
     @staticmethod 
-    def set_server_modules(guild_id: int, modules: list[str]):
+    def set_server_modules(modules: list[str]):
         cfg = config.read()
-        if 'server_modules' not in cfg:
-            cfg['server_modules'] = {}
-        cfg['server_modules'][str(guild_id)] = modules
+        cfg['server_modules'] = modules
         config.write(cfg)
 
     @staticmethod
-    def is_module_enabled(guild_id: int, module_name: str) -> bool:
-        return module_name in ModuleLoader.get_server_modules(guild_id)
-
-    @staticmethod
-    def get_guild_command_sync_flags(guild_id: int) -> commands.CommandSyncFlags:
-        enabled_modules = ModuleLoader.get_server_modules(guild_id)
-        if not enabled_modules:
-            return commands.CommandSyncFlags.none()
-        return commands.CommandSyncFlags.default()
+    def is_module_enabled(module_name: str) -> bool:
+        return module_name in ModuleLoader.get_server_modules()
 
     @classmethod
     def load_all_modules(cls, client: commands.Bot, cogs_dir: Path = CONFIG['COGS_DIR']) -> None:
-        print(f"Loading modules for guilds: {[g.id for g in client.guilds]}")
-        guild_modules = {}
-        for guild in client.guilds:
-            enabled_modules = cls.get_server_modules(guild.id)
-            print(f"Guild {guild.id} enabled modules: {enabled_modules}")
-            if enabled_modules:
-                guild_modules[guild.id] = enabled_modules
+        print("Loading modules...")
+        enabled_modules = cls.get_server_modules()
+        print(f"Enabled modules: {enabled_modules}")
+        
         for file_path in Path(cogs_dir).rglob("*.py"):
             if file_path.stem == "__init__": continue
             relative_parts = file_path.relative_to(cogs_dir).parts
@@ -240,23 +223,18 @@ class ModuleLoader:
                 if len(relative_parts) > 1 
                 else f"modules.{file_path.stem}"
             )
-            target_guilds = [
-                guild_id for guild_id, modules in guild_modules.items()
-                if module_name in modules
-            ]
-            print(f"Module {module_name} will be loaded for guilds: {target_guilds}")
-            if target_guilds:
-                cls.load_single_module(client, file_path, module_name, target_guilds)
+            if module_name in enabled_modules:
+                print(f"Loading module {module_name}")
+                cls.load_single_module(client, file_path, module_name)
 
     @staticmethod
-    def load_single_module(client: commands.Bot, file_path: Path, name: str, target_guilds: list[int]) -> None:
+    def load_single_module(client: commands.Bot, file_path: Path, name: str) -> None:
         try:
-            print(f"Loading module {name} for guilds {target_guilds}")
+            print(f"Loading module {name}")
             spec = importlib.util.spec_from_file_location(name, file_path)
             if not spec or not spec.loader:
                 raise ImportError(f"Failed to load spec for {name}")
             module = importlib.util.module_from_spec(spec)
-            module.GUILD_IDS = target_guilds
             sys.modules[name] = module
             try:
                 spec.loader.exec_module(module)
@@ -268,23 +246,6 @@ class ModuleLoader:
                 if isinstance(attr, type) and issubclass(attr, commands.Cog) and attr is not commands.Cog:
                     cog = attr(client)
                     print(f"Found cog {attr.__name__} in module {name}")
-                    for cmd in cog.walk_commands():
-                        cmd.guild_ids = target_guilds
-                        print(f"Registered command {cmd.name} for guilds {target_guilds}")
-                    if hasattr(cog, 'listeners') and callable(getattr(cog, 'listeners')):
-                        original_listeners = cog.listeners()
-                        cog._listeners = {}
-                        for event_name, old_listener in original_listeners:
-                            print(f"Found listener {event_name} in cog {attr.__name__}")
-                            async def wrapped_listener(event_args, old_listener=old_listener):
-                                if hasattr(event_args, 'guild') and event_args.guild:
-                                    if event_args.guild.id not in target_guilds:
-                                        return
-                                elif hasattr(event_args, 'guild_id'):
-                                    if event_args.guild_id not in target_guilds:
-                                        return
-                                await old_listener(event_args)
-                            cog.add_listener(wrapped_listener, event_name)
                     client.add_cog(cog)
                     print(f"Added cog {attr.__name__} to bot")
         except Exception as e:
@@ -322,7 +283,7 @@ class ModuleListView(disnake.ui.View):
         self.add_navigation_buttons()
         if not self.modules:
             current_modules = ModuleLoader.get_available_modules()
-            enabled_modules = ModuleLoader.get_server_modules(self.guild_id) if self.guild_id else []
+            enabled_modules = ModuleLoader.get_server_modules() if self.guild_id else []
             for module_name in current_modules:
                 self.modules[module_name] = {
                     "id": module_name,
@@ -380,7 +341,7 @@ class ModuleListView(disnake.ui.View):
                         module_name for module_name, info in self.modules.items()
                         if self.selected_modules[module_name]
                     ]
-                    ModuleLoader.set_server_modules(self.guild_id, enabled_modules)
+                    ModuleLoader.set_server_modules(enabled_modules)
                 for cog in list(client.cogs.keys()):
                     client.remove_cog(cog)
                 for module_name in list(sys.modules):
@@ -583,7 +544,6 @@ async def control_panel(ctx):
 async def on_ready():
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
     print(f'Logged in as {client.user.name}')
-    print(f"Connected to guilds: {[g.id for g in client.guilds]}")
     for cog in list(client.cogs.keys()):
         client.remove_cog(cog)
     for module_name in list(sys.modules):
@@ -591,6 +551,7 @@ async def on_ready():
             del sys.modules[module_name]
     ModuleLoader.load_all_modules(client)
     await bot_manager.handle_restart_message()
+    await client.sync_commands()
 
 @client.event
 async def on_slash_command(inter: disnake.ApplicationCommandInteraction):
