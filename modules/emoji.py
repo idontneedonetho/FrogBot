@@ -70,7 +70,7 @@ class EmojiCog(commands.Cog):
         await self.process_reaction(payload, is_add=False)
 
     async def process_reaction(self, payload: RawReactionActionEvent, is_add: bool):
-        if payload.guild_id is None:
+        if payload.guild_id is None or payload.user_id == self.bot.user.id:
             return
         emoji_name = str(payload.emoji)
         async with self.reaction_lock:
