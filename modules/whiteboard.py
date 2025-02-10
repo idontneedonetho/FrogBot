@@ -26,10 +26,12 @@ class WhiteboardModal(ui.Modal):
         self.default_values = default_values or {}
         components = [
             ui.TextInput(
-                label="Title",
+                label="Title (Optional)",
                 custom_id="title",
                 style=TextInputStyle.short,
-                value=self.default_values.get("title", "Whiteboard")
+                value=self.default_values.get("title", ""),
+                required=False,
+                placeholder="Leave empty for no title"
             ),
             ui.TextInput(
                 label="Content",
@@ -383,9 +385,10 @@ class WhiteboardCog(commands.Cog):
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
 
     async def _create_whiteboard_text(self, title, content, editor_ids, inter=None):
-        formatted_title = title.strip()
         formatted_content = content.strip()
-        return f"**{formatted_title}**\n\n{formatted_content}"
+        if title.strip():
+            return f"**{title.strip()}**\n\n{formatted_content}"
+        return formatted_content
 
     async def _get_maintainers_list(self, editor_ids, inter):
         maintainers = []
