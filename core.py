@@ -208,7 +208,7 @@ intents = disnake.Intents.default()
 intents.members = intents.messages = intents.message_content = intents.guild_messages = intents.reactions = True
 
 client = commands.Bot(
-    command_prefix='//||',
+    command_prefix='/',
     intents=intents,
     command_sync_flags=commands.CommandSyncFlags.default(),
     test_guilds=CONFIG['TEST_GUILDS']
