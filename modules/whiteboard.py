@@ -26,14 +26,6 @@ class WhiteboardModal(ui.Modal):
         self.default_values = default_values or {}
         components = [
             ui.TextInput(
-                label="Title (Optional)",
-                custom_id="title",
-                style=TextInputStyle.short,
-                value=self.default_values.get("title", ""),
-                required=False,
-                placeholder="Leave empty for no title"
-            ),
-            ui.TextInput(
                 label="Content",
                 custom_id="content",
                 style=TextInputStyle.paragraph,
@@ -93,7 +85,6 @@ class WhiteboardView(ui.View):
         modal = WhiteboardModal(
             title="Edit Whiteboard",
             default_values={
-                "title": self.message_data["title"],
                 "content": self.message_data["content"],
                 "scheduled_time": scheduled_time,
                 "timezone": self.message_data.get("timezone", "UTC"),
@@ -108,14 +99,12 @@ class WhiteboardView(ui.View):
                 check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
                 timeout=1200
             )
-            title = modal_inter.text_values['title']
             content = modal_inter.text_values['content']
             editor_ids = [eid.strip() for eid in modal_inter.text_values.get('editor_id', '').split(',') if eid.strip()]
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self.cog._validate_timezone(timezone_code)
             message_data = {
-                "title": title,
                 "content": content,
                 "editor_ids": editor_ids
             }
@@ -157,7 +146,7 @@ class WhiteboardView(ui.View):
                     )
                     return
             else:
-                message_text = await self.cog._create_whiteboard_text(title, content, editor_ids, inter)
+                message_text = await self.cog._create_whiteboard_text(content, editor_ids, inter)
                 await modal_inter.channel.send(message_text)
                 await modal_inter.response.send_message("Whiteboard updated and sent immediately!", ephemeral=True)
         except asyncio.TimeoutError:
@@ -184,8 +173,7 @@ class MessageSelect(ui.Select):
             tz = pytz.timezone(msg["timezone"])
             local_time = scheduled_time.astimezone(tz)
             if msg["is_whiteboard"]:
-                whiteboard_data = json.loads(msg["whiteboard_data"])
-                label = whiteboard_data.get("title", "Whiteboard")
+                label = "Whiteboard"
                 description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
             else:
                 label = "Message"
@@ -228,7 +216,7 @@ class MessageSelectView(ui.View):
                         content = msg.content if msg.content else ""
                         if message["is_whiteboard"]:
                             whiteboard_data = json.loads(message["whiteboard_data"])
-                            if whiteboard_data.get("title", "") in content and whiteboard_data.get("content", "") in content:
+                            if whiteboard_data.get("content", "") in content:
                                 await msg.delete()
                                 break
                         elif message["content"] in content:
@@ -334,14 +322,12 @@ class WhiteboardCog(commands.Cog):
                 check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
                 timeout=1200
             )
-            title = modal_inter.text_values['title']
             content = modal_inter.text_values['content']
             editor_ids = [eid.strip() for eid in modal_inter.text_values.get('editor_id', '').split(',') if eid.strip()]
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self._validate_timezone(timezone_code)
             message_data = {
-                "title": title,
                 "content": content,
                 "editor_ids": editor_ids
             }
@@ -378,17 +364,14 @@ class WhiteboardCog(commands.Cog):
                     )
                     return
             else:
-                message_text = await self._create_whiteboard_text(title, content, editor_ids, inter)
+                message_text = await self._create_whiteboard_text(content, editor_ids, inter)
                 await modal_inter.channel.send(message_text)
                 await modal_inter.response.send_message("Whiteboard created successfully!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
 
-    async def _create_whiteboard_text(self, title, content, editor_ids, inter=None):
-        formatted_content = content.strip()
-        if title.strip():
-            return f"**{title.strip()}**\n\n{formatted_content}"
-        return formatted_content
+    async def _create_whiteboard_text(self, content, editor_ids, inter=None):
+        return content.strip()
 
     async def _get_maintainers_list(self, editor_ids, inter):
         maintainers = []
@@ -400,7 +383,6 @@ class WhiteboardCog(commands.Cog):
         return sorted(maintainers)
 
     async def _validate_timezone(self, timezone_code: str) -> tuple[str, pytz.timezone]:
-        """Validate and return the timezone code and timezone object."""
         try:
             timezone = timezone_code.strip().upper()
             if timezone in TIMEZONE_OPTIONS:
@@ -437,6 +419,43 @@ class WhiteboardCog(commands.Cog):
         if not has_permission and "editor_ids" in message_data:
             has_permission = str(inter.author.id) in message_data["editor_ids"]
         return has_permission
+
+    @commands.message_command(name="Edit Message")
+    async def edit_message_context(self, inter: disnake.MessageCommandInteraction):
+        message = inter.target
+        if message.author.id != self.client.user.id:
+            await inter.response.send_message("I can only edit messages that I've sent.", ephemeral=True)
+            return
+        if not await self._can_edit_whiteboard(inter, {"editor_ids": []}):
+            await inter.response.send_message("You don't have permission to edit this message.", ephemeral=True)
+            return
+        modal = ui.Modal(
+            title="Edit Message",
+            custom_id="edit_message_modal",
+            components=[
+                ui.TextInput(
+                    label="Content",
+                    custom_id="content",
+                    style=TextInputStyle.paragraph,
+                    value=message.content
+                )
+            ],
+            timeout=1200
+        )
+        await inter.response.send_modal(modal)
+        try:
+            modal_inter = await self.client.wait_for(
+                'modal_submit',
+                check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
+                timeout=1200
+            )
+            content = modal_inter.text_values['content'].strip()
+            await message.edit(content=content)
+            await modal_inter.response.send_message("Message updated successfully!", ephemeral=True)
+        except asyncio.TimeoutError:
+            await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
+        except Exception as e:
+            await inter.followup.send(f"An error occurred while processing your edit: {str(e)}", ephemeral=True)
 
 def setup(client):
     client.add_cog(WhiteboardCog(client))
