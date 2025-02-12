@@ -60,15 +60,6 @@ class WhiteboardModal(ui.Modal):
                     value=self.default_values.get("timezone", "UTC")
                 )
             ])
-        components.append(
-            ui.TextInput(
-                label="Editor IDs (Optional, comma separated)",
-                custom_id="editor_id",
-                style=TextInputStyle.short,
-                required=False,
-                value=self.default_values.get("editor_id", "")
-            )
-        )
         super().__init__(
             title=title,
             custom_id="whiteboard_modal",
@@ -214,9 +205,6 @@ class MessageSelectView(ui.View):
         if not message:
             await inter.response.send_message("Message not found.", ephemeral=True)
             return False
-        if message["author_id"] != inter.author.id and not await self.cog._can_edit_whiteboard(inter, {"editor_ids": []}):
-            await inter.response.send_message("You don't have permission to edit this message.", ephemeral=True)
-            return False
         try:
             channel = inter.guild.get_channel(message["channel_id"])
             if channel:
@@ -224,7 +212,7 @@ class MessageSelectView(ui.View):
                     if msg.author == inter.guild.me:
                         content = msg.content if msg.content else ""
                         if message["is_whiteboard"]:
-                            whiteboard_data = json.loads(message["whiteboard_data"])
+                            whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
                             if whiteboard_data.get("content", "") in content:
                                 await msg.delete()
                                 break
@@ -233,34 +221,23 @@ class MessageSelectView(ui.View):
                             break
         except Exception as e:
             print(f"Error cleaning up old message: {e}")
-        whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {}
+        try:
+            whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
+        except:
+            whiteboard_data = {"content": message["content"]}
         scheduled_time = datetime.fromisoformat(message["scheduled_time"])
         tz = pytz.timezone(message["timezone"])
         local_time = scheduled_time.astimezone(tz)
         message_data = {
-            "title": whiteboard_data.get("title", "Whiteboard"),
-            "content": whiteboard_data.get("content", ""),
-            "editor_ids": whiteboard_data.get("editor_ids", []),
+            "content": whiteboard_data.get("content", message["content"]),
             "scheduled_time": local_time,
             "timezone": message["timezone"],
             "schedule_id": message["id"]
         }
-        message_text = await self.cog._create_whiteboard_text(
-            message_data["title"],
-            message_data["content"],
-            message_data["editor_ids"],
-            inter
-        )
-        maintainers = await self.cog._get_maintainers_list(message_data["editor_ids"], inter)
-        embed = disnake.Embed(
-            title="Whiteboard Maintainers",
-            description="\n".join(maintainers),
-            color=disnake.Color.blue()
-        )
+        message_text = await self.cog._create_whiteboard_text(message_data["content"])
         view = WhiteboardView(self.cog, message_data)
         await inter.response.send_message(
             content=message_text,
-            embed=embed,
             view=view,
             ephemeral=True
         )
@@ -398,7 +375,35 @@ class WhiteboardCog(commands.Cog):
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
 
-    async def _create_whiteboard_text(self, content, editor_ids, inter=None):
+    @whiteboard.sub_command(name="edit")
+    @is_admin_or_privileged(rank_id=1198482895342411846)
+    async def edit_whiteboard(self, inter):
+        messages = await get_user_scheduled_messages(None)
+        if not messages:
+            await inter.response.send_message("There are no scheduled messages.", ephemeral=True)
+            return
+        now = datetime.now(pytz.UTC)
+        future_messages = [
+            msg for msg in messages 
+            if datetime.fromisoformat(msg["scheduled_time"]) > now
+            and not msg.get("is_cancelled", False)
+            and msg["is_whiteboard"]
+        ]
+        if not future_messages:
+            await inter.response.send_message("There are no pending scheduled whiteboards.", ephemeral=True)
+            return
+        view = MessageSelectView(self, future_messages)
+        await inter.response.send_message(
+            "Select a whiteboard to edit:",
+            view=view,
+            ephemeral=True
+        )
+
+    async def _can_edit_whiteboard(self, inter, message_data):
+        return (inter.author.guild_permissions.administrator or 
+                any(role.id == self.privileged_role_id for role in inter.author.roles))
+
+    async def _create_whiteboard_text(self, content, editor_ids=None, inter=None):
         return content.strip()
 
     async def _get_maintainers_list(self, editor_ids, inter):
@@ -419,34 +424,6 @@ class WhiteboardCog(commands.Cog):
             return timezone, tz
         except pytz.exceptions.UnknownTimeZoneError:
             return "UTC", pytz.UTC
-
-    @whiteboard.sub_command(name="edit")
-    async def edit_whiteboard(self, inter):
-        messages = await get_user_scheduled_messages(inter.author.id)
-        if not messages:
-            await inter.response.send_message("You have no scheduled messages.", ephemeral=True)
-            return
-        now = datetime.now(pytz.UTC)
-        future_messages = [
-            msg for msg in messages 
-            if datetime.fromisoformat(msg["scheduled_time"]) > now
-        ]
-        if not future_messages:
-            await inter.response.send_message("You have no pending scheduled messages.", ephemeral=True)
-            return
-        view = MessageSelectView(self, future_messages)
-        await inter.response.send_message(
-            "Select a message to edit:",
-            view=view,
-            ephemeral=True
-        )
-
-    async def _can_edit_whiteboard(self, inter, message_data):
-        has_permission = (inter.author.guild_permissions.administrator or 
-                         any(role.id == self.privileged_role_id for role in inter.author.roles))
-        if not has_permission and "editor_ids" in message_data:
-            has_permission = str(inter.author.id) in message_data["editor_ids"]
-        return has_permission
 
     @commands.message_command(name="Edit Message")
     async def edit_message_context(self, inter: disnake.MessageCommandInteraction):
