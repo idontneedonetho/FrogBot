@@ -26,6 +26,21 @@ class WhiteboardModal(ui.Modal):
         self.default_values = default_values or {}
         components = [
             ui.TextInput(
+                label="Channel",
+                custom_id="channel",
+                style=TextInputStyle.short,
+                value=self.default_values.get("channel", ""),
+                placeholder="Enter #channel-name or channel ID"
+            ),
+            ui.TextInput(
+                label="Title (Optional)",
+                custom_id="title",
+                style=TextInputStyle.short,
+                value=self.default_values.get("title", ""),
+                required=False,
+                placeholder="Leave empty for no title"
+            ),
+            ui.TextInput(
                 label="Content",
                 custom_id="content",
                 style=TextInputStyle.paragraph,
@@ -322,12 +337,30 @@ class WhiteboardCog(commands.Cog):
                 check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
                 timeout=1200
             )
+            channel_input = modal_inter.text_values['channel'].strip()
+            target_channel = None
+            if channel_input.startswith('#'):
+                channel_name = channel_input[1:]
+                target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
+            if not target_channel and channel_input.isdigit():
+                try:
+                    target_channel = inter.guild.get_channel(int(channel_input))
+                except:
+                    pass
+            if not target_channel:
+                await modal_inter.response.send_message(
+                    "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
+                    ephemeral=True
+                )
+                return
+            title = modal_inter.text_values['title']
             content = modal_inter.text_values['content']
             editor_ids = [eid.strip() for eid in modal_inter.text_values.get('editor_id', '').split(',') if eid.strip()]
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self._validate_timezone(timezone_code)
             message_data = {
+                "title": title,
                 "content": content,
                 "editor_ids": editor_ids
             }
@@ -338,7 +371,7 @@ class WhiteboardCog(commands.Cog):
                     utc_dt = dt.astimezone(pytz.UTC)
                     whiteboard_data = json.dumps(message_data)
                     schedule_id = await schedule_message(
-                        inter.channel.id,
+                        target_channel.id,
                         inter.author.id,
                         content,
                         utc_dt.isoformat(),
@@ -347,12 +380,12 @@ class WhiteboardCog(commands.Cog):
                         whiteboard_data
                     )
                     await modal_inter.response.send_message(
-                        f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')}",
+                        f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
                         ephemeral=True
                     )
                     self._schedule_message_task({
                         "id": schedule_id,
-                        "channel_id": inter.channel.id,
+                        "channel_id": target_channel.id,
                         "scheduled_time": utc_dt.isoformat(),
                         "is_whiteboard": True,
                         "whiteboard_data": whiteboard_data
@@ -364,9 +397,9 @@ class WhiteboardCog(commands.Cog):
                     )
                     return
             else:
-                message_text = await self._create_whiteboard_text(content, editor_ids, inter)
-                await modal_inter.channel.send(message_text)
-                await modal_inter.response.send_message("Whiteboard created successfully!", ephemeral=True)
+                message_text = await self._create_whiteboard_text(title, content, editor_ids, inter)
+                await target_channel.send(message_text)
+                await modal_inter.response.send_message(f"Whiteboard created successfully in {target_channel.mention}!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
 
