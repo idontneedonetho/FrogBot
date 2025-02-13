@@ -88,7 +88,6 @@ class WhiteboardView(ui.View):
                 "content": self.message_data["content"],
                 "scheduled_time": scheduled_time,
                 "timezone": self.message_data.get("timezone", "UTC"),
-                "editor_id": ",".join(str(eid) for eid in self.message_data.get("editor_ids", []))
             },
             include_scheduling=True
         )
@@ -100,13 +99,11 @@ class WhiteboardView(ui.View):
                 timeout=1200
             )
             content = modal_inter.text_values['content']
-            editor_ids = [eid.strip() for eid in modal_inter.text_values.get('editor_id', '').split(',') if eid.strip()]
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self.cog._validate_timezone(timezone_code)
             message_data = {
                 "content": content,
-                "editor_ids": editor_ids
             }
             schedule_id = self.message_data.get("schedule_id")
             if schedule_id in self.cog.scheduled_tasks:
@@ -146,7 +143,7 @@ class WhiteboardView(ui.View):
                     )
                     return
             else:
-                message_text = await self.cog._create_whiteboard_text(content, editor_ids, inter)
+                message_text = await self.cog._create_whiteboard_text(content)
                 await modal_inter.channel.send(message_text)
                 await modal_inter.response.send_message("Whiteboard updated and sent immediately!", ephemeral=True)
         except asyncio.TimeoutError:
@@ -278,10 +275,7 @@ class WhiteboardCog(commands.Cog):
             if message_data["is_whiteboard"]:
                 whiteboard_data = json.loads(message_data["whiteboard_data"])
                 message_text = await self._create_whiteboard_text(
-                    whiteboard_data["title"],
-                    whiteboard_data["content"],
-                    whiteboard_data.get("editor_ids", []),
-                    None
+                    whiteboard_data["content"]
                 )
                 await channel.send(message_text)
             else:
@@ -328,13 +322,11 @@ class WhiteboardCog(commands.Cog):
                     return
             else:
                 target_channel = inter.channel
-            editor_ids = [eid.strip() for eid in modal_inter.text_values.get('editor_id', '').split(',') if eid.strip()]
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self._validate_timezone(timezone_code)
             message_data = {
                 "content": content,
-                "editor_ids": editor_ids
             }
             if scheduled_time:
                 try:
@@ -369,7 +361,7 @@ class WhiteboardCog(commands.Cog):
                     )
                     return
             else:
-                message_text = await self._create_whiteboard_text(content, editor_ids, inter)
+                message_text = await self._create_whiteboard_text(content)
                 await target_channel.send(message_text)
                 await modal_inter.response.send_message(f"Whiteboard created successfully in {target_channel.mention}!", ephemeral=True)
         except asyncio.TimeoutError:
@@ -403,17 +395,8 @@ class WhiteboardCog(commands.Cog):
         return (inter.author.guild_permissions.administrator or 
                 any(role.id == self.privileged_role_id for role in inter.author.roles))
 
-    async def _create_whiteboard_text(self, content, editor_ids=None, inter=None):
+    async def _create_whiteboard_text(self, content):
         return content.strip()
-
-    async def _get_maintainers_list(self, editor_ids, inter):
-        maintainers = []
-        if inter:
-            maintainers = [role.name for role in inter.guild.roles if role.permissions.administrator]
-            privileged_role = inter.guild.get_role(self.privileged_role_id)
-            if privileged_role:
-                maintainers.append(privileged_role.name)
-        return sorted(maintainers)
 
     async def _validate_timezone(self, timezone_code: str) -> tuple[str, pytz.timezone]:
         try:
@@ -431,7 +414,7 @@ class WhiteboardCog(commands.Cog):
         if message.author.id != self.client.user.id:
             await inter.response.send_message("I can only edit messages that I've sent.", ephemeral=True)
             return
-        if not await self._can_edit_whiteboard(inter, {"editor_ids": []}):
+        if not await self._can_edit_whiteboard(inter, {}):
             await inter.response.send_message("You don't have permission to edit this message.", ephemeral=True)
             return
         modal = ui.Modal(
