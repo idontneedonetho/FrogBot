@@ -2,7 +2,6 @@
 
 from modules.utils.database import schedule_message, get_scheduled_message, get_user_scheduled_messages, cancel_scheduled_message
 from disnake import TextInputStyle, ui, SelectOption
-from modules.utils.commons import send_long_message
 from core import is_admin_or_privileged
 from disnake.ext import commands
 from datetime import datetime
@@ -145,11 +144,22 @@ class WhiteboardView(ui.View):
                     return
             else:
                 message_text = await self.cog._create_whiteboard_text(content)
-                class DummyMessage:
-                    def __init__(self, channel):
-                        self.channel = channel
-                dummy_message = DummyMessage(inter.channel)
-                await send_long_message(dummy_message, message_text, should_reply=True)
+                parts = []
+                current_part = ''
+                for line in message_text.split('\n'):
+                    if len(current_part) + len(line) + 1 > 1950:
+                        parts.append(current_part)
+                        current_part = line + '\n'
+                    else:
+                        current_part += line + '\n'
+                if current_part:
+                    parts.append(current_part)
+                last_message = None
+                for i, part in enumerate(parts):
+                    if i == 0:
+                        last_message = await inter.channel.send(part)
+                    else:
+                        last_message = await last_message.reply(part)
                 await modal_inter.response.send_message("Whiteboard updated and sent immediately!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
@@ -305,11 +315,22 @@ class WhiteboardCog(commands.Cog):
                 message_text = await self._create_whiteboard_text(
                     whiteboard_data["content"]
                 )
-                class DummyMessage:
-                    def __init__(self, channel):
-                        self.channel = channel
-                dummy_message = DummyMessage(channel)
-                await send_long_message(dummy_message, message_text, should_reply=True)
+                parts = []
+                current_part = ''
+                for line in message_text.split('\n'):
+                    if len(current_part) + len(line) + 1 > 1950:
+                        parts.append(current_part)
+                        current_part = line + '\n'
+                    else:
+                        current_part += line + '\n'
+                if current_part:
+                    parts.append(current_part)
+                last_message = None
+                for i, part in enumerate(parts):
+                    if i == 0:
+                        last_message = await channel.send(part)
+                    else:
+                        last_message = await last_message.reply(part)
             else:
                 await channel.send(message_data["content"])
             await cancel_scheduled_message(message_data["id"])
@@ -394,11 +415,22 @@ class WhiteboardCog(commands.Cog):
                     return
             else:
                 message_text = await self._create_whiteboard_text(content)
-                class DummyMessage:
-                    def __init__(self, channel):
-                        self.channel = channel
-                dummy_message = DummyMessage(target_channel)
-                await send_long_message(dummy_message, message_text, should_reply=True)
+                parts = []
+                current_part = ''
+                for line in message_text.split('\n'):
+                    if len(current_part) + len(line) + 1 > 1950:
+                        parts.append(current_part)
+                        current_part = line + '\n'
+                    else:
+                        current_part += line + '\n'
+                if current_part:
+                    parts.append(current_part)
+                last_message = None
+                for i, part in enumerate(parts):
+                    if i == 0:
+                        last_message = await target_channel.send(part)
+                    else:
+                        last_message = await last_message.reply(part)
                 await modal_inter.response.send_message(f"Whiteboard created successfully in {target_channel.mention}!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
@@ -507,11 +539,22 @@ class WhiteboardCog(commands.Cog):
                     await msg.delete()
                 except Exception as e:
                     print(f"Error deleting message: {e}")
-            class DummyMessage:
-                def __init__(self, channel):
-                    self.channel = channel
-            dummy_message = DummyMessage(message.channel)
-            await send_long_message(dummy_message, content, should_reply=True)
+            parts = []
+            current_part = ''
+            for line in content.split('\n'):
+                if len(current_part) + len(line) + 1 > 1950:
+                    parts.append(current_part)
+                    current_part = line + '\n'
+                else:
+                    current_part += line + '\n'
+            if current_part:
+                parts.append(current_part)
+            last_message = None
+            for i, part in enumerate(parts):
+                if i == 0:
+                    last_message = await message.channel.send(part)
+                else:
+                    last_message = await last_message.reply(part)
             await modal_inter.response.send_message("Message updated successfully!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
