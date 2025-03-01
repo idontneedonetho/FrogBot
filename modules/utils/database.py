@@ -168,16 +168,20 @@ async def get_user_language(thread_id: int, user_id: int) -> str:
     return rows[0][0] if rows else None
 
 async def add_thread_language(thread_id: int, language: str):
-    await db_access_with_retry(
-        'INSERT OR IGNORE INTO thread_languages (thread_id, language) VALUES (?, ?)',
-        (thread_id, language)
-    )
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO thread_languages (thread_id, language) VALUES (?, ?)",
+            (thread_id, language.lower())
+        )
+        await db.commit()
 
 async def remove_thread_language(thread_id: int, language: str):
-    await db_access_with_retry(
-        'DELETE FROM thread_languages WHERE thread_id = ? AND language = ?',
-        (thread_id, language)
-    )
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute(
+            "DELETE FROM thread_languages WHERE thread_id = ? AND language = ?",
+            (thread_id, language.lower())
+        )
+        await db.commit()
 
 async def get_thread_languages(thread_id: int) -> list[str]:
     rows = await db_access_with_retry(

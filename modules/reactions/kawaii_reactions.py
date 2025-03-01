@@ -1,12 +1,12 @@
 # modules.reactions.kawaii_reactions
 
 from disnake.ext import commands
-from openai import AsyncOpenAI
-from core import Config
+import google.generativeai as genai
+from core import config
 import random
 
 class KawaiiReactionsCog(commands.Cog):
-    __slots__ = ('bot', 'fallback_responses', 'last_used', 'openai_client', 'max_context_tokens', 'encoding')
+    __slots__ = ('bot', 'fallback_responses', 'last_used', 'gemini_model')
     
     SYSTEM_PROMPTS = {
         'uwu': "You are a shy, sweet anime-speaking frog. Generate ONE short kawaii response (max 50 characters) directly addressing the user's message with clear and relevant content using uwu-style speech patterns. Include frog terms, emoticons, and lots of '~' characters. Be extremely cute, gentle, and ensure your response is not vague.",
@@ -22,10 +22,11 @@ class KawaiiReactionsCog(commands.Cog):
         self.bot = bot
         self.fallback_responses = self.FALLBACK_RESPONSES
         self.last_used = {'uwu': None, 'owo': None}
-        api_key = Config().read().get('OPENAI_API_KEY')
+        api_key = config.read().get('GOOGLE_API_KEY')
         if not api_key:
-            raise ValueError("OpenAI API key not found in config")
-        self.openai_client = AsyncOpenAI(api_key=api_key)
+            raise ValueError("Google API key not found in config")
+        genai.configure(api_key=api_key)
+        self.gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
     async def get_message_history(self, message):
         messages = []
@@ -39,18 +40,30 @@ class KawaiiReactionsCog(commands.Cog):
 
     async def generate_response(self, response_type, message_history):
         try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPTS[response_type]},
-                    {"role": "user", "content": message_history}
-                ],
-                max_tokens=50,
-                temperature=0.9
+            gemini_messages = [
+                {"role": "user", "parts": [f"SYSTEM INSTRUCTION: {self.SYSTEM_PROMPTS[response_type]}"]},
+                {"role": "user", "parts": [message_history]}
+            ]
+            generation_config = {
+                "temperature": 0.9,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_output_tokens": 50,
+            }
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+            ]
+            response = self.gemini_model.generate_content(
+                gemini_messages,
+                generation_config=generation_config,
+                safety_settings=safety_settings
             )
-            return response.choices[0].message.content.strip()
+            return response.text.strip()
         except Exception as e:
-            print(f"OpenAI API error: {e}")
+            print(f"Gemini API error: {e}")
             return random.choice(self.fallback_responses[response_type])
 
     async def send_response(self, message, response_type):

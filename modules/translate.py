@@ -1,30 +1,33 @@
 # modules.translate
 
-from asyncio import Queue, create_task, Task, sleep
-from typing import Dict, Set, List, Union
+from asyncio import Queue, create_task, sleep
+import google.generativeai as genai
 from collections import defaultdict
 from modules.utils import database
 from disnake import Embed, Color
 from disnake.ext import commands
+from typing import Set, List
 from core import config
 import disnake
 import asyncio
 import logging
-import openai
+
 
 CONSTANTS = {
-    'MODEL_NAME': "gpt-4o-mini",
+    'MODEL_NAME': "gemini-2.0-flash",
     'USAGE_THRESHOLD': 1,
     'PREFERRED_LANG_THRESHOLD': 70,
-    'MAX_HISTORY': 50,
+    'MAX_HISTORY': 10,
+    'CONTEXT_MESSAGES': 3,
     'MAX_CACHED_THREADS': 1000,
     'NUM_WORKERS': 3,
     'CLEANUP_INTERVAL': 3600
 }
 
-openai_client = openai.OpenAI(api_key=config.read().get('OPENAI_API_KEY'))
+genai.configure(api_key=config.read().get('GOOGLE_API_KEY'))
+gemini_model = genai.GenerativeModel(CONSTANTS['MODEL_NAME'])
 
-COMBINED_PROMPT = """You are a translation assistant. Your job is to:
+SYSTEM_PROMPT = """You are a translation assistant. Your job is to:
 1. Detect languages accurately
 2. Translate messages while maintaining context and nuance
 3. Never add commentary or additional messages
@@ -38,11 +41,10 @@ COMBINED_PROMPT = """You are a translation assistant. Your job is to:
 class TranslationCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.thread_histories: Dict[int, List[dict]] = {}
-        self.language_usage: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        self.language_usage_cache = {}
+        self.thread_histories = {}
+        self.language_usage = defaultdict(lambda: defaultdict(int))
         self.translation_queue = Queue()
-        self.worker_tasks: List[Task] = []
+        self.worker_tasks = []
         self.cleanup_task = None
         self._ready = False
 
@@ -58,7 +60,6 @@ class TranslationCog(commands.Cog):
         for task in self.worker_tasks:
             task.cancel()
         self.thread_histories.clear()
-        self.language_usage_cache.clear()
         self.language_usage.clear()
         self._ready = False
 
@@ -87,12 +88,12 @@ class TranslationCog(commands.Cog):
                     )[:len(self.thread_histories) - CONSTANTS['MAX_CACHED_THREADS']]
                     for thread_id in threads_to_remove:
                         del self.thread_histories[thread_id]
-                self.language_usage_cache.clear()
                 logging.info(f"Cleanup completed. Active threads: {len(self.thread_histories)}")
             except Exception as e:
                 logging.error(f"Error during cleanup: {e}")
             await sleep(CONSTANTS['CLEANUP_INTERVAL'])
 
+    @commands.Cog.listener()
     async def on_thread_delete(self, thread: disnake.Thread):
         await database.clear_thread_data(thread.id)
         self.thread_histories.pop(thread.id, None)
@@ -101,15 +102,7 @@ class TranslationCog(commands.Cog):
     def _format_language_name(self, lang: str) -> str:
         return ' '.join(word.capitalize() for word in lang.split())
 
-    async def handle_message_translation(
-        self, 
-        content: str, 
-        target_langs: Set[str], 
-        thread_id: int, 
-        username: str, 
-        user_id: int, 
-        message: Union[disnake.Message, disnake.ModalInteraction]
-    ) -> tuple[str, Dict[str, str]]:
+    async def translate_message(self, content: str, target_langs: Set[str], thread_id: int, username: str, user_id: int, message):
         try:
             content = content.replace('\n', ' ').strip()
             if not content:
@@ -119,11 +112,16 @@ class TranslationCog(commands.Cog):
                     content = content.replace(f'<@{mention.id}>', mention.display_name)\
                                    .replace(f'<@!{mention.id}>', mention.display_name)
             readable_langs = [self._format_language_name(lang) for lang in target_langs]
-            prompt = f"Translate this complete message to {', '.join(readable_langs)}:\n{content}"
-            response = await self._make_openai_request(
-                self._prepare_message(thread_id, prompt, username),
-                thread_id
-            )
+            history = self.get_thread_history(thread_id)
+            messages = [history[0]]
+            if len(history) > 1:
+                context_start = max(1, len(history) - CONSTANTS['CONTEXT_MESSAGES'])
+                messages.extend(history[context_start:])
+            messages.append({
+                "role": "user", 
+                "content": f"{username}: Translate this message to {', '.join(readable_langs)}:\n{content}"
+            })
+            response = await self._make_api_request(messages, thread_id)
             lines = response.strip().split('\n')
             if not lines or not lines[0].startswith('DETECTED:'):
                 raise ValueError("Invalid response format from translation model")
@@ -137,31 +135,50 @@ class TranslationCog(commands.Cog):
             }
             await asyncio.gather(
                 database.update_language_usage(user_id, detected_lang),
-                self._update_user_language_preference(user_id, detected_lang, thread_id)
+                self._update_language_preference(user_id, detected_lang, thread_id)
             )
             if thread_id in self.thread_histories and len(self.thread_histories[thread_id]) > CONSTANTS['MAX_HISTORY']:
                 self.thread_histories[thread_id] = (
-                    [self.thread_histories[thread_id][0]]  # Keep system prompt
+                    [self.thread_histories[thread_id][0]]
                     + self.thread_histories[thread_id][-(CONSTANTS['MAX_HISTORY']-1):]
                 )
-            return detected_lang, {
-                lang: trans 
-                for lang, trans in translations.items()
-                if lang != detected_lang and trans.strip() != content.strip()
-            }
+            return (
+                detected_lang,
+                {lang: trans for lang, trans in translations.items() 
+                 if lang != detected_lang and trans.strip() != content.strip()}
+            )
         except Exception as e:
             logging.error(f"Translation error: {e}")
             self.thread_histories.pop(thread_id, None)
             raise
 
-    async def _make_openai_request(self, messages: List[dict], thread_id: int) -> str:
+    async def _make_api_request(self, messages: List[dict], thread_id: int) -> str:
         try:
-            response = openai_client.chat.completions.create(
-                model=CONSTANTS['MODEL_NAME'],
-                messages=messages,
-                temperature=0,
+            gemini_messages = []
+            system_msg = next((msg for msg in messages if msg["role"] == "system"), None)
+            if system_msg:
+                gemini_messages.append({"role": "user", "parts": [f"SYSTEM INSTRUCTION: {system_msg['content']}"]})
+            for msg in messages:
+                if msg["role"] != "system":
+                    role = "user" if msg["role"] == "user" else "model"
+                    gemini_messages.append({"role": role, "parts": [msg["content"]]})
+            generation_config = {
+                "temperature": 0.1,
+                "top_p": 0.95,
+                "top_k": 40,
+            }
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+            ]
+            response = gemini_model.generate_content(
+                gemini_messages,
+                generation_config=generation_config,
+                safety_settings=safety_settings
             )
-            result = response.choices[0].message.content.strip()
+            result = response.text.strip()
             if thread_id in self.thread_histories:
                 self.thread_histories[thread_id].append({
                     "role": "assistant", 
@@ -169,13 +186,14 @@ class TranslationCog(commands.Cog):
                 })
             return result
         except Exception as e:
-            logging.error(f"OpenAI API error: {e}")
+            logging.error(f"Google Gemini API error: {e}")
             raise
 
-    async def _update_user_language_preference(self, user_id: int, detected_lang: str, thread_id: int):
+    async def _update_language_preference(self, user_id: int, detected_lang: str, thread_id: int):
         try:
-            if user_id not in self.language_usage:
-                await self.load_language_usage(user_id)
+            if not self.language_usage[user_id]:
+                usage_data = await database.get_language_usage(user_id)
+                self.language_usage[user_id].update(usage_data)
             detected_lang = detected_lang.lower().strip()
             self.language_usage[user_id][detected_lang] += 1
             total_messages = sum(self.language_usage[user_id].values())
@@ -188,61 +206,18 @@ class TranslationCog(commands.Cog):
                 if usage_percentages[preferred_lang] > CONSTANTS['PREFERRED_LANG_THRESHOLD']:
                     current_user_lang = await database.get_user_language(thread_id, user_id)
                     if current_user_lang != preferred_lang:
-                        await self.handle_new_user_language(thread_id, user_id, preferred_lang)
+                        await asyncio.gather(
+                            database.set_user_language(thread_id, user_id, preferred_lang),
+                            database.add_thread_language(thread_id, preferred_lang)
+                        )
         except Exception as e:
             logging.error(f"Error updating language preference: {e}")
-
-    async def handle_new_user_language(self, thread_id: int, user_id: int, lang_code: str) -> None:
-        await asyncio.gather(
-            database.set_user_language(thread_id, user_id, lang_code),
-            database.add_thread_language(thread_id, lang_code)
-        )
-
-    def _prepare_message(self, thread_id: int, content: str, username: str) -> List[dict]:
-        messages = self.get_thread_history(thread_id).copy()
-        messages.append({"role": "user", "content": f"{username}: {content}"})
-        return messages
 
     def get_thread_history(self, thread_id: int) -> List[dict]:
         return self.thread_histories.setdefault(
             thread_id, 
-            [{"role": "system", "content": COMBINED_PROMPT}]
+            [{"role": "system", "content": SYSTEM_PROMPT}]
         )
-
-    def create_translation_embed(
-        self, 
-        message: disnake.Message, 
-        original_text: str, 
-        translations: Dict[str, str], 
-        auto: bool = True
-    ) -> Embed:
-        embed = Embed(
-            title="🌐 Auto-Translations" if auto else "🌐 Translation", 
-            color=Color.blue()
-        )
-        if not auto:
-            embed.add_field(
-                name="📝 Original", 
-                value=f"```{original_text}```", 
-                inline=False
-            )
-        for lang, text in translations.items():
-            if text and text.strip():
-                display_lang = self._format_language_name(lang)
-                embed.add_field(
-                    name=f"🔄 {display_lang}", 
-                    value=f"```{text}```", 
-                    inline=False
-                )
-        author = message.author
-        embed.set_author(
-            name=f"{'Translations for' if auto else 'Requested by'} {author.display_name}",
-            icon_url=author.avatar.url if author.avatar else None
-        )
-        embed.set_footer(
-            text="⚠️ These translations were generated by an AI language model and may not be perfectly accurate."
-        )
-        return embed
 
     async def translation_worker(self):
         while True:
@@ -254,7 +229,7 @@ class TranslationCog(commands.Cog):
                         continue
                     if not content.strip():
                         continue
-                    _, translations = await self.handle_message_translation(
+                    _, translations = await self.translate_message(
                         content, target_langs, thread_id, username, user_id, message
                     )
                     if translations:
@@ -264,14 +239,33 @@ class TranslationCog(commands.Cog):
                         except disnake.HTTPException as e:
                             logging.error(f"Failed to send translation: {e}")
                 except Exception as e:
-                    worker_id = id(asyncio.current_task())
-                    logging.error(f"Error in worker {worker_id}: {e}")
+                    logging.error(f"Error in translation worker: {e}")
                 finally:
                     self.translation_queue.task_done()
             except Exception as e:
-                worker_id = id(asyncio.current_task())
-                logging.error(f"Translation worker {worker_id} critical error: {e}")
+                logging.error(f"Translation worker critical error: {e}")
                 await sleep(1)
+
+    def create_translation_embed(self, message, original_text, translations, auto=True):
+        embed = Embed(
+            title="🌐 Auto-Translations" if auto else "🌐 Translation", 
+            color=Color.blue()
+        )
+        if not auto:
+            embed.add_field(name="📝 Original", value=f"```{original_text}```", inline=False)
+        for lang, text in translations.items():
+            if text and text.strip():
+                display_lang = self._format_language_name(lang)
+                embed.add_field(name=f"🔄 {display_lang}", value=f"```{text}```", inline=False)
+        author = message.author
+        embed.set_author(
+            name=f"{'Translations for' if auto else 'Requested by'} {author.display_name}",
+            icon_url=author.avatar.url if author.avatar else None
+        )
+        embed.set_footer(
+            text="⚠️ These translations were generated by an AI language model and may not be perfectly accurate."
+        )
+        return embed
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
@@ -296,7 +290,7 @@ class TranslationCog(commands.Cog):
         pass
 
     @translate_group.sub_command(name="message", description="Translate a message to another language")
-    async def translate_message(self, inter: disnake.ApplicationCommandInteraction):
+    async def translate_message_cmd(self, inter: disnake.ApplicationCommandInteraction):
         modal = disnake.ui.Modal(
             title="Translate Text",
             custom_id="translate_modal",
@@ -319,13 +313,150 @@ class TranslationCog(commands.Cog):
         )
         await inter.response.send_modal(modal)
 
+    @translate_group.sub_command(name="thread", description="Manage thread translation settings")
+    async def thread_cmd(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        action: str = commands.Param(choices=["enable", "disable", "status"], description="Action to perform")):
+        if not isinstance(inter.channel, disnake.Thread):
+            await self._send_embed(inter, "❌ Invalid Channel", "This command can only be used in threads!", Color.red())
+            return
+        thread_id = inter.channel.id
+        if action == "enable":
+            if await database.is_thread_active(thread_id):
+                await self._send_embed(inter, "❌ Already Active", "Auto-translation is already enabled in this thread!", Color.red())
+                return
+            await database.set_thread_active(thread_id, True)
+            self.thread_histories[thread_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+            description = (
+                "Auto-translation has been enabled for this thread!\n\n"
+                "**How it works**\n"
+                "Users' language preference will be automatically detected and used for translations."
+            )
+            await self._send_embed(inter, "🌐 Translation Enabled", description, Color.green(), ephemeral=False)
+        elif action == "disable":
+            if not await database.is_thread_active(thread_id):
+                await self._send_embed(inter, "❌ Not Active", "Auto-translation is not enabled in this thread!", Color.red())
+                return
+            await database.set_thread_active(thread_id, False)
+            self.thread_histories.pop(thread_id, None)
+            await self._send_embed(inter, "🌐 Translation Disabled", "Auto-translation has been disabled for this thread.", Color.orange(), ephemeral=False)
+        else:
+            is_active = await database.is_thread_active(thread_id)
+            embed = Embed(
+                title="🌐 Translation Status",
+                description=f"Auto-translation is currently **{'enabled' if is_active else 'disabled'}** in this thread.",
+                color=Color.green() if is_active else Color.red()
+            )
+            if is_active:
+                thread_languages = await database.get_thread_languages(thread_id)
+                if thread_languages:
+                    formatted_langs = [self._format_language_name(lang) for lang in thread_languages]
+                    embed.add_field(
+                        name="Active Languages",
+                        value=", ".join(formatted_langs),
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="Managing Languages",
+                        value=(
+                            "• Add a language: `/translate language add [language]`\n"
+                            "• Remove a language: `/translate language remove [language]`"
+                        ),
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="No Languages Set",
+                        value="Use `/translate language add [language]` to add languages for translation.",
+                        inline=False
+                    )
+            await inter.response.send_message(embed=embed, ephemeral=True)
+
+    @translate_group.sub_command(name="language", description="Add or remove a language from thread translations")
+    async def language_cmd(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        action: str = commands.Param(choices=["add", "remove"], description="Add or remove a language"),
+        language: str = commands.Param(description="Language name (e.g., English, Spanish, French)")
+    ):
+        if not isinstance(inter.channel, disnake.Thread):
+            await self._send_embed(inter, "❌ Invalid Channel", "This command can only be used in threads!", Color.red())
+            return
+        thread_id = inter.channel.id
+        if not await database.is_thread_active(thread_id):
+            await self._send_embed(inter, "❌ Not Active", "Auto-translation is not enabled in this thread!", Color.red())
+            return
+        language = language.lower().strip()
+        if action == "add":
+            await database.add_thread_language(thread_id, language)
+            await self._send_embed(
+                inter, 
+                "✅ Language Added", 
+                f"Added {self._format_language_name(language)} to thread translations.", 
+                Color.green(),
+                ephemeral=False
+            )
+        else:
+            thread_languages = await database.get_thread_languages(thread_id)
+            if language not in thread_languages:
+                await self._send_embed(
+                    inter, 
+                    "❌ Language Not Found", 
+                    f"{self._format_language_name(language)} is not in the thread's language list.", 
+                    Color.red()
+                )
+                return
+            await database.remove_thread_language(thread_id, language)
+            await self._send_embed(
+                inter, 
+                "🗑️ Language Removed", 
+                f"Removed {self._format_language_name(language)} from thread translations.", 
+                Color.orange(),
+                ephemeral=False
+            )
+
+    @translate_group.sub_command(name="usage", description="View or reset your language usage statistics")
+    async def usage_cmd(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        action: str = commands.Param(choices=["view", "reset"], description="View or reset statistics")
+    ):
+        user_id = inter.author.id
+        if action == "view":
+            if not self.language_usage[user_id]:
+                usage_data = await database.get_language_usage(user_id)
+                self.language_usage[user_id].update(usage_data)
+            if not self.language_usage[user_id]:
+                await self._send_embed(inter, "📊 Language Usage Statistics", "No language usage data available yet.", Color.blue())
+                return
+            total_messages = sum(self.language_usage[user_id].values())
+            usage_stats = [
+                f"{self._format_language_name(lang)}: {(count / total_messages) * 100:.1f}% ({count} messages)"
+                for lang, count in self.language_usage[user_id].items()
+            ]
+            embed = Embed(
+                title="📊 Language Usage Statistics",
+                description="\n".join(usage_stats),
+                color=Color.blue()
+            )
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await database.clear_language_usage(user_id)
+            self.language_usage[user_id].clear()
+            await self._send_embed(inter, "📊 Statistics Reset", "Your language usage statistics have been reset.", Color.green())
+
+    async def _send_embed(self, inter, title, description, color, ephemeral=True):
+        embed = Embed(title=title, description=description, color=color)
+        await inter.response.send_message(embed=embed, ephemeral=ephemeral)
+
     @commands.Cog.listener("on_modal_submit")
     async def on_translate_modal_submit(self, inter: disnake.ModalInteraction):
         if inter.custom_id == "translate_modal":
             await inter.response.defer()
             text_to_translate = inter.text_values["text_to_translate"]
             target_lang = inter.text_values["target_language"].lower()
-            _, translations = await self.handle_message_translation(
+            _, translations = await self.translate_message(
                 text_to_translate,
                 {target_lang},
                 inter.channel.id if isinstance(inter.channel, disnake.Thread) else 0,
@@ -344,7 +475,7 @@ class TranslationCog(commands.Cog):
                 if not message.content:
                     await inter.edit_original_response("The selected message has no text to translate.")
                     return
-                _, translations = await self.handle_message_translation(
+                _, translations = await self.translate_message(
                     message.content,
                     {target_lang},
                     inter.channel.id if isinstance(inter.channel, disnake.Thread) else 0,
@@ -360,131 +491,6 @@ class TranslationCog(commands.Cog):
             except Exception as e:
                 logging.error(f"Context menu translation error: {e}")
                 await inter.edit_original_response("Failed to translate message. Please try again later.")
-
-    @translate_group.sub_command(name="thread", description="Manage thread translation settings")
-    async def thread_group(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        action: str = commands.Param(choices=["enable", "disable", "status"], description="Action to perform")):
-        actions = {
-            "enable": self.enable_translation,
-            "disable": self.disable_translation,
-            "status": self.translation_status
-        }
-        await actions[action](inter)
-
-    @translate_group.sub_command(name="usage", description="Manage your language usage statistics")
-    async def usage_group(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        action: str = commands.Param(choices=["view", "reset"], description="Action to perform")):
-        actions = {
-            "view": self.language_usage_stats,
-            "reset": self.reset_usage_stats
-        }
-        await actions[action](inter)
-
-    async def enable_translation(self, inter: disnake.ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            await self._send_embed_response(inter, "❌ Invalid Channel", "This command can only be used in threads!", Color.red())
-            return
-        thread_id = inter.channel.id
-        try:
-            if await database.is_thread_active(thread_id):
-                await self._send_embed_response(inter, "❌ Already Active", "Auto-translation is already enabled in this thread!", Color.red())
-                return
-            await database.set_thread_active(thread_id, True)
-            self.thread_histories[thread_id] = [{"role": "system", "content": COMBINED_PROMPT}]
-            description = (
-                "Auto-translation has been enabled for this thread!\n\n"
-                "**How it works**\n"
-                "Users' language preference will be automatically detected and used for translations."
-            )
-            await self._send_embed_response(inter, "🌐 Translation Enabled", description, Color.green(), ephemeral=False)
-        except Exception as e:
-            logging.error(f"Failed to enable translation in thread {thread_id}: {e}")
-            await self._send_embed_response(inter, "❌ Error", "Failed to enable translation. Please try again later.", Color.red())
-
-    async def disable_translation(self, inter: disnake.ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            await self._send_embed_response( inter, "❌ Invalid Channel", "This command can only be used in threads!", Color.red())
-            return
-        thread_id = inter.channel.id
-        try:
-            if not await database.is_thread_active(thread_id):
-                await self._send_embed_response( inter, "❌ Not Active", "Auto-translation is not enabled in this thread!", Color.red())
-                return
-            await database.set_thread_active(thread_id, False)
-            self.thread_histories.pop(thread_id, None)
-            await self._send_embed_response( inter, "🌐 Translation Disabled", "Auto-translation has been disabled for this thread.", Color.orange(), ephemeral=False)
-        except Exception as e:
-            logging.error(f"Failed to disable translation in thread {thread_id}: {e}")
-            await self._send_embed_response(inter, "❌ Error", "Failed to disable translation. Please try again later.", Color.red())
-
-    async def translation_status(self, inter: disnake.ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            await self._send_embed_response(inter, "❌ Invalid Channel", "This command can only be used in threads!", Color.red())
-            return
-        is_active = await database.is_thread_active(inter.channel.id)
-        embed = Embed(
-            title="🌐 Translation Status",
-            description=f"Auto-translation is currently **{'enabled' if is_active else 'disabled'}** in this thread.",
-            color=Color.green() if is_active else Color.red()
-        )
-        if is_active:
-            thread_languages = await database.get_thread_languages(inter.channel.id)
-            if thread_languages:
-                formatted_langs = [self._format_language_name(lang) for lang in thread_languages]
-                embed.add_field(
-                    name="Active Languages",
-                    value=", ".join(formatted_langs),
-                    inline=False
-                )
-        await inter.response.send_message(embed=embed, ephemeral=True)
-
-    async def language_usage_stats(self, inter: disnake.ApplicationCommandInteraction):
-        user_id = inter.author.id
-        if user_id not in self.language_usage:
-            await self.load_language_usage(user_id)
-        if not self.language_usage[user_id]:
-            await self._send_embed_response(inter, "📊 Language Usage Statistics", "No language usage data available yet.", Color.blue())
-            return
-        total_messages = sum(self.language_usage[user_id].values())
-        usage_stats = [
-            f"{self._format_language_name(lang)}: {(count / total_messages) * 100:.1f}% ({count} messages)"
-            for lang, count in self.language_usage[user_id].items()
-        ]
-        embed = Embed(
-            title="📊 Language Usage Statistics",
-            description="\n".join(usage_stats),
-            color=Color.blue()
-        )
-        await inter.response.send_message(embed=embed, ephemeral=True)
-
-    async def reset_usage_stats(self, inter: disnake.ApplicationCommandInteraction):
-        user_id = inter.author.id
-        await database.clear_language_usage(user_id)
-        self.language_usage.pop(user_id, None)
-        await self._send_embed_response(inter, "📊 Statistics Reset", "Your language usage statistics have been reset.", Color.green())
-
-    async def _send_embed_response(
-        self, 
-        inter: disnake.ApplicationCommandInteraction,
-        title: str,
-        description: str,
-        color: Color,
-        ephemeral: bool = True
-    ):
-        embed = Embed(title=title, description=description, color=color)
-        await inter.response.send_message(embed=embed, ephemeral=ephemeral)
-
-    async def load_language_usage(self, user_id: int):
-        try:
-            usage_data = await database.get_language_usage(user_id)
-            self.language_usage[user_id] = defaultdict(int, usage_data)
-        except Exception as e:
-            logging.error(f"Error loading language usage for user {user_id}: {e}")
-            self.language_usage[user_id] = defaultdict(int)
 
     @commands.message_command(name="Translate")
     async def translate_context_menu(self, inter: disnake.MessageCommandInteraction, message: disnake.Message):
