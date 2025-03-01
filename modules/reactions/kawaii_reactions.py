@@ -1,6 +1,6 @@
 # modules.reactions.kawaii_reactions
 
-import google.generativeai as genai
+import google as genai
 from disnake.ext import commands
 from core import config
 import random
