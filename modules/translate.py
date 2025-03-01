@@ -1,7 +1,7 @@
 # modules.translate
 
 from asyncio import Queue, create_task, sleep
-import google as genai
+import google.generativeai as genai
 from collections import defaultdict
 from modules.utils import database
 from disnake import Embed, Color

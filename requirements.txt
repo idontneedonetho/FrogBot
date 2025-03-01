@@ -1,6 +1,6 @@
 disnake
 aiosqlite
-google-genai
+google-generativeai
 psutil
 PyYAML
 pytz
