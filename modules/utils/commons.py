@@ -1,5 +1,5 @@
 # modules.utils.commons
-# This is legacy code, leaving it here for now
+
 import logging
 import disnake
 import re
