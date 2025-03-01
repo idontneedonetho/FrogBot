@@ -145,7 +145,11 @@ class WhiteboardView(ui.View):
                     return
             else:
                 message_text = await self.cog._create_whiteboard_text(content)
-                await send_long_message(modal_inter, message_text, should_reply=False)
+                class DummyMessage:
+                    def __init__(self, channel):
+                        self.channel = channel
+                dummy_message = DummyMessage(inter.channel)
+                await send_long_message(dummy_message, message_text, should_reply=True)
                 await modal_inter.response.send_message("Whiteboard updated and sent immediately!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
@@ -212,12 +216,30 @@ class MessageSelectView(ui.View):
                         if message["is_whiteboard"]:
                             whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
                             if whiteboard_data.get("content", "").strip() in content:
-                                related_messages = [msg]
-                                async for prev_msg in channel.history(limit=10, before=msg.created_at):
-                                    if prev_msg.author == inter.guild.me and prev_msg.created_at.timestamp() > msg.created_at.timestamp() - 5:
-                                        related_messages.append(prev_msg)
-                                for m in sorted(related_messages, key=lambda x: x.created_at, reverse=True):
-                                    await m.delete()
+                                first_message = msg
+                                reference = msg.reference
+                                while reference and reference.message_id:
+                                    try:
+                                        ref_message = await channel.fetch_message(reference.message_id)
+                                        if ref_message.author == inter.guild.me:
+                                            first_message = ref_message
+                                            reference = ref_message.reference
+                                        else:
+                                            break
+                                    except:
+                                        break
+                                related_messages = [first_message]
+                                current_msg = first_message
+                                async for chain_msg in channel.history(limit=20, after=first_message.created_at):
+                                    if (chain_msg.author == inter.guild.me and 
+                                        chain_msg.reference and chain_msg.reference.message_id == current_msg.id):
+                                        related_messages.append(chain_msg)
+                                        current_msg = chain_msg
+                                for m in related_messages:
+                                    try:
+                                        await m.delete()
+                                    except Exception as e:
+                                        print(f"Error deleting message: {e}")
                                 break
                         elif message["content"] in content:
                             await msg.delete()
@@ -287,7 +309,7 @@ class WhiteboardCog(commands.Cog):
                     def __init__(self, channel):
                         self.channel = channel
                 dummy_message = DummyMessage(channel)
-                await send_long_message(dummy_message, message_text, should_reply=False)
+                await send_long_message(dummy_message, message_text, should_reply=True)
             else:
                 await channel.send(message_data["content"])
             await cancel_scheduled_message(message_data["id"])
@@ -372,7 +394,11 @@ class WhiteboardCog(commands.Cog):
                     return
             else:
                 message_text = await self._create_whiteboard_text(content)
-                await send_long_message(modal_inter, message_text, should_reply=False)
+                class DummyMessage:
+                    def __init__(self, channel):
+                        self.channel = channel
+                dummy_message = DummyMessage(target_channel)
+                await send_long_message(dummy_message, message_text, should_reply=True)
                 await modal_inter.response.send_message(f"Whiteboard created successfully in {target_channel.mention}!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
@@ -427,11 +453,33 @@ class WhiteboardCog(commands.Cog):
         if not await self._can_edit_whiteboard(inter, {}):
             await inter.response.send_message("You don't have permission to edit this message.", ephemeral=True)
             return
-        full_content = message.content
-        if len(full_content) >= 1900:
-            async for msg in message.channel.history(limit=10, before=message.created_at):
-                if msg.author.id == self.client.user.id and msg.created_at.timestamp() > message.created_at.timestamp() - 5:
-                    full_content += "\n" + msg.content
+        first_message = message
+        reference = message.reference
+        while reference and reference.message_id:
+            try:
+                ref_message = await message.channel.fetch_message(reference.message_id)
+                if ref_message.author.id == self.client.user.id:
+                    first_message = ref_message
+                    reference = ref_message.reference
+                else:
+                    break
+            except:
+                break
+        related_messages = [first_message]
+        current_msg = first_message
+        try:
+            async for msg in message.channel.history(limit=20, after=first_message.created_at):
+                if (msg.author.id == self.client.user.id and 
+                    msg.reference and msg.reference.message_id == current_msg.id):
+                    related_messages.append(msg)
+                    current_msg = msg
+        except Exception as e:
+            print(f"Error finding related messages: {e}")
+        full_content = ""
+        for msg in related_messages:
+            if full_content:
+                full_content += "\n"
+            full_content += msg.content
         modal = ui.Modal(
             title="Edit Message",
             custom_id="edit_message_modal",
@@ -454,17 +502,16 @@ class WhiteboardCog(commands.Cog):
                 timeout=1200
             )
             content = modal_inter.text_values['content'].strip()
-            related_messages = [message]
-            async for msg in message.channel.history(limit=10, before=message.created_at):
-                if msg.author.id == self.client.user.id and msg.created_at.timestamp() > message.created_at.timestamp() - 5:
-                    related_messages.append(msg)
-            for msg in sorted(related_messages, key=lambda x: x.created_at, reverse=True):
-                await msg.delete()
+            for msg in related_messages:
+                try:
+                    await msg.delete()
+                except Exception as e:
+                    print(f"Error deleting message: {e}")
             class DummyMessage:
                 def __init__(self, channel):
                     self.channel = channel
             dummy_message = DummyMessage(message.channel)
-            await send_long_message(dummy_message, content, should_reply=False)
+            await send_long_message(dummy_message, content, should_reply=True)
             await modal_inter.response.send_message("Message updated successfully!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
