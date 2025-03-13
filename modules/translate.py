@@ -162,11 +162,6 @@ class TranslationCog(commands.Cog):
                 if msg["role"] != "system":
                     role = "user" if msg["role"] == "user" else "model"
                     gemini_messages.append({"role": role, "parts": [msg["content"]]})
-            generation_config = {
-                "temperature": 0.1,
-                "top_p": 0.95,
-                "top_k": 40,
-            }
             safety_settings = [
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -175,7 +170,6 @@ class TranslationCog(commands.Cog):
             ]
             response = gemini_model.generate_content(
                 gemini_messages,
-                generation_config=generation_config,
                 safety_settings=safety_settings
             )
             result = response.text.strip()
