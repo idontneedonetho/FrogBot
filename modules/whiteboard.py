@@ -12,10 +12,10 @@ import json
 
 TIMEZONE_OPTIONS = {
     'UTC': 'UTC',
-    'EST': 'US/Eastern',
-    'CST': 'US/Central',
-    'MST': 'US/Mountain',
-    'PST': 'US/Pacific',
+    'EST': 'America/New_York',
+    'CST': 'America/Chicago',
+    'MST': 'America/Denver',
+    'PST': 'America/Los_Angeles',
     'BST': 'Europe/London',
     'CET': 'Europe/Paris',
     'JST': 'Asia/Tokyo'
@@ -42,6 +42,13 @@ class WhiteboardModal(ui.Modal):
             )
         ]
         if include_scheduling:
+            current_tz = "UTC"
+            if self.default_values.get("timezone"):
+                try:
+                    tz = pytz.timezone(TIMEZONE_OPTIONS.get(self.default_values["timezone"].upper(), self.default_values["timezone"]))
+                    current_tz = datetime.now(tz).strftime("%Z")
+                except:
+                    pass
             components.extend([
                 ui.TextInput(
                     label="Schedule Date/Time (Optional)",
@@ -55,7 +62,7 @@ class WhiteboardModal(ui.Modal):
                     label="Timezone",
                     custom_id="timezone",
                     style=TextInputStyle.short,
-                    placeholder="UTC, EST, CST, MST, PST",
+                    placeholder=f"UTC, EST/EDT, CST/CDT, MST/MDT, PST/PDT (current: {current_tz})",
                     required=False,
                     value=self.default_values.get("timezone", "UTC")
                 )
@@ -88,6 +95,7 @@ class WhiteboardView(ui.View):
                 "content": self.message_data["content"],
                 "scheduled_time": scheduled_time,
                 "timezone": self.message_data.get("timezone", "UTC"),
+                "channel": self.message_data.get("channel", "")
             },
             include_scheduling=True
         )
@@ -99,11 +107,31 @@ class WhiteboardView(ui.View):
                 timeout=1200
             )
             content = modal_inter.text_values['content']
+            channel_input = modal_inter.text_values['channel'].strip()
+            target_channel = None
+            if channel_input:
+                if channel_input.startswith('#'):
+                    channel_name = channel_input[1:]
+                    target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
+                elif channel_input.isdigit():
+                    try:
+                        target_channel = inter.guild.get_channel(int(channel_input))
+                    except:
+                        pass
+                if not target_channel:
+                    await modal_inter.response.send_message(
+                        "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
+                        ephemeral=True
+                    )
+                    return
+            else:
+                target_channel = inter.channel
             scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
             timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
             timezone, tz = await self.cog._validate_timezone(timezone_code)
             message_data = {
                 "content": content,
+                "channel": target_channel.mention
             }
             schedule_id = self.message_data.get("schedule_id")
             if schedule_id in self.cog.scheduled_tasks:
@@ -117,7 +145,7 @@ class WhiteboardView(ui.View):
                     utc_dt = dt.astimezone(pytz.UTC)
                     whiteboard_data = json.dumps(message_data)
                     new_schedule_id = await schedule_message(
-                        inter.channel.id,
+                        target_channel.id,
                         inter.author.id,
                         content,
                         utc_dt.isoformat(),
@@ -126,12 +154,12 @@ class WhiteboardView(ui.View):
                         whiteboard_data
                     )
                     await modal_inter.response.send_message(
-                        f"Whiteboard updated and rescheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')}",
+                        f"Whiteboard updated and rescheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
                         ephemeral=True
                     )
                     self.cog._schedule_message_task({
                         "id": new_schedule_id,
-                        "channel_id": inter.channel.id,
+                        "channel_id": target_channel.id,
                         "scheduled_time": utc_dt.isoformat(),
                         "is_whiteboard": True,
                         "whiteboard_data": whiteboard_data
@@ -157,10 +185,10 @@ class WhiteboardView(ui.View):
                 last_message = None
                 for i, part in enumerate(parts):
                     if i == 0:
-                        last_message = await inter.channel.send(part)
+                        last_message = await target_channel.send(part)
                     else:
                         last_message = await last_message.reply(part)
-                await modal_inter.response.send_message("Whiteboard updated and sent immediately!", ephemeral=True)
+                await modal_inter.response.send_message(f"Whiteboard updated and sent immediately in {target_channel.mention}!", ephemeral=True)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
         except Exception as e:
@@ -396,8 +424,9 @@ class WhiteboardCog(commands.Cog):
                         True,
                         whiteboard_data
                     )
+                    current_tz_abbr = dt.strftime("%Z")
                     await modal_inter.response.send_message(
-                        f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
+                        f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p')} {current_tz_abbr} ({timezone}) in {target_channel.mention}",
                         ephemeral=True
                     )
                     self._schedule_message_task({
