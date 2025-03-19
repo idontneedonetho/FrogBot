@@ -18,6 +18,7 @@ class HelpView(View):
 
     async def interaction_check(self, inter) -> bool:
         try:
+            await inter.response.defer()
             if inter.component.custom_id == "help_general":
                 await self.cog.general_help(inter, inter.guild.me.display_name)
             elif inter.component.custom_id == "help_points":
@@ -27,6 +28,8 @@ class HelpView(View):
             return True
         except Exception as e:
             logging.error(f"Error in help interaction: {e}")
+            if not inter.response.is_done():
+                await inter.response.send_message(content="An error occurred while processing your request.", ephemeral=True)
             return False
 
 class HelpCog(commands.Cog):

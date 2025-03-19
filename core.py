@@ -9,12 +9,11 @@ import subprocess
 import logging
 import asyncio
 import disnake
-import aiohttp
 import yaml
 import sys
 
 CONFIG = {
-    'VERSION': 'v3.0',
+    'VERSION': 'v3.1',
     'CONFIG_FILE': Path('config.yaml'),
     'COGS_DIR': Path("modules"),
     'TEST_GUILDS': [698205243103641711, 1137853399715549214],
@@ -25,8 +24,8 @@ class Config:
     DEFAULT_FIELDS = {
         'DISCORD_TOKEN': ('Enter your Discord bot token: ', True),
         'DATABASE_FILE': ('Enter your database filename (optional): ', False),
-        'OPENAI_API_KEY': ('Enter your OpenAI API key (optional): ', False),
-        'GITHUB_TOKEN': ('Enter your GitHub personal access token (optional): ', False)
+        'GITHUB_TOKEN': ('Enter your GitHub personal access token (optional): ', False),
+        'GOOGLE_API_KEY': ('Enter your Google AI API key (optional): ', False)
     }
 
     def __init__(self, filename: Path = CONFIG['CONFIG_FILE']):
@@ -37,7 +36,9 @@ class Config:
     
     def write(self, config: dict[str, Any]) -> None:
         self._config_path.write_text(yaml.safe_dump(config))
-    def update(self, key: str, value: Any): self.write({**self.read(), key: value})
+
+    def update(self, key: str, value: Any): 
+        self.write({**self.read(), key: value})
 
     def setup_config(self):
         if self._config_path.exists(): return
@@ -103,38 +104,6 @@ class GitManager:
         except Exception as e:
             logging.error(f"Error getting git branches: {e}")
             return ["beta"]
-
-    @staticmethod
-    async def get_remote_modules() -> dict[str, dict]:
-        try:
-            headers = {}
-            if github_token := config.read().get('GITHUB_TOKEN'):
-                headers['Authorization'] = f'token {github_token}'
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    'https://api.github.com/repos/idontneedonetho/FrogBot/contents/modules',
-                    headers=headers
-                ) as response:
-                    if response.status != 200:
-                        raise Exception(f"GitHub API error: {response.status}")
-                    contents = await response.json()
-                modules = {'root': {}}
-                for item in contents:
-                    if item['type'] == 'file' and item['name'].endswith('.py') and item['name'] != '__init__.py':
-                        modules['root'][item['name']] = item['download_url']
-                    elif item['type'] == 'dir':
-                        category = item['name']
-                        modules[category] = {}
-                        async with session.get(item['url'], headers=headers) as response:
-                            if response.status == 200:
-                                category_contents = await response.json()
-                                for file in category_contents:
-                                    if file['name'].endswith('.py') and file['name'] != '__init__.py':
-                                        modules[category][file['name']] = file['download_url']
-            return modules
-        except Exception as e:
-            logging.error(f"Error fetching remote modules: {e}")
-            return {}
 
 class BotManager:
     def __init__(self, client: commands.Bot):
@@ -219,24 +188,32 @@ class ModuleLoader:
     @staticmethod
     def get_available_modules(cogs_dir: Path = CONFIG['COGS_DIR']) -> dict[str, bool]:
         modules = {}
+        enabled_modules = config.read().get('ENABLED_MODULES', {})
         cogs_path = Path(cogs_dir)
         if not cogs_path.exists():
             cogs_path.mkdir(parents=True)
             (cogs_path / "__init__.py").touch()
         for file_path in cogs_path.rglob("*.py"):
-            if file_path.stem == "__init__": continue
+            if file_path.stem == "__init__": 
+                continue
             relative_parts = file_path.relative_to(cogs_dir).parts
             module_name = (
                 f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}" 
                 if len(relative_parts) > 1 
                 else f"modules.{file_path.stem}"
             )
-            modules[module_name] = True
+            module_key = '.'.join(module_name.split('.')[1:])
+            modules[module_name] = enabled_modules.get(module_key, True)
         return modules
 
     @staticmethod
     def load_single_module(client: commands.Bot, file_path: Path, name: str) -> None:
         try:
+            enabled_modules = config.read().get('ENABLED_MODULES', {})
+            module_key = '.'.join(name.split('.')[1:])
+            if not enabled_modules.get(module_key, True):
+                logging.info(f"Skipping disabled module: {name}")
+                return
             spec = importlib.util.spec_from_file_location(name, file_path)
             if not spec or not spec.loader:
                 raise ImportError(f"Failed to load spec for {name}")
@@ -259,7 +236,8 @@ class ModuleLoader:
     @classmethod
     def load_all_modules(cls, client: commands.Bot, cogs_dir: Path = CONFIG['COGS_DIR']) -> None:
         for file_path in Path(cogs_dir).rglob("*.py"):
-            if file_path.stem == "__init__": continue
+            if file_path.stem == "__init__": 
+                continue
             relative_parts = file_path.relative_to(cogs_dir).parts
             module_name = (
                 f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}" 
@@ -268,44 +246,13 @@ class ModuleLoader:
             )
             cls.load_single_module(client, file_path, module_name)
 
-    @staticmethod
-    async def download_module(category: str, filename: str) -> bool:
-        try:
-            module_dir = CONFIG['COGS_DIR'] / (category if category != 'root' else '')
-            module_dir.mkdir(parents=True, exist_ok=True)
-            (module_dir / "__init__.py").touch(exist_ok=True)
-            module_path = f"modules/{category if category != 'root' else ''}/{filename}".strip('/')
-            code, stdout, stderr = await GitManager.run_cmd(
-                "git", "checkout", "origin/beta", "--", module_path
-            )
-            if code != 0:
-                logging.error(f"Git command failed: git checkout origin/beta -- {module_path}, Error: {stderr}")
-                return False
-            return True
-        except Exception as e:
-            logging.error(f"Error downloading module: {e}")
-            return False
-
-    @staticmethod
-    def uninstall_module(category: str, filename: str) -> bool:
-        try:
-            if category == "root":
-                module_path = CONFIG['COGS_DIR'] / filename
-            else:
-                module_path = CONFIG['COGS_DIR'] / category / filename
-            if module_path.exists():
-                module_path.unlink()
-            return True
-        except Exception as e:
-            logging.error(f"Error uninstalling module: {e}")
-            return False
-
 class ModuleListView(disnake.ui.View):
-    def __init__(self):
+    def __init__(self, client: commands.Bot):
         super().__init__(timeout=300)
+        self.client = client
         self.current_page = 0
         self.modules_per_page = 9
-        self.modules = {}
+        self.module_keys = set()
         self.selected_modules = {}
         self.add_navigation_buttons()
 
@@ -327,41 +274,31 @@ class ModuleListView(disnake.ui.View):
     async def refresh_module_buttons(self, inter: disnake.MessageInteraction):
         self.clear_items()
         self.add_navigation_buttons()
-        if not self.modules:
-            remote_modules = await GitManager.get_remote_modules()
-            current_modules = ModuleLoader.get_available_modules()
-            for category, modules in remote_modules.items():
-                for module_name, url in modules.items():
-                    module_id = (
-                        f"modules.{module_name[:-3]}" 
-                        if category == "root" 
-                        else f"modules.{category}.{module_name[:-3]}"
-                    )
-                    module_path = f"{category}/{module_name}"
-                    self.modules[module_path] = {
-                        "id": module_id,
-                        "installed": module_id in current_modules,
-                        "category": category
-                    }
-                    if module_path not in self.selected_modules:
-                        self.selected_modules[module_path] = self.modules[module_path]["installed"]
-        total_pages = (len(self.modules) - 1) // self.modules_per_page + 1
+        if not self.module_keys:
+            available_modules = ModuleLoader.get_available_modules()
+            enabled_modules = config.read().get('ENABLED_MODULES', {})
+            for module_name in available_modules:
+                config_key = '.'.join(module_name.split('.')[1:])
+                self.module_keys.add(config_key)
+                if config_key not in self.selected_modules:
+                    self.selected_modules[config_key] = enabled_modules.get(config_key, True)
+        total_pages = (len(self.module_keys) - 1) // self.modules_per_page + 1
         for child in self.children:
             if child.custom_id == "prev_page":
                 child.disabled = self.current_page <= 0
             elif child.custom_id == "next_page":
                 child.disabled = self.current_page >= total_pages - 1
         start_idx = self.current_page * self.modules_per_page
-        page_modules = list(self.modules.items())[start_idx:start_idx + self.modules_per_page]
-        for idx, (module_path, info) in enumerate(page_modules):
+        page_modules = sorted(list(self.module_keys))[start_idx:start_idx + self.modules_per_page]
+        for idx, config_key in enumerate(page_modules):
             row = idx // 3
             if row >= 3:
                 continue
             self.add_item(disnake.ui.Button(
-                label=module_path.split('/')[-1],
-                style=disnake.ButtonStyle.green if self.selected_modules[module_path] else disnake.ButtonStyle.gray,
-                custom_id=f"toggle_module_{module_path}",
-                emoji="✅" if self.selected_modules[module_path] else "❌",
+                label=config_key,
+                style=disnake.ButtonStyle.green if self.selected_modules[config_key] else disnake.ButtonStyle.gray,
+                custom_id=f"toggle_module_{config_key}",
+                emoji="✅" if self.selected_modules[config_key] else "❌",
                 row=row
             ))
         content = f"🧩 Module Manager - Page {self.current_page + 1}/{total_pages}"
@@ -376,38 +313,28 @@ class ModuleListView(disnake.ui.View):
                 self.current_page = max(0, self.current_page - 1)
                 await self.refresh_module_buttons(inter)
             elif inter.component.custom_id == "next_page":
-                total_pages = (len(self.modules) - 1) // self.modules_per_page + 1
+                total_pages = (len(self.module_keys) - 1) // self.modules_per_page + 1
                 self.current_page = min(total_pages - 1, self.current_page + 1)
                 await self.refresh_module_buttons(inter)
             elif inter.component.custom_id == "module_list_back":
                 await inter.response.edit_message(
-                    content=f"🤖 {client.user.display_name} Control Panel",
+                    content=f"🤖 {self.client.user.display_name} Control Panel",
                     view=ControlPanelView()
                 )
             elif inter.component.custom_id == "apply_modules":
+                config_data = config.read()
+                config_data['ENABLED_MODULES'] = self.selected_modules
+                config.write(config_data)
+                for cog in list(self.client.cogs.keys()):
+                    self.client.remove_cog(cog)
+                ModuleLoader.load_all_modules(self.client)
                 await inter.response.edit_message(
-                    content="Applying changes...",
-                    view=None
-                )
-                for module_path, info in self.modules.items():
-                    category = info["category"]
-                    filename = module_path.split('/')[-1]
-                    is_selected = self.selected_modules[module_path]
-                    is_installed = info["installed"]
-                    if is_selected and not is_installed:
-                        await ModuleLoader.download_module(category, filename)
-                    elif not is_selected and is_installed:
-                        ModuleLoader.uninstall_module(category, filename)
-                for cog in list(client.cogs.keys()):
-                    client.remove_cog(cog)
-                ModuleLoader.load_all_modules(client)
-                await inter.edit_original_message(
-                    content="Modules updated successfully!",
+                    content="Module settings updated successfully!",
                     view=None
                 )
             elif inter.component.custom_id.startswith("toggle_module_"):
-                module_path = inter.component.custom_id.replace("toggle_module_", "")
-                self.selected_modules[module_path] = not self.selected_modules[module_path]
+                config_key = inter.component.custom_id.replace("toggle_module_", "")
+                self.selected_modules[config_key] = not self.selected_modules[config_key]
                 await self.refresh_module_buttons(inter)
             return True
         except Exception as e:
@@ -560,7 +487,7 @@ class ControlPanelView(disnake.ui.View):
 
     async def show_module_options(self, inter: disnake.MessageInteraction):
         try:
-            module_view = ModuleListView()
+            module_view = ModuleListView(inter.bot)
             await module_view.refresh_module_buttons(inter)
         except Exception as e:
             if not inter.response.is_done():
@@ -599,3 +526,5 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__": main()
+
+'''Kaofui was here uwu'''
