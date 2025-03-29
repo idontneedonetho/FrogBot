@@ -5,21 +5,12 @@ from disnake import TextInputStyle, ui, SelectOption
 from core import is_admin_or_privileged
 from disnake.ext import commands
 from datetime import datetime
+import dateparser
 import asyncio
 import disnake
 import pytz
 import json
 
-TIMEZONE_OPTIONS = {
-    'UTC': 'UTC',
-    'EST': 'America/New_York',
-    'CST': 'America/Chicago',
-    'MST': 'America/Denver',
-    'PST': 'America/Los_Angeles',
-    'BST': 'Europe/London',
-    'CET': 'Europe/Paris',
-    'JST': 'Asia/Tokyo'
-}
 
 class WhiteboardModal(ui.Modal):
     def __init__(self, title="Whiteboard", default_values=None, include_scheduling=False):
@@ -42,29 +33,14 @@ class WhiteboardModal(ui.Modal):
             )
         ]
         if include_scheduling:
-            current_tz = "UTC"
-            if self.default_values.get("timezone"):
-                try:
-                    tz = pytz.timezone(TIMEZONE_OPTIONS.get(self.default_values["timezone"].upper(), self.default_values["timezone"]))
-                    current_tz = datetime.now(tz).strftime("%Z")
-                except:
-                    pass
             components.extend([
                 ui.TextInput(
                     label="Schedule Date/Time (Optional)",
                     custom_id="scheduled_time",
                     style=TextInputStyle.short,
-                    placeholder="MM/DD/YYYY HH:MM AM/PM (leave empty for immediate)",
+                    placeholder="Examples: '3/24/2025 9am est', 'tomorrow 2pm', 'next monday 3pm' (leave empty for immediate)",
                     required=False,
                     value=self.default_values.get("scheduled_time", "")
-                ),
-                ui.TextInput(
-                    label="Timezone",
-                    custom_id="timezone",
-                    style=TextInputStyle.short,
-                    placeholder=f"UTC, EST/EDT, CST/CDT, MST/MDT, PST/PDT (current: {current_tz})",
-                    required=False,
-                    value=self.default_values.get("timezone", "UTC")
                 )
             ])
         super().__init__(
@@ -94,7 +70,6 @@ class WhiteboardView(ui.View):
             default_values={
                 "content": self.message_data["content"],
                 "scheduled_time": scheduled_time,
-                "timezone": self.message_data.get("timezone", "UTC"),
                 "channel": self.message_data.get("channel", "")
             },
             include_scheduling=True
@@ -106,93 +81,56 @@ class WhiteboardView(ui.View):
                 check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
                 timeout=1200
             )
-            content = modal_inter.text_values['content']
-            channel_input = modal_inter.text_values['channel'].strip()
-            target_channel = None
-            if channel_input:
-                if channel_input.startswith('#'):
-                    channel_name = channel_input[1:]
-                    target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
-                elif channel_input.isdigit():
-                    try:
-                        target_channel = inter.guild.get_channel(int(channel_input))
-                    except:
-                        pass
-                if not target_channel:
-                    await modal_inter.response.send_message(
-                        "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
-                        ephemeral=True
-                    )
-                    return
-            else:
-                target_channel = inter.channel
-            scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
-            timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
-            timezone, tz = await self.cog._validate_timezone(timezone_code)
-            message_data = {
-                "content": content,
-                "channel": target_channel.mention
-            }
-            schedule_id = self.message_data.get("schedule_id")
-            if schedule_id in self.cog.scheduled_tasks:
-                self.cog.scheduled_tasks[schedule_id].cancel()
-                del self.cog.scheduled_tasks[schedule_id]
-            await cancel_scheduled_message(schedule_id)
-            if scheduled_time:
-                try:
-                    dt = datetime.strptime(scheduled_time, "%m/%d/%Y %I:%M %p")
-                    dt = tz.localize(dt)
-                    utc_dt = dt.astimezone(pytz.UTC)
-                    whiteboard_data = json.dumps(message_data)
-                    new_schedule_id = await schedule_message(
-                        target_channel.id,
-                        inter.author.id,
-                        content,
-                        utc_dt.isoformat(),
-                        timezone,
-                        True,
-                        whiteboard_data
-                    )
-                    await modal_inter.response.send_message(
-                        f"Whiteboard updated and rescheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
-                        ephemeral=True
-                    )
-                    self.cog._schedule_message_task({
-                        "id": new_schedule_id,
-                        "channel_id": target_channel.id,
-                        "scheduled_time": utc_dt.isoformat(),
-                        "is_whiteboard": True,
-                        "whiteboard_data": whiteboard_data
-                    })
-                except ValueError:
-                    await modal_inter.response.send_message(
-                        "Invalid time format. Please use MM/DD/YYYY HH:MM AM/PM",
-                        ephemeral=True
-                    )
-                    return
-            else:
-                message_text = await self.cog._create_whiteboard_text(content)
-                parts = []
-                current_part = ''
-                for line in message_text.split('\n'):
-                    if len(current_part) + len(line) + 1 > 1950:
-                        parts.append(current_part)
-                        current_part = line + '\n'
-                    else:
-                        current_part += line + '\n'
-                if current_part:
-                    parts.append(current_part)
-                last_message = None
-                for i, part in enumerate(parts):
-                    if i == 0:
-                        last_message = await target_channel.send(part)
-                    else:
-                        last_message = await last_message.reply(part)
-                await modal_inter.response.send_message(f"Whiteboard updated and sent immediately in {target_channel.mention}!", ephemeral=True)
+            await self._handle_modal_submit(modal_inter, inter)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
         except Exception as e:
             await inter.followup.send(f"An error occurred while processing your edit: {str(e)}", ephemeral=True)
+
+    async def _handle_modal_submit(self, modal_inter, inter):
+        content = modal_inter.text_values['content']
+        channel_input = modal_inter.text_values['channel'].strip()
+        target_channel = await self._get_target_channel(inter, channel_input, modal_inter)
+        if not target_channel:
+            return
+        scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
+        message_data = {
+            "content": content,
+            "channel": target_channel.mention
+        }
+        schedule_id = self.message_data.get("schedule_id")
+        if schedule_id in self.cog.scheduled_tasks:
+            self.cog.scheduled_tasks[schedule_id].cancel()
+            del self.cog.scheduled_tasks[schedule_id]
+        await cancel_scheduled_message(schedule_id)
+        if scheduled_time:
+            await self.cog._handle_scheduled_message(modal_inter, target_channel, content, scheduled_time, message_data)
+        else:
+            await self._handle_immediate_message(modal_inter, target_channel, content)
+
+    async def _get_target_channel(self, inter, channel_input, modal_inter):
+        if not channel_input:
+            return inter.channel
+        if channel_input.startswith('#'):
+            channel_name = channel_input[1:]
+            target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
+        elif channel_input.isdigit():
+            try:
+                target_channel = inter.guild.get_channel(int(channel_input))
+            except:
+                pass
+        else:
+            target_channel = None
+        if not target_channel:
+            await modal_inter.response.send_message(
+                "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
+                ephemeral=True
+            )
+            return None
+        return target_channel
+
+    async def _handle_immediate_message(self, modal_inter, target_channel, content):
+        await self._split_and_send_message(content, target_channel, modal_inter)
 
     @ui.button(label="Cancel Schedule", style=disnake.ButtonStyle.danger)
     async def cancel_schedule(self, button: ui.Button, inter: disnake.MessageInteraction):
@@ -212,12 +150,8 @@ class MessageSelect(ui.Select):
             scheduled_time = datetime.fromisoformat(msg["scheduled_time"])
             tz = pytz.timezone(msg["timezone"])
             local_time = scheduled_time.astimezone(tz)
-            if msg["is_whiteboard"]:
-                label = "Whiteboard"
-                description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
-            else:
-                label = "Message"
-                description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
+            label = "Whiteboard" if msg["is_whiteboard"] else "Message"
+            description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
             options.append(SelectOption(
                 label=label[:100],
                 description=description,
@@ -248,40 +182,7 @@ class MessageSelectView(ui.View):
         try:
             channel = inter.guild.get_channel(message["channel_id"])
             if channel:
-                async for msg in channel.history(limit=100):
-                    if msg.author == inter.guild.me:
-                        content = msg.content if msg.content else ""
-                        if message["is_whiteboard"]:
-                            whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
-                            if whiteboard_data.get("content", "").strip() in content:
-                                first_message = msg
-                                reference = msg.reference
-                                while reference and reference.message_id:
-                                    try:
-                                        ref_message = await channel.fetch_message(reference.message_id)
-                                        if ref_message.author == inter.guild.me:
-                                            first_message = ref_message
-                                            reference = ref_message.reference
-                                        else:
-                                            break
-                                    except:
-                                        break
-                                related_messages = [first_message]
-                                current_msg = first_message
-                                async for chain_msg in channel.history(limit=20, after=first_message.created_at):
-                                    if (chain_msg.author == inter.guild.me and 
-                                        chain_msg.reference and chain_msg.reference.message_id == current_msg.id):
-                                        related_messages.append(chain_msg)
-                                        current_msg = chain_msg
-                                for m in related_messages:
-                                    try:
-                                        await m.delete()
-                                    except Exception as e:
-                                        print(f"Error deleting message: {e}")
-                                break
-                        elif message["content"] in content:
-                            await msg.delete()
-                            break
+                await self._cleanup_old_messages(channel, message)
         except Exception as e:
             print(f"Error cleaning up old message: {e}")
         try:
@@ -305,6 +206,42 @@ class MessageSelectView(ui.View):
             ephemeral=True
         )
         return True
+
+    async def _cleanup_old_messages(self, channel, message):
+        async for msg in channel.history(limit=100):
+            if msg.author == channel.guild.me:
+                content = msg.content if msg.content else ""
+                if message["is_whiteboard"]:
+                    whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
+                    if whiteboard_data.get("content", "").strip() in content:
+                        first_message = msg
+                        reference = msg.reference
+                        while reference and reference.message_id:
+                            try:
+                                ref_message = await channel.fetch_message(reference.message_id)
+                                if ref_message.author == channel.guild.me:
+                                    first_message = ref_message
+                                    reference = ref_message.reference
+                                else:
+                                    break
+                            except:
+                                break
+                        related_messages = [first_message]
+                        current_msg = first_message
+                        async for chain_msg in channel.history(limit=20, after=first_message.created_at):
+                            if (chain_msg.author == channel.guild.me and 
+                                chain_msg.reference and chain_msg.reference.message_id == current_msg.id):
+                                related_messages.append(chain_msg)
+                                current_msg = chain_msg
+                        for m in related_messages:
+                            try:
+                                await m.delete()
+                            except Exception as e:
+                                print(f"Error deleting message: {e}")
+                        break
+                elif message["content"] in content:
+                    await msg.delete()
+                    break
 
 class WhiteboardCog(commands.Cog):
     def __init__(self, client):
@@ -340,25 +277,7 @@ class WhiteboardCog(commands.Cog):
                 channel = await self.client.fetch_channel(message_data["channel_id"])
             if message_data["is_whiteboard"]:
                 whiteboard_data = json.loads(message_data["whiteboard_data"])
-                message_text = await self._create_whiteboard_text(
-                    whiteboard_data["content"]
-                )
-                parts = []
-                current_part = ''
-                for line in message_text.split('\n'):
-                    if len(current_part) + len(line) + 1 > 1950:
-                        parts.append(current_part)
-                        current_part = line + '\n'
-                    else:
-                        current_part += line + '\n'
-                if current_part:
-                    parts.append(current_part)
-                last_message = None
-                for i, part in enumerate(parts):
-                    if i == 0:
-                        last_message = await channel.send(part)
-                    else:
-                        last_message = await last_message.reply(part)
+                await self._split_and_send_message(whiteboard_data["content"], channel)
             else:
                 await channel.send(message_data["content"])
             await cancel_scheduled_message(message_data["id"])
@@ -383,86 +302,69 @@ class WhiteboardCog(commands.Cog):
                 check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
                 timeout=1200
             )
-            content = modal_inter.text_values['content']
-            channel_input = modal_inter.text_values['channel'].strip()
-            target_channel = None
-            if channel_input:
-                if channel_input.startswith('#'):
-                    channel_name = channel_input[1:]
-                    target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
-                elif channel_input.isdigit():
-                    try:
-                        target_channel = inter.guild.get_channel(int(channel_input))
-                    except:
-                        pass
-                if not target_channel:
-                    await modal_inter.response.send_message(
-                        "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
-                        ephemeral=True
-                    )
-                    return
-            else:
-                target_channel = inter.channel
-            scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
-            timezone_code = modal_inter.text_values.get('timezone', 'UTC').strip().upper()
-            timezone, tz = await self._validate_timezone(timezone_code)
-            message_data = {
-                "content": content,
-            }
-            if scheduled_time:
-                try:
-                    dt = datetime.strptime(scheduled_time, "%m/%d/%Y %I:%M %p")
-                    dt = tz.localize(dt)
-                    utc_dt = dt.astimezone(pytz.UTC)
-                    whiteboard_data = json.dumps(message_data)
-                    schedule_id = await schedule_message(
-                        target_channel.id,
-                        inter.author.id,
-                        content,
-                        utc_dt.isoformat(),
-                        timezone,
-                        True,
-                        whiteboard_data
-                    )
-                    current_tz_abbr = dt.strftime("%Z")
-                    await modal_inter.response.send_message(
-                        f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p')} {current_tz_abbr} ({timezone}) in {target_channel.mention}",
-                        ephemeral=True
-                    )
-                    self._schedule_message_task({
-                        "id": schedule_id,
-                        "channel_id": target_channel.id,
-                        "scheduled_time": utc_dt.isoformat(),
-                        "is_whiteboard": True,
-                        "whiteboard_data": whiteboard_data
-                    })
-                except ValueError:
-                    await modal_inter.response.send_message(
-                        "Invalid time format. Please use MM/DD/YYYY HH:MM AM/PM",
-                        ephemeral=True
-                    )
-                    return
-            else:
-                message_text = await self._create_whiteboard_text(content)
-                parts = []
-                current_part = ''
-                for line in message_text.split('\n'):
-                    if len(current_part) + len(line) + 1 > 1950:
-                        parts.append(current_part)
-                        current_part = line + '\n'
-                    else:
-                        current_part += line + '\n'
-                if current_part:
-                    parts.append(current_part)
-                last_message = None
-                for i, part in enumerate(parts):
-                    if i == 0:
-                        last_message = await target_channel.send(part)
-                    else:
-                        last_message = await last_message.reply(part)
-                await modal_inter.response.send_message(f"Whiteboard created successfully in {target_channel.mention}!", ephemeral=True)
+            await self._handle_modal_submit(modal_inter, inter)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
+
+    async def _handle_modal_submit(self, modal_inter, inter):
+        content = modal_inter.text_values['content']
+        channel_input = modal_inter.text_values['channel'].strip()
+        target_channel = await self._get_target_channel(inter, channel_input, modal_inter)
+        if not target_channel:
+            return
+        scheduled_time = modal_inter.text_values.get('scheduled_time', '').strip()
+        message_data = {
+            "content": content,
+        }
+        if scheduled_time:
+            await self._handle_scheduled_message(modal_inter, target_channel, content, scheduled_time, message_data)
+        else:
+            await self._handle_immediate_message(modal_inter, target_channel, content)
+
+    async def _get_target_channel(self, inter, channel_input, modal_inter):
+        if not channel_input:
+            return inter.channel
+        if channel_input.startswith('#'):
+            channel_name = channel_input[1:]
+            target_channel = disnake.utils.get(inter.guild.channels, name=channel_name)
+        elif channel_input.isdigit():
+            try:
+                target_channel = inter.guild.get_channel(int(channel_input))
+            except:
+                pass
+        else:
+            target_channel = None
+        if not target_channel:
+            await modal_inter.response.send_message(
+                "Invalid channel. Please enter a valid channel name (e.g., #general) or channel ID.",
+                ephemeral=True
+            )
+            return None
+        return target_channel
+
+    async def _split_and_send_message(self, content, channel, modal_inter=None):
+        message_text = await self._create_whiteboard_text(content)
+        parts = []
+        current_part = ''
+        for line in message_text.split('\n'):
+            if len(current_part) + len(line) + 1 > 1950:
+                parts.append(current_part)
+                current_part = line + '\n'
+            else:
+                current_part += line + '\n'
+        if current_part:
+            parts.append(current_part)
+        last_message = None
+        for i, part in enumerate(parts):
+            if i == 0:
+                last_message = await channel.send(part)
+            else:
+                last_message = await last_message.reply(part)
+        if modal_inter:
+            await modal_inter.response.send_message(
+                f"Whiteboard {'updated and ' if modal_inter.custom_id == 'edit_message_modal' else ''}sent successfully in {channel.mention}!",
+                ephemeral=True
+            )
 
     @whiteboard.sub_command(name="edit")
     @is_admin_or_privileged(rank_id=1198482895342411846)
@@ -495,16 +397,6 @@ class WhiteboardCog(commands.Cog):
     async def _create_whiteboard_text(self, content):
         return content.strip()
 
-    async def _validate_timezone(self, timezone_code: str) -> tuple[str, pytz.timezone]:
-        try:
-            timezone = timezone_code.strip().upper()
-            if timezone in TIMEZONE_OPTIONS:
-                timezone = TIMEZONE_OPTIONS[timezone]
-            tz = pytz.timezone(timezone)
-            return timezone, tz
-        except pytz.exceptions.UnknownTimeZoneError:
-            return "UTC", pytz.UTC
-
     @commands.message_command(name="Edit Message")
     async def edit_message_context(self, inter: disnake.MessageCommandInteraction):
         message = inter.target
@@ -514,33 +406,8 @@ class WhiteboardCog(commands.Cog):
         if not await self._can_edit_whiteboard(inter, {}):
             await inter.response.send_message("You don't have permission to edit this message.", ephemeral=True)
             return
-        first_message = message
-        reference = message.reference
-        while reference and reference.message_id:
-            try:
-                ref_message = await message.channel.fetch_message(reference.message_id)
-                if ref_message.author.id == self.client.user.id:
-                    first_message = ref_message
-                    reference = ref_message.reference
-                else:
-                    break
-            except:
-                break
-        related_messages = [first_message]
-        current_msg = first_message
-        try:
-            async for msg in message.channel.history(limit=20, after=first_message.created_at):
-                if (msg.author.id == self.client.user.id and 
-                    msg.reference and msg.reference.message_id == current_msg.id):
-                    related_messages.append(msg)
-                    current_msg = msg
-        except Exception as e:
-            print(f"Error finding related messages: {e}")
-        full_content = ""
-        for msg in related_messages:
-            if full_content:
-                full_content += "\n"
-            full_content += msg.content
+        related_messages = await self._get_related_messages(message)
+        full_content = "\n".join(msg.content for msg in related_messages)
         modal = ui.Modal(
             title="Edit Message",
             custom_id="edit_message_modal",
@@ -568,27 +435,83 @@ class WhiteboardCog(commands.Cog):
                     await msg.delete()
                 except Exception as e:
                     print(f"Error deleting message: {e}")
-            parts = []
-            current_part = ''
-            for line in content.split('\n'):
-                if len(current_part) + len(line) + 1 > 1950:
-                    parts.append(current_part)
-                    current_part = line + '\n'
-                else:
-                    current_part += line + '\n'
-            if current_part:
-                parts.append(current_part)
-            last_message = None
-            for i, part in enumerate(parts):
-                if i == 0:
-                    last_message = await message.channel.send(part)
-                else:
-                    last_message = await last_message.reply(part)
-            await modal_inter.response.send_message("Message updated successfully!", ephemeral=True)
+            await self._split_and_send_message(content, message.channel, modal_inter)
         except asyncio.TimeoutError:
             await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
         except Exception as e:
             await inter.followup.send(f"An error occurred while processing your edit: {str(e)}", ephemeral=True)
+
+    async def _get_related_messages(self, message):
+        first_message = message
+        reference = message.reference
+        while reference and reference.message_id:
+            try:
+                ref_message = await message.channel.fetch_message(reference.message_id)
+                if ref_message.author.id == self.client.user.id:
+                    first_message = ref_message
+                    reference = ref_message.reference
+                else:
+                    break
+            except:
+                break
+        related_messages = [first_message]
+        current_msg = first_message
+        try:
+            async for msg in message.channel.history(limit=20, after=first_message.created_at):
+                if (msg.author.id == self.client.user.id and 
+                    msg.reference and msg.reference.message_id == current_msg.id):
+                    related_messages.append(msg)
+                    current_msg = msg
+        except Exception as e:
+            print(f"Error finding related messages: {e}")
+        return related_messages
+
+    async def _handle_scheduled_message(self, modal_inter, target_channel, content, scheduled_time, message_data):
+        try:
+            dt = dateparser.parse(scheduled_time)
+            if not dt:
+                await modal_inter.response.send_message(
+                    "Could not parse the date/time. Please try a different format.",
+                    ephemeral=True
+                )
+                return
+            if not dt.tzinfo:
+                dt = pytz.UTC.localize(dt)
+            utc_dt = dt.astimezone(pytz.UTC)
+            now = datetime.now(pytz.UTC)
+            if utc_dt <= now:
+                await modal_inter.response.send_message(
+                    "Please schedule the message for a future time.",
+                    ephemeral=True
+                )
+                return
+            whiteboard_data = json.dumps(message_data)
+            tz_str = dt.tzinfo.zone if hasattr(dt.tzinfo, 'zone') else dt.tzinfo.tzname(dt)
+            schedule_id = await schedule_message(
+                target_channel.id,
+                modal_inter.author.id,
+                content,
+                utc_dt.isoformat(),
+                tz_str,
+                True,
+                whiteboard_data
+            )
+            await modal_inter.response.send_message(
+                f"Whiteboard scheduled for {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
+                ephemeral=True
+            )
+            self._schedule_message_task({
+                "id": schedule_id,
+                "channel_id": target_channel.id,
+                "scheduled_time": utc_dt.isoformat(),
+                "is_whiteboard": True,
+                "whiteboard_data": whiteboard_data
+            })
+        except Exception as e:
+            await modal_inter.response.send_message(
+                f"Error parsing date/time: {str(e)}. Please try a different format.",
+                ephemeral=True
+            )
 
 def setup(client):
     client.add_cog(WhiteboardCog(client))
