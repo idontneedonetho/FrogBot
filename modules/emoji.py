@@ -81,7 +81,7 @@ class EmojiCog(commands.Cog):
         async with self.reaction_lock:
             for _ in range(Config.MAX_RETRIES):
                 try:
-                    if emoji_name == "🗑️" and is_add:
+                    if emoji_name == "🏁" and is_add:
                         await self._handle_trash_reaction(payload)
                     elif emoji_name in EMOJI_POINTS:
                         await self.process_emoji_points(payload, is_add)
@@ -112,16 +112,16 @@ class EmojiCog(commands.Cog):
             emoji_str = str(reaction.emoji)
             if emoji_str == "❌":
                 has_x = True
-            elif emoji_str == "🗑️":
+            elif emoji_str == "🏁":
                 has_trash = True
         return has_x, has_trash
 
     async def _update_resolution_embed(self, message: Message, has_x: bool, has_trash: bool) -> None:
         if message.embeds and "React with" not in message.embeds[0].footer.text:
             embed = message.embeds[0]
-            embed.set_footer(text="React with ❌ if this is incorrect or 🗑️ to close now.")
+            embed.set_footer(text="React with ❌ if this is incorrect or 🏁 to close now.")
             await message.edit(embed=embed)
-        for emoji, needed in [("❌", not has_x), ("🗑️", not has_trash)]:
+        for emoji, needed in [("❌", not has_x), ("🏁", not has_trash)]:
             if needed:
                 await message.add_reaction(emoji)
 
@@ -203,10 +203,10 @@ class EmojiCog(commands.Cog):
             description="@here, this issue/request has been marked as *resolved!*\nNo further action is needed.\nThis thread will be automatically deleted in *7 days*.",
             color=Color.green()
         )
-        embed.set_footer(text="React with ❌ if this is incorrect or 🗑️ to close now.")
+        embed.set_footer(text="React with ❌ if this is incorrect or 🏁 to close now.")
         reply_message = await message.reply(embed=embed)
         await reply_message.add_reaction("❌")
-        await reply_message.add_reaction("🗑️")
+        await reply_message.add_reaction("🏁")
         current_timestamp = int(time.time())
         await log_checkmark_message_id(reply_message.id, channel.id, current_timestamp)
         asyncio.create_task(self.resolution_countdown(reply_message, channel.id))
@@ -275,7 +275,7 @@ class EmojiCog(commands.Cog):
             authorized_role = guild.get_role(Config.ROLE_ID)
             if not (user.guild_permissions.administrator or user.id == Config.ADMIN_USER_ID or authorized_role in user.roles):
                 try:
-                    await message.remove_reaction("🗑️", user)
+                    await message.remove_reaction("🏁", user)
                 except disnake.HTTPException:
                     pass
                 return
