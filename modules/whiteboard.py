@@ -5,6 +5,7 @@ from disnake import TextInputStyle, ui, SelectOption
 from core import is_admin_or_privileged
 from disnake.ext import commands
 from datetime import datetime
+import dateutil.tz
 import dateparser
 import asyncio
 import disnake
@@ -146,12 +147,33 @@ class WhiteboardView(ui.View):
 class MessageSelect(ui.Select):
     def __init__(self, messages):
         options = []
+        utc_fallback_used = False
         for msg in messages:
-            scheduled_time = datetime.fromisoformat(msg["scheduled_time"])
-            tz = pytz.timezone(msg["timezone"])
-            local_time = scheduled_time.astimezone(tz)
+            try:
+                scheduled_time_utc = datetime.fromisoformat(msg["scheduled_time"])
+                if not scheduled_time_utc.tzinfo:
+                    scheduled_time_utc = pytz.UTC.localize(scheduled_time_utc)
+                tz_name = msg.get("timezone", "UTC")
+                tz = None
+                try:
+                    tz = pytz.timezone(tz_name)
+                except pytz.UnknownTimeZoneError:
+                    if dateutil:
+                        tz = dateutil.tz.gettz(tz_name)
+                    if not tz:
+                        print(f"Warning: Could not parse timezone '{tz_name}'. Defaulting to UTC for display.")
+                        tz = pytz.UTC
+                        utc_fallback_used = True
+                local_time = scheduled_time_utc.astimezone(tz)
+                description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
+                if tz == pytz.UTC and tz_name != "UTC" and utc_fallback_used:
+                     description += f" (Original TZ '{tz_name}' unknown, showing UTC)"
+                     utc_fallback_used = False
+            except Exception as e:
+                print(f"Error processing scheduled message ID {msg.get('id', 'N/A')} for display: {e}")
+                local_time = datetime.fromisoformat(msg["scheduled_time"])
+                description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p')} (Error parsing timezone)"
             label = "Whiteboard" if msg["is_whiteboard"] else "Message"
-            description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
             options.append(SelectOption(
                 label=label[:100],
                 description=description,
@@ -468,15 +490,20 @@ class WhiteboardCog(commands.Cog):
 
     async def _handle_scheduled_message(self, modal_inter, target_channel, content, scheduled_time, message_data):
         try:
-            dt = dateparser.parse(scheduled_time)
+            settings = {'PREFER_DATES_FROM': 'future', 'RETURN_AS_TIMEZONE_AWARE': True}
+            dt = dateparser.parse(scheduled_time, settings=settings)
             if not dt:
                 await modal_inter.response.send_message(
-                    "Could not parse the date/time. Please try a different format.",
+                    "Could not parse the date/time. Please try a different format (e.g., 'MM/DD/YYYY HH:MM AM/PM Timezone', 'tomorrow 2pm EST').",
                     ephemeral=True
                 )
                 return
             if not dt.tzinfo:
-                dt = pytz.UTC.localize(dt)
+                await modal_inter.response.send_message(
+                    "Could not determine the timezone for the provided time. Please include a timezone (e.g., 'EST', 'PDT', 'America/New_York').",
+                    ephemeral=True
+                )
+                return
             utc_dt = dt.astimezone(pytz.UTC)
             now = datetime.now(pytz.UTC)
             if utc_dt <= now:
@@ -486,7 +513,11 @@ class WhiteboardCog(commands.Cog):
                 )
                 return
             whiteboard_data = json.dumps(message_data)
-            tz_str = dt.tzinfo.zone if hasattr(dt.tzinfo, 'zone') else dt.tzinfo.tzname(dt)
+            tz_str = getattr(dt.tzinfo, 'zone', None)
+            if not tz_str:
+                tz_str = dt.tzname()
+            if not tz_str:
+                tz_str = str(dt.tzinfo)
             schedule_id = await schedule_message(
                 target_channel.id,
                 modal_inter.author.id,
@@ -505,11 +536,13 @@ class WhiteboardCog(commands.Cog):
                 "channel_id": target_channel.id,
                 "scheduled_time": utc_dt.isoformat(),
                 "is_whiteboard": True,
-                "whiteboard_data": whiteboard_data
+                "whiteboard_data": whiteboard_data,
+                "timezone": tz_str
             })
         except Exception as e:
+            print(f"Error parsing/scheduling date/time: {e}")
             await modal_inter.response.send_message(
-                f"Error parsing date/time: {str(e)}. Please try a different format.",
+                f"Error parsing date/time: {str(e)}. Please try using a clear format like 'MM/DD/YYYY HH:MM AM/PM Timezone' or check bot logs.",
                 ephemeral=True
             )
 
