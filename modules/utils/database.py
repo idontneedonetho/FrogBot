@@ -223,7 +223,9 @@ async def schedule_message(channel_id: int, author_id: int, content: str, schedu
     async with aiosqlite.connect(DATABASE_FILE) as conn:
         async with conn.cursor() as cursor:
             await cursor.execute(
-                'INSERT INTO scheduled_messages (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                '''INSERT INTO scheduled_messages 
+                   (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
                 (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
             )
             await conn.commit()
@@ -257,11 +259,15 @@ async def get_user_scheduled_messages(author_id: int = None) -> list:
             return [dict(row) for row in rows] if rows else []
 
 async def cancel_scheduled_message(id: int) -> bool:
-    await db_access_with_retry(
-        'UPDATE scheduled_messages SET is_cancelled = 1 WHERE id = ?',
-        (id,)
-    )
-    return True
+    try:
+        await db_access_with_retry(
+            'UPDATE scheduled_messages SET is_cancelled = 1 WHERE id = ?',
+            (id,)
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Failed to cancel scheduled message {id}: {e}")
+        return False
 
 async def update_scheduled_message(id: int, content: str = None, scheduled_time: str = None, timezone: str = None, whiteboard_data: str = None) -> bool:
     updates = []
@@ -281,11 +287,15 @@ async def update_scheduled_message(id: int, content: str = None, scheduled_time:
     if not updates:
         return False    
     params.append(id)
-    await db_access_with_retry(
-        f'UPDATE scheduled_messages SET {", ".join(updates)} WHERE id = ?',
-        tuple(params)
-    )
-    return True
+    try:
+        await db_access_with_retry(
+            f'UPDATE scheduled_messages SET {", ".join(updates)} WHERE id = ?',
+            tuple(params)
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Failed to update scheduled message {id}: {e}")
+        return False
 
 class ThreadCleanupManager:
     def __init__(self, bot):
