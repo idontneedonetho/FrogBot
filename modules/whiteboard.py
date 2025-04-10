@@ -241,7 +241,7 @@ class WhiteboardCog(commands.Cog):
         for msg in future_messages:
             try:
                 scheduled_time = datetime.fromisoformat(msg["scheduled_time"])
-                description = f"Scheduled for {scheduled_time.astimezone(pytz.UTC).strftime('%m/%d/%Y %I:%M %p UTC')}"
+                description = f"Scheduled for {scheduled_time.strftime('%m/%d/%Y %I:%M %p UTC')}"
             except Exception as e:
                 logging.error(f"Error formatting time for message {msg['id']}: {e}")
                 description = f"Scheduled for {msg['scheduled_time']}"
@@ -264,14 +264,11 @@ class WhiteboardCog(commands.Cog):
             async def edit_callback(btn_inter):
                 try:
                     whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
-                    scheduled_time = datetime.fromisoformat(message["scheduled_time"])
-                    tz = pytz.timezone(message.get("timezone", "UTC"))
-                    local_time = scheduled_time.astimezone(tz)
                     modal = WhiteboardModal(
                         title="Edit Whiteboard",
                         default_values={
                             "content": whiteboard_data.get("content", message["content"]),
-                            "scheduled_time": local_time.strftime("%m/%d/%Y %I:%M %p %Z"),
+                            "scheduled_time": datetime.fromisoformat(message["scheduled_time"]).strftime("%Y-%m-%d %H:%M:%S"),
                             "channel": message.get("channel", "")
                         }
                     )
@@ -306,7 +303,7 @@ class WhiteboardCog(commands.Cog):
             view.add_item(edit_btn)
             view.add_item(cancel_btn)
             await select_inter.response.send_message(
-                f"Manage whiteboard scheduled for {datetime.fromisoformat(message['scheduled_time']).astimezone(pytz.timezone(message.get('timezone', 'UTC'))).strftime('%m/%d/%Y %I:%M %p %Z')}",
+                f"Manage whiteboard originally scheduled for {datetime.fromisoformat(message['scheduled_time']).strftime('%Y-%m-%d %H:%M:%S UTC')}",
                 view=view,
                 ephemeral=True
             )
@@ -325,13 +322,15 @@ class WhiteboardCog(commands.Cog):
             target_channel = await self._get_target_channel(inter, channel_input, modal_inter)
             scheduled_time_str = modal_inter.text_values.get('scheduled_time', '').strip()
             utc_dt, tz_name, dt = await self._parse_scheduled_time(scheduled_time_str)
-            await update_scheduled_message(
-                message_id,
-                new_content=content,
-                new_scheduled_time=utc_dt.isoformat(),
-                new_timezone=tz_name,
-                new_channel_id=target_channel.id
+            success = await update_scheduled_message(
+                id=message_id,
+                content=content,
+                scheduled_time=utc_dt.isoformat(),
+                timezone=tz_name,
+                whiteboard_data=json.dumps({"content": content, "channel": target_channel.mention})
             )
+            if not success:
+                raise Exception("Database update failed")
             self._schedule_message_task({
                 "id": message_id,
                 "channel_id": target_channel.id,
