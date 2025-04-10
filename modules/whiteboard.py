@@ -2,7 +2,7 @@
 
 from modules.utils.database import (
     schedule_message, get_scheduled_message, 
-    get_user_scheduled_messages, cancel_scheduled_message
+    get_user_scheduled_messages, cancel_scheduled_message, update_scheduled_message
 )
 from disnake import TextInputStyle, ui, SelectOption
 from core import is_admin_or_privileged
@@ -103,9 +103,12 @@ class WhiteboardCog(commands.Cog):
             raise ValueError("Could not parse the date/time. Please try a different format.")
         if not dt.tzinfo:
             raise ValueError("Could not determine the timezone. Please include a timezone (e.g., 'EST', 'PDT').")
+        try:
+            tz = pytz.timezone(dt.tzinfo.tzname(dt))
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.UTC
         utc_dt = dt.astimezone(pytz.UTC)
-        tz_name = getattr(dt.tzinfo, 'zone', None) or dt.tzname() or str(dt.tzinfo)
-        return utc_dt, tz_name, dt
+        return utc_dt, tz.zone, dt
 
     async def _handle_modal_submit(self, modal_inter, inter):
         try:
@@ -224,9 +227,6 @@ class WhiteboardCog(commands.Cog):
     @is_admin_or_privileged(rank_id=1198482895342411846)
     async def edit_whiteboard(self, inter):
         messages = await get_user_scheduled_messages(None)
-        if not messages:
-            await inter.response.send_message("There are no scheduled messages.", ephemeral=True)
-            return
         now = datetime.now(pytz.UTC)
         future_messages = [
             msg for msg in messages 
@@ -241,63 +241,111 @@ class WhiteboardCog(commands.Cog):
         for msg in future_messages:
             try:
                 scheduled_time = datetime.fromisoformat(msg["scheduled_time"])
-                dt = dateparser.parse(f"now {msg.get('timezone', 'UTC')}", settings={'RETURN_AS_TIMEZONE_AWARE': True})
-                local_time = scheduled_time.astimezone(dt.tzinfo)
-                description = f"Scheduled for {local_time.strftime('%m/%d/%Y %I:%M %p %Z')}"
+                description = f"Scheduled for {scheduled_time.astimezone(pytz.UTC).strftime('%m/%d/%Y %I:%M %p UTC')}"
             except Exception as e:
                 logging.error(f"Error formatting time for message {msg['id']}: {e}")
                 description = f"Scheduled for {msg['scheduled_time']}"
-                
             options.append(SelectOption(
                 label=f"Whiteboard {msg['id']}",
                 description=description,
                 value=str(msg["id"])
             ))
         select = ui.Select(
-            placeholder="Select a whiteboard to edit...",
+            placeholder="Select a whiteboard to manage...",
             options=options,
             custom_id="whiteboard_select"
         )
-        
         async def select_callback(select_inter):
             message_id = int(select.values[0])
             message = await get_scheduled_message(message_id)
-            if not message:
-                await select_inter.response.send_message("Message not found.", ephemeral=True)
-                return
-            try:
-                whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
-                scheduled_time = datetime.fromisoformat(message["scheduled_time"])
-                dt = dateparser.parse(f"now {message.get('timezone', 'UTC')}", settings={'RETURN_AS_TIMEZONE_AWARE': True})
-                local_time = scheduled_time.astimezone(dt.tzinfo)
-                modal = WhiteboardModal(
-                    title="Edit Whiteboard",
-                    default_values={
-                        "content": whiteboard_data.get("content", message["content"]),
-                        "scheduled_time": local_time.strftime("%m/%d/%Y %I:%M %p %Z"),
-                        "channel": message.get("channel", "")
-                    }
-                )
-                await select_inter.response.send_modal(modal)
+            edit_btn = ui.Button(label="Edit", style=disnake.ButtonStyle.primary)
+            cancel_btn = ui.Button(label="Cancel", style=disnake.ButtonStyle.danger)
+
+            async def edit_callback(btn_inter):
                 try:
-                    modal_inter = await self.client.wait_for(
-                        'modal_submit',
-                        check=lambda i: i.custom_id == modal.custom_id and i.author.id == select_inter.author.id,
-                        timeout=1200
+                    whiteboard_data = json.loads(message["whiteboard_data"]) if message["whiteboard_data"] else {"content": message["content"]}
+                    scheduled_time = datetime.fromisoformat(message["scheduled_time"])
+                    tz = pytz.timezone(message.get("timezone", "UTC"))
+                    local_time = scheduled_time.astimezone(tz)
+                    modal = WhiteboardModal(
+                        title="Edit Whiteboard",
+                        default_values={
+                            "content": whiteboard_data.get("content", message["content"]),
+                            "scheduled_time": local_time.strftime("%m/%d/%Y %I:%M %p %Z"),
+                            "channel": message.get("channel", "")
+                        }
                     )
-                    await self._handle_modal_submit(modal_inter, select_inter)
-                except asyncio.TimeoutError:
-                    await select_inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
-            except Exception as e:
-                logging.error(f"Error editing whiteboard: {e}")
-                await select_inter.response.send_message(
-                    "An error occurred while preparing the edit form. Please try again.",
-                    ephemeral=True
-                )
+                    modal.custom_id = f"edit_modal_{message_id}"
+                    await btn_inter.response.send_modal(modal)
+                    try:
+                        modal_inter = await self.client.wait_for(
+                            'modal_submit',
+                            check=lambda i: i.custom_id == modal.custom_id and i.author.id == btn_inter.author.id,
+                            timeout=1200
+                        )
+                        await self._handle_edit_submit(modal_inter, btn_inter, message_id)
+                    except asyncio.TimeoutError:
+                        await btn_inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
+                except Exception as e:
+                    logging.error(f"Error editing whiteboard: {e}")
+                    await btn_inter.response.send_message("An error occurred. Please try again.", ephemeral=True)
+
+            async def cancel_callback(btn_inter):
+                try:
+                    await cancel_scheduled_message(message_id)
+                    if message_id in self.scheduled_tasks:
+                        self.scheduled_tasks[message_id].cancel()
+                        del self.scheduled_tasks[message_id]
+                    await btn_inter.response.send_message("✅ Whiteboard cancellation successful!", ephemeral=True)
+                except Exception as e:
+                    logging.error(f"Error cancelling whiteboard: {e}")
+                    await btn_inter.response.send_message("Failed to cancel whiteboard. Please try again.", ephemeral=True)
+            edit_btn.callback = edit_callback
+            cancel_btn.callback = cancel_callback
+            view = ui.View()
+            view.add_item(edit_btn)
+            view.add_item(cancel_btn)
+            await select_inter.response.send_message(
+                f"Manage whiteboard scheduled for {datetime.fromisoformat(message['scheduled_time']).astimezone(pytz.timezone(message.get('timezone', 'UTC'))).strftime('%m/%d/%Y %I:%M %p %Z')}",
+                view=view,
+                ephemeral=True
+            )
         select.callback = select_callback
         view = ui.View()
         view.add_item(select)
-        await inter.response.send_message("Select a whiteboard to edit:", view=view, ephemeral=True)
+        await inter.response.send_message("Select a whiteboard to manage:", view=view, ephemeral=True)
+
+    async def _handle_edit_submit(self, modal_inter, inter, message_id):
+        try:
+            if message_id in self.scheduled_tasks:
+                self.scheduled_tasks[message_id].cancel()
+                del self.scheduled_tasks[message_id]
+            content = modal_inter.text_values['content'].strip()
+            channel_input = modal_inter.text_values['channel'].strip()
+            target_channel = await self._get_target_channel(inter, channel_input, modal_inter)
+            scheduled_time_str = modal_inter.text_values.get('scheduled_time', '').strip()
+            utc_dt, tz_name, dt = await self._parse_scheduled_time(scheduled_time_str)
+            await update_scheduled_message(
+                message_id,
+                new_content=content,
+                new_scheduled_time=utc_dt.isoformat(),
+                new_timezone=tz_name,
+                new_channel_id=target_channel.id
+            )
+            self._schedule_message_task({
+                "id": message_id,
+                "channel_id": target_channel.id,
+                "scheduled_time": utc_dt.isoformat(),
+                "is_whiteboard": True,
+                "whiteboard_data": json.dumps({"content": content, "channel": target_channel.mention})
+            })
+            await modal_inter.response.send_message(
+                f"✅ Whiteboard updated! New schedule: {dt.strftime('%Y-%m-%d %I:%M %p %Z')} in {target_channel.mention}",
+                ephemeral=True
+            )
+        except Exception as e:
+            logging.error(f"Error handling edit submission: {e}")
+            await modal_inter.response.send_message("Failed to update whiteboard. Please try again.", ephemeral=True)
 
 def setup(client):
     client.add_cog(WhiteboardCog(client))
