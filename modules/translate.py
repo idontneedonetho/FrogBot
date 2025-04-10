@@ -1,6 +1,7 @@
 # modules.translate
 
 from disnake import Embed, Color, Message, ApplicationCommandInteraction, ModalInteraction, MessageCommandInteraction, TextInputStyle, ui
+from google.generativeai.types import GenerationConfig
 from modules.utils.commons import send_long_message
 from asyncio import Queue, create_task, sleep
 from typing import Set, List, Dict, Tuple
@@ -11,6 +12,7 @@ from functools import lru_cache
 from core import config
 import disnake
 import logging
+import json
 
 class TranslationConfig:
     MODEL_NAME = "gemini-2.0-flash"
@@ -25,11 +27,10 @@ class TranslationConfig:
 1. Translate messages while maintaining context and nuance
 2. Never add commentary or additional messages
 3. Always use full language names
-4. Never translate into the source language - only translate into the target languages
-5. Return responses in this format:
-   TRANSLATIONS:
-   <language_name>:translated_text
-   <language_name>:translated_text"""
+4. Never translate into the source language - only translate into the target languages.
+5. Return translations ONLY as a valid JSON object containing a single key 'translations', which maps lowercase language names to translated text."""
+
+EXPECTED_RESPONSE_SCHEMA = Dict[str, Dict[str, str]]
 
 genai.configure(api_key=config.read().get('GOOGLE_API_KEY'))
 gemini_model = genai.GenerativeModel(TranslationConfig.MODEL_NAME)
@@ -75,58 +76,79 @@ class TranslationCog(commands.Cog):
                 content = ' '.join(content.replace(f'<@{m.id}>', m.display_name).replace(f'<@!{m.id}>', m.display_name) 
                                  for m in message.mentions)
             user_lang = await database.get_user_language(thread_id, user_id) or 'english'
-            context = await self._get_message_context(message) if isinstance(message.channel, disnake.Thread) else ''
-            prompt = [
-                {"role": "user", "parts": [f"SYSTEM INSTRUCTION: {TranslationConfig.SYSTEM_PROMPT}"]},
-                {"role": "model", "parts": ["I understand. I will translate messages according to the specified format."]},
-                {"role": "user", "parts": [self._build_prompt_text(content, username, user_lang, target_langs, context)]}
-            ]
-            response = await self._make_api_request(prompt)
-            translations = self._parse_translation_response(response, user_lang, content)
+            history_messages = await self._get_message_context(message)
+            prompt_history = []
+            prompt_history.append({"role": "user", "parts": [TranslationConfig.SYSTEM_PROMPT]})
+            prompt_history.append({"role": "model", "parts": ["Okay, I will follow these instructions and output only the specified JSON structure."]})
+            for msg in history_messages:
+                prompt_history.append({"role": "user", "parts": [f"{msg.author.display_name}: {msg.content}"]})
+            final_request = f"Translate this message from {self._format_language_name(user_lang)} to {', '.join(self._format_language_name(lang) for lang in target_langs)}:\n{content}"
+            prompt_history.append({"role": "user", "parts": [final_request]})
+            response_json = await self._make_api_request(prompt_history, target_langs)
+            translations = self._parse_translation_response(response_json, content)
             return user_lang, translations
         except Exception as e:
             logging.error(f"Translation error: {e}")
             raise
 
-    def _build_prompt_text(self, content: str, username: str, user_lang: str, target_langs: Set[str], context: str) -> str:
-        prompt = f"{username}: Translate this message from {self._format_language_name(user_lang)} to {', '.join(self._format_language_name(lang) for lang in target_langs)}:\n{content}"
-        return f"Previous messages for context:\n{context}\n\n{prompt}" if context else prompt
-
-    async def _get_message_context(self, message) -> str:
+    async def _get_message_context(self, message) -> List[Message]:
         if not isinstance(message.channel, disnake.Thread):
-            return ''
-        messages = [msg async for msg in message.channel.history(limit=TranslationConfig.CONTEXT_MESSAGES, before=message.created_at)
+            return []
+        history = [msg async for msg in message.channel.history(limit=TranslationConfig.CONTEXT_MESSAGES, before=message.created_at)
                    if not msg.author.bot and msg.content.strip()]
-        return "\n".join(f"{msg.author.display_name}: {msg.content}" for msg in reversed(messages))
+        return list(reversed(history))
 
-    async def _make_api_request(self, messages: List[dict]) -> str:
+    async def _make_api_request(self, messages: List[dict], target_langs: Set[str]) -> dict:
         try:
-            response = gemini_model.generate_content(
-                messages,
-                safety_settings=TranslationConfig.SAFETY_SETTINGS
+            lang_properties = {lang.lower(): {"type": "string"} for lang in target_langs}
+            lang_ordering = sorted(list(lang_properties.keys()))
+            gen_config = GenerationConfig(
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "translations": {
+                            "type": "object",
+                            "properties": lang_properties,
+                            "required": lang_ordering
+                        }
+                    },
+                    "required": ["translations"]
+                }
             )
-            return response.text.strip()
+            response = await gemini_model.generate_content_async(
+                messages,
+                generation_config=gen_config,
+                safety_settings=TranslationConfig.SAFETY_SETTINGS,
+                request_options={'timeout': 60}
+            )
+            if not response.text:
+                 logging.error("Received empty response text from Gemini API.")
+                 raise ValueError("Received empty response from translation model")
+            return json.loads(response.text)
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to decode JSON response: {e}\nResponse text: {getattr(response, 'text', 'N/A')}")
+            raise ValueError("Received invalid JSON format from translation model") from e
+        except (AttributeError, KeyError, IndexError) as e:
+            logging.error(f"Error processing Gemini API response structure: {e}")
+            raise ValueError("Error processing response from translation model") from e
         except Exception as e:
             logging.error(f"Google Gemini API error: {e}")
             raise
 
-    def _parse_translation_response(self, response: str, user_lang: str, original_content: str) -> Dict[str, str]:
-        lines = response.strip().split('\n')
-        if not lines or not lines[0].startswith('TRANSLATIONS:'):
-            raise ValueError("Invalid response format from translation model")
-        translations = {}
-        for line in lines[1:]:
-            if ':' not in line:
-                continue
-            lang, trans = line.split(':', 1)
-            lang = lang.strip().lower()
-            trans = trans.strip()
-            if lang and trans:
-                translations[lang] = trans
-        return {
-            lang: trans for lang, trans in translations.items() 
-            if trans.strip() != original_content.strip()
-        }
+    def _parse_translation_response(self, response_json: dict, original_content: str) -> Dict[str, str]:
+        if not isinstance(response_json, dict) or "translations" not in response_json:
+             logging.error(f"Invalid JSON structure received: {response_json}")
+             raise ValueError("Invalid JSON structure from translation model")
+        translations = response_json.get("translations", {})
+        if not isinstance(translations, dict):
+            logging.error(f"Expected 'translations' to be a dict, got: {type(translations)}")
+            raise ValueError("Invalid 'translations' format in JSON response")
+        valid_translations = {}
+        for lang, trans in translations.items():
+             if isinstance(lang, str) and isinstance(trans, str) and trans.strip() != original_content.strip():
+                 valid_translations[lang.lower()] = trans
+        return valid_translations
     
     async def translation_worker(self):
         while True:
