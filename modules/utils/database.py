@@ -1,8 +1,8 @@
 # modules.utils.database
 
 from disnake.ext import commands
+from typing import Dict, Optional
 from core import config
-from typing import Dict
 import aiosqlite
 import disnake
 import asyncio
@@ -82,6 +82,17 @@ async def initialize_database():
                     is_whiteboard BOOLEAN NOT NULL DEFAULT 0,
                     whiteboard_data TEXT,
                     is_cancelled BOOLEAN NOT NULL DEFAULT 0
+                )
+            ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS wiki_search_log (
+                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    query_text TEXT NOT NULL,
+                    event_timestamp INTEGER NOT NULL,
+                    event_type TEXT NOT NULL,
+                    queue_length INTEGER,
+                    details TEXT
                 )
             ''')
             await conn.commit()
@@ -296,6 +307,18 @@ async def update_scheduled_message(id: int, content: str = None, scheduled_time:
     except Exception as e:
         logging.error(f"Failed to update scheduled message {id}: {e}")
         return False
+
+async def log_wiki_search_event(user_id: int, query_text: str, event_type: str, queue_length: int, details: Optional[str] = None):
+    try:
+        current_timestamp = int(time.time())
+        await db_access_with_retry(
+            '''INSERT INTO wiki_search_log 
+               (user_id, query_text, event_timestamp, event_type, queue_length, details) 
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (user_id, query_text, current_timestamp, event_type, queue_length, details)
+        )
+    except Exception as e:
+        logging.error(f"Failed to log wiki search event (user: {user_id}, query: '{query_text}', event: {event_type}): {e}", exc_info=True)
 
 class ThreadCleanupManager:
     def __init__(self, bot):

@@ -85,7 +85,7 @@ class TranslationCog(commands.Cog):
             final_request = f"Translate this message from {self._format_language_name(user_lang)} to {', '.join(self._format_language_name(lang) for lang in target_langs)}:\n{content}"
             prompt_history.append({"role": "user", "parts": [final_request]})
             response_json = await self._make_api_request(prompt_history, target_langs)
-            translations = self._parse_translation_response(response_json, content)
+            translations = self._parse_translation_response(response_json, content, user_lang)
             return user_lang, translations
         except Exception as e:
             logging.error(f"Translation error: {e}")
@@ -136,7 +136,7 @@ class TranslationCog(commands.Cog):
             logging.error(f"Google Gemini API error: {e}")
             raise
 
-    def _parse_translation_response(self, response_json: dict, original_content: str) -> Dict[str, str]:
+    def _parse_translation_response(self, response_json: dict, original_content: str, source_lang: str) -> Dict[str, str]:
         if not isinstance(response_json, dict) or "translations" not in response_json:
              logging.error(f"Invalid JSON structure received: {response_json}")
              raise ValueError("Invalid JSON structure from translation model")
@@ -146,7 +146,7 @@ class TranslationCog(commands.Cog):
             raise ValueError("Invalid 'translations' format in JSON response")
         valid_translations = {}
         for lang, trans in translations.items():
-             if isinstance(lang, str) and isinstance(trans, str) and trans.strip() != original_content.strip():
+             if isinstance(lang, str) and isinstance(trans, str) and trans.strip() != original_content.strip() and lang.lower() != source_lang.lower():
                  valid_translations[lang.lower()] = trans
         return valid_translations
     
