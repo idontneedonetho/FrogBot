@@ -74,6 +74,12 @@ class HelpCog(commands.Cog):
                 f"Shutdown {bot_name}, needs confirmation.\n\n"
                 "**/backup**\n"
                 "Force backup the database. Automatically done at midnight UTC daily.\n\n"
+                "**/toggle_onboarding_kick [enabled]**\n"
+                "Enables or disables the 24-hour kick rule for new members who don't complete onboarding. "
+                "When enabled, the rule becomes active for members joining after the next 00:00 UTC.\n\n"
+                "**/clear_member_roles**\n"
+                "Removes a predefined list of roles (specified in `config.yaml` under `ROLE_CLEAR_TARGET_IDS`) "
+                "from all non-bot members.\n\n"
             )
         )
         await inter.edit_original_message(embed=embed, view=self.get_help_view("advanced"))
@@ -128,6 +134,8 @@ class HelpCog(commands.Cog):
                 "Display this help message.\n\n"
                 "--------\n\n"
                 "*Advanced commands need Admin permissions*\n\n"
+                "**AI Chat & Assistance**\n"
+                "You can chat with me by mentioning my name or in designated channels. I can assist with various queries, remember information (notes), and search the FrogPilot Wiki.\n\n"
             )
         )
         await inter.edit_original_message(embed=embed, view=self.get_help_view("general"))

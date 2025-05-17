@@ -160,10 +160,18 @@ class OnboardingAuditCog(commands.Cog):
         cleared_count = 0
         member_count = 0
         roles_removed_summary = {}
+        dunce_role_id_int = int(self.dunce_role_id) if isinstance(self.dunce_role_id, (int, str)) and str(self.dunce_role_id).isdigit() else 0
+        tadpole_role_id_int = int(self.tadpole_role_id) if isinstance(self.tadpole_role_id, (int, str)) and str(self.tadpole_role_id).isdigit() else 0
+
         for member in guild.members:
             if member.bot:
                 continue
             member_count += 1
+            member_role_ids = {role.id for role in member.roles}
+            if (dunce_role_id_int != 0 and dunce_role_id_int in member_role_ids) or \
+               (tadpole_role_id_int != 0 and tadpole_role_id_int in member_role_ids):
+                logging.info(f"Skipping role clear for member {member.display_name} because they have the Dunce or Tadpole role.")
+                continue
             roles_to_remove_for_this_member = []
             for role in member.roles:
                 if role.id in target_role_ids_set:

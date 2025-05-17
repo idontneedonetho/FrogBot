@@ -134,25 +134,32 @@ async def convert_mentions(text: str, message: disnake.Message) -> str:
     converted_text = re.sub(r'(?<!<)@((?!\d+>)[\w\\.-]+)', replace_mention, text)
     return converted_text 
 
-def parse_chromadb_query_results(query_results: Dict, existing_ids_to_skip: Optional[set] = None) -> List[Dict]:
+
+def parse_mem0_query_results(query_results: Dict, existing_ids_to_skip: Optional[set] = None) -> List[Dict]:
     parsed_notes = []
-    if not query_results or not query_results.get('ids') or not query_results['ids'][0]:
+    if not query_results or not query_results.get('results'):
         return parsed_notes
     existing_ids_to_skip = existing_ids_to_skip or set()
-    for i, note_id in enumerate(query_results['ids'][0]):
-        if note_id in existing_ids_to_skip:
+    for entry in query_results['results']:
+        memory_id = entry.get('id')
+        if not memory_id or memory_id in existing_ids_to_skip:
             continue
-        distance = query_results['distances'][0][i] if query_results.get('distances') and query_results['distances'][0] else None
-        doc = query_results['documents'][0][i] if query_results.get('documents') and query_results['documents'][0] else "N/A"
-        meta = query_results['metadatas'][0][i] if query_results.get('metadatas') and query_results['metadatas'][0] else {}
+        content = entry.get('memory', 'N/A')
+        score = entry.get('score')
+        metadata = entry.get('metadata', {})
+        original_context = metadata.get("original_context")
+        timestamp = metadata.get("timestamp", entry.get('created_at'))
+        channel_id = metadata.get("channel_id")
+        is_global = metadata.get("is_global", False)
         parsed_notes.append({
-            "id": note_id,
-            "content": doc,
-            "context": meta.get("context"),
-            "timestamp": meta.get("timestamp"),
-            "distance": distance,
-            "channel_id": meta.get("channel_id"),
-            "is_global": meta.get("is_global", False)
+            "id": memory_id,
+            "content": content,
+            "context": original_context,
+            "timestamp": timestamp,
+            "score": score,
+            "channel_id": channel_id,
+            "is_global": is_global,
+            "metadata": metadata
         })
     return parsed_notes
 

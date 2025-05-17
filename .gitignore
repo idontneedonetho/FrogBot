@@ -16,3 +16,4 @@ user_points_test.db
 user_points.db
 memory_check.py
 chroma_db/
+data/

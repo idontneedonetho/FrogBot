@@ -12,26 +12,30 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-take_note_func = genai.types.FunctionDeclaration(
-    name="take_note",
-    description="Records a piece of information, correction, or important detail mentioned in the conversation for future reference. Use this when users provide new facts, correct previous statements, or highlight something significant.",
+remember_context_func = genai.types.FunctionDeclaration(
+    name="remember_context",
+    description=(
+        "Processes and stores significant information, facts, user preferences, or conversational nuances from the recent dialogue. "
+        "Use this to build a persistent memory about the user or topic being discussed. "
+        "mem0 will infer structured memories from the provided context and messages."
+    ),
     parameters={
         "type": "object",
         "properties": {
-            "note_content": {
+            "reason_to_remember": {
                 "type": "string",
-                "description": "The specific piece of information or text to be recorded as a note."
+                "description": "A brief explanation or summary of what key information should be focused on or extracted from the recent messages (e.g., 'User expressed preference for sci-fi movies', 'Key decision made about project X')."
             },
-            "context": {
-                "type": "string",
-                "description": "Optional: Brief context about the note, like who provided the information or what message it relates to (e.g., 'Correction from UserX about parameter Y')."
+            "num_recent_messages_to_include": {
+                "type": "integer",
+                "description": "Optional (defaults to 3): Number of recent actual messages (including user and assistant turns) to fetch from history and provide to mem0 for context and memory inference. Max typically around 5-7 to keep it focused."
             },
             "is_global": {
                 "type": "boolean",
-                "description": "Optional (defaults to false/channel-specific): Set to true ONLY if this note represents a general fact or preference applicable across ALL channels. Leave false/omit for channel-specific info."
+                "description": "Optional (defaults to false/user-specific): Set to true ONLY if this memory represents a general fact applicable across all contexts for this user. Leave false/omit for context-specific memories tied more to the current conversation flow."
             }
         },
-        "required": ["note_content"]
+        "required": ["reason_to_remember"]
     }
 )
 
@@ -66,40 +70,6 @@ react_func = genai.types.FunctionDeclaration(
             }
         },
         "required": ["emoji"]
-    }
-)
-
-update_note_func = genai.types.FunctionDeclaration(
-    name="update_note",
-    description="Updates an existing note identified by its ID with new content. Use this when new information significantly overlaps with or corrects an existing note retrieved from context.",
-    parameters={
-        "type": "object",
-        "properties": {
-            "note_id": {
-                "type": "string",
-                "description": "The unique ID of the note to be updated. Get this from the [Relevant Notes Retrieved] context."
-            },
-            "new_content": {
-                "type": "string",
-                "description": "The revised or updated content for the note."
-            }
-        },
-        "required": ["note_id", "new_content"]
-    }
-)
-
-delete_note_func = genai.types.FunctionDeclaration(
-    name="delete_note",
-    description="Deletes a specific note using its unique ID. Use this when a retrieved note is confirmed to be completely outdated, irrelevant, or incorrect.",
-    parameters={
-        "type": "object",
-        "properties": {
-            "note_id": {
-                "type": "string",
-                "description": "The unique ID of the note to be deleted. Get this from the [Relevant Notes Retrieved] context."
-            }
-        },
-        "required": ["note_id"]
     }
 )
 
@@ -139,9 +109,7 @@ search_frogpilot_wiki_func = genai.types.FunctionDeclaration(
 
 all_tools = genai.types.Tool(
     function_declarations=[
-        take_note_func,
-        update_note_func,
-        delete_note_func,
+        remember_context_func,
         send_message_func,
         react_func,
         ignore_func,
@@ -177,59 +145,58 @@ async def _handle_react_to_message(cog: 'LLMCog', message: 'disnake.Message', ar
             function_response=genai.types.FunctionResponse(name=action_name, response={"error": "missing emoji parameter"})
         )
 
-async def _handle_take_note(cog: 'LLMCog', message: 'disnake.Message', args: Dict[str, Any]) -> genai.types.Part:
-    action_name = "take_note"
-    note_content = args.get("note_content")
-    context = args.get("context")
+async def _handle_remember_context(cog: 'LLMCog', message: 'disnake.Message', args: Dict[str, Any]) -> genai.types.Part:
+    action_name = "remember_context"
+    reason_to_remember = args.get("reason_to_remember")
+    num_messages_to_include = args.get("num_recent_messages_to_include", 3)
     is_global = args.get("is_global", False)
+    user_id = str(message.author.id)
+    channel_id_str = str(message.channel.id)
     response_data = {}
-    if note_content:
-        await cog.save_note(
-            note_content=note_content,
-            context=context,
-            channel_id=message.channel.id,
-            is_global=is_global
+    if not reason_to_remember:
+        logger.warning("remember_context call without reason_to_remember.")
+        response_data = {"error": "missing reason_to_remember"}
+        return genai.types.Part(
+            function_response=genai.types.FunctionResponse(name=action_name, response=response_data)
         )
-        response_data = {"status": "note_saved", "note_content_preview": note_content[:50]+"..." if len(note_content) > 50 else note_content}
-    else:
-        logger.warning("take_note call without note_content.")
-        response_data = {"error": "missing note_content"}
-    return genai.types.Part(
-        function_response=genai.types.FunctionResponse(name=action_name, response=response_data)
-    )
-
-async def _handle_update_note(cog: 'LLMCog', message: 'disnake.Message', args: Dict[str, Any]) -> genai.types.Part:
-    action_name = "update_note"
-    note_id = args.get("note_id")
-    new_content = args.get("new_content")
-    response_data = {}
-    if note_id and new_content:
-        await cog.update_note_content(
-            note_id=note_id,
-            new_content=new_content,
-            channel_id=message.channel.id
-        )
-        response_data = {"status": "note_updated", "note_id": note_id, "new_content_preview": new_content[:50]+"..." if len(new_content) > 50 else new_content}
-    else:
-        logger.warning(f"update_note call missing note_id ({note_id}) or new_content.")
-        response_data = {"error": "missing note_id or new_content"}
-    return genai.types.Part(
-        function_response=genai.types.FunctionResponse(name=action_name, response=response_data)
-    )
-
-async def _handle_delete_note(cog: 'LLMCog', message: 'disnake.Message', args: Dict[str, Any]) -> genai.types.Part:
-    action_name = "delete_note"
-    note_id = args.get("note_id")
-    response_data = {}
-    if note_id:
-        success = await cog.delete_note(note_id=note_id)
-        if success:
-            response_data = {"status": "note_deleted", "note_id": note_id}
+    messages_to_commit = []
+    try:
+        actual_num_to_fetch = max(1, num_messages_to_include)
+        history_limit_for_before = max(0, actual_num_to_fetch - 1)
+        fetched_discord_messages = []
+        if history_limit_for_before > 0:
+            async for msg in message.channel.history(limit=history_limit_for_before, before=message, oldest_first=False):
+                fetched_discord_messages.append(msg)
+            fetched_discord_messages.reverse()
+        fetched_discord_messages.append(message)
+        for msg_from_hist in fetched_discord_messages:
+            role = "assistant" if msg_from_hist.author == cog.bot.user else "user"
+            content = msg_from_hist.content
+            if content:
+                messages_to_commit.append({"role": role, "content": content})
+        if not messages_to_commit:
+            logger.warning("No messages found or formatted to commit to memory.")
+            response_data = {"error": "no_messages_to_commit", "reason": "Could not fetch or format recent messages."}
         else:
-            response_data = {"error": "failed to delete note or note not found", "note_id": note_id}
-    else:
-        logger.warning("delete_note call missing note_id.")
-        response_data = {"error": "missing note_id"}
+            memory_ids = await cog.commit_messages_to_memory(
+                user_id=user_id,
+                reason_to_remember=reason_to_remember,
+                messages_to_commit=messages_to_commit,
+                is_global=is_global,
+                channel_id=channel_id_str
+            )
+            if memory_ids:
+                response_data = {
+                    "status": "context_committed_to_mem0", 
+                    "memory_id(s)": memory_ids,
+                    "reason": reason_to_remember,
+                    "num_messages_processed": len(messages_to_commit)
+                }
+            else:
+                response_data = {"error": "failed_to_commit_context_to_mem0"}
+    except Exception as e:
+        logger.error(f"Error in _handle_remember_context: {e}", exc_info=True)
+        response_data = {"error": f"internal_error_in_handler: {str(e)}"}
     return genai.types.Part(
         function_response=genai.types.FunctionResponse(name=action_name, response=response_data)
     )
@@ -271,9 +238,7 @@ async def _handle_search_frogpilot_wiki(cog: 'LLMCog', message: 'disnake.Message
 ToolHandlerType = Callable[['LLMCog', 'disnake.Message', Dict[str, Any]], Coroutine[Any, Any, Optional[genai.types.Part]]]
 TOOL_HANDLERS: Dict[str, ToolHandlerType] = {
     "react_to_message": _handle_react_to_message,
-    "take_note": _handle_take_note,
-    "update_note": _handle_update_note,
-    "delete_note": _handle_delete_note,
+    "remember_context": _handle_remember_context,
     "get_recent_channel_history": _handle_get_recent_channel_history,
     "search_frogpilot_wiki": _handle_search_frogpilot_wiki,
 }

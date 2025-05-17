@@ -5,3 +5,6 @@ psutil
 PyYAML
 pytz
 dateparser
+Pillow
+python-dotenv
+mem0ai
