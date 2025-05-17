@@ -1,13 +1,14 @@
 # modules.llm.utils.utils
 
-from modules.llm.utils.config import IMAGE_MAX_SIZE, VIDEO_SIZE_LIMIT
-from typing import Optional, Dict
+from modules.llm.utils.config import IMAGE_MAX_SIZE, VIDEO_SIZE_LIMIT, MAX_REPLY_DEPTH
+from typing import Optional, Dict, List
 from google import genai
 from io import BytesIO
 from PIL import Image
 import logging
 import aiohttp
 import disnake
+import json
 import re
 
 logger = logging.getLogger(__name__)
@@ -132,3 +133,87 @@ async def convert_mentions(text: str, message: disnake.Message) -> str:
             return original_name
     converted_text = re.sub(r'(?<!<)@((?!\d+>)[\w\\.-]+)', replace_mention, text)
     return converted_text 
+
+def parse_chromadb_query_results(query_results: Dict, existing_ids_to_skip: Optional[set] = None) -> List[Dict]:
+    parsed_notes = []
+    if not query_results or not query_results.get('ids') or not query_results['ids'][0]:
+        return parsed_notes
+    existing_ids_to_skip = existing_ids_to_skip or set()
+    for i, note_id in enumerate(query_results['ids'][0]):
+        if note_id in existing_ids_to_skip:
+            continue
+        distance = query_results['distances'][0][i] if query_results.get('distances') and query_results['distances'][0] else None
+        doc = query_results['documents'][0][i] if query_results.get('documents') and query_results['documents'][0] else "N/A"
+        meta = query_results['metadatas'][0][i] if query_results.get('metadatas') and query_results['metadatas'][0] else {}
+        parsed_notes.append({
+            "id": note_id,
+            "content": doc,
+            "context": meta.get("context"),
+            "timestamp": meta.get("timestamp"),
+            "distance": distance,
+            "channel_id": meta.get("channel_id"),
+            "is_global": meta.get("is_global", False)
+        })
+    return parsed_notes
+
+def extract_forwarded_content(message: disnake.Message) -> str:
+    forward_context_str = ""
+    if message.embeds:
+        for embed in message.embeds:
+            if embed.description and embed.type == 'rich':
+                logger.info(f"Extracted forwarded content from embed for message {message.id}.")
+                forward_context_str = f"[Forwarded Message Content:]\\n{embed.description}"
+                break
+    return forward_context_str 
+
+async def build_reply_chain_context(message: disnake.Message, bot: disnake.ClientUser) -> str:
+    reply_context_str = ""
+    if message.reference and message.reference.message_id:
+        reply_chain_messages = []
+        current_msg_in_chain = message
+        depth = 0
+        while depth < MAX_REPLY_DEPTH and current_msg_in_chain.reference and current_msg_in_chain.reference.message_id:
+            ref = current_msg_in_chain.reference
+            ref_msg = ref.resolved
+            if not ref_msg:
+                try:
+                    ref_msg = await message.channel.fetch_message(ref.message_id)
+                except (disnake.NotFound, disnake.Forbidden):
+                    logger.warning(f"Could not fetch referenced message {ref.message_id} at depth {depth}. Stopping chain.")
+                    break
+                except Exception as e:
+                    logger.error(f"Error fetching referenced message {ref.message_id} at depth {depth}: {e}")
+                    break
+            if ref_msg:
+                reply_chain_messages.insert(0, ref_msg)
+                current_msg_in_chain = ref_msg
+                depth += 1
+            else:
+                break
+        if reply_chain_messages:
+            context_parts = []
+            for i, msg_in_chain in enumerate(reply_chain_messages):
+                formatted_msg_in_chain = format_discord_message(msg_in_chain, bot)
+                label = f"[Replying To Message:]" if i == len(reply_chain_messages) - 1 else f"[Reply Chain Message {i+1}/{len(reply_chain_messages)}:]"
+                context_parts.append(f"{label}\\\\n{json.dumps(formatted_msg_in_chain, indent=2)}")
+            reply_context_str = "\\\\n\\\\n".join(context_parts)
+            logger.info(f"Built reply chain context ({len(reply_chain_messages)} messages) for message {message.id}")
+    return reply_context_str
+
+async def get_recent_channel_history(channel: disnake.abc.Messageable, bot: disnake.ClientUser, num_messages: int) -> str:
+    history_str = f"Recent messages in #{channel.name} (newest first):\\n"
+    message_count = 0
+    try:
+        async for msg in channel.history(limit=num_messages):
+            formatted = format_discord_message(msg, bot)
+            history_str += f"- {formatted['author']}: {formatted['content']}\\\\n"
+            message_count += 1
+        if message_count == 0:
+            history_str += "(No recent messages found or accessible)."
+        return history_str
+    except disnake.Forbidden:
+        logger.warning(f"Missing permissions to read history in channel {channel.id}")
+        return "(Error: Cannot access channel history due to permissions)."
+    except Exception as e:
+        logger.error(f"Error fetching channel history for {channel.id}: {e}")
+        return f"(Error fetching channel history: {e})" 

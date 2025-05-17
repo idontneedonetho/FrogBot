@@ -1,9 +1,10 @@
 # modules.llm.utils.tools
 
+from modules.llm.utils.config import DEFAULT_HISTORY_MESSAGES, MAX_HISTORY_REQUEST
+from typing import Optional, Any, TYPE_CHECKING, Callable, Coroutine, Dict
+import modules.llm.utils.utils as utils
 from google import genai
 import logging
-from typing import Optional, Any, TYPE_CHECKING, Callable, Coroutine, Dict
-from modules.llm.utils.config import DEFAULT_HISTORY_MESSAGES, MAX_HISTORY_REQUEST
 
 if TYPE_CHECKING:
     from ..llm import LLMCog 
@@ -243,7 +244,7 @@ async def _handle_get_recent_channel_history(cog: 'LLMCog', message: 'disnake.Me
         num_to_fetch = DEFAULT_HISTORY_MESSAGES
     num_to_fetch = max(1, min(num_to_fetch, MAX_HISTORY_REQUEST))
     logger.info(f"Executing get_recent_channel_history for {num_to_fetch} messages.")
-    history_result = await cog._get_recent_channel_history(message.channel, num_to_fetch)
+    history_result = await utils.get_recent_channel_history(message.channel, cog.bot, num_to_fetch)
     response_data = {"history": history_result, "messages_retrieved": num_to_fetch}
     return genai.types.Part(
         function_response=genai.types.FunctionResponse(name=action_name, response=response_data)
