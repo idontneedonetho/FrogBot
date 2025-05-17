@@ -1,37 +1,39 @@
-import re, uuid
+import re
+import uuid
 import logging
-from .models import WebSocketMessage, QueryResponse 
+import time
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import requests
 from pydantic import ValidationError
-# Import handlers from handlers.py
+
+from .models import WebSocketMessage, QueryResponse
+from .models import TextBlock, SearchMarkerBlock, NewlineBlock
 from .handlers import (
-    BaseHandler, 
     FileContentsHandler,
     ReferenceHandler,
     ListAppendHandler,
     ChunkHandler,
     LoggingHandler
 )
-# Import WebSocketManager and WebSocketError
 from .websocket_manager import WebSocketManager, WebSocketError as WebSocketManagerError
 
 logger = logging.getLogger(__name__)
-from typing import Any, Callable, Dict, List, Optional
-import requests 
+
 
 class DeepWikiConfig:
     """Configuration settings for the DeepWiki client."""
-    BASE_API_URL = "https://api.devin.ai/ada"
-    QUERY_ENDPOINT = f"{BASE_API_URL}/query"
-    WS_ENDPOINT_FORMAT = f"wss://{BASE_API_URL.split('://')[1]}/ws/query/{{query_id}}"
-    SEARCH_URL_FORMAT = "https://deepwiki.com/search/{query_id}"
-    DEFAULT_ORIGIN = "https://deepwiki.com"
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    DEFAULT_ENGINE_ID = "agent"
-    # DEFAULT_ENGINE_ID = "multihop"
-    DEFAULT_REPO = ["FrogAi/FrogPilot"]
-    HTTP_TIMEOUT = 30
-    WEBSOCKET_TIMEOUT = 120
-    ssl_verify = True
+    BASE_API_URL: str = "https://api.devin.ai/ada"
+    QUERY_ENDPOINT: str = f"{BASE_API_URL}/query"
+    WS_ENDPOINT_FORMAT: str = f"wss://{BASE_API_URL.split('://')[1]}/ws/query/{{query_id}}"
+    SEARCH_URL_FORMAT: str = "https://deepwiki.com/search/{query_id}"
+    DEFAULT_ORIGIN: str = "https://deepwiki.com"
+    DEFAULT_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0"
+    DEFAULT_ENGINE_ID: str = "agent"
+    DEFAULT_REPO: List[str] = ["FrogAi/FrogPilot"]
+    HTTP_TIMEOUT: int = 30
+    WEBSOCKET_TIMEOUT: int = 120
+    SSL_VERIFY: bool = True
     MSG_DONE: str = "Received 'done' message"
     MSG_LOADING_INDEXES: str = "Server is loading indexes..."
 
@@ -40,176 +42,348 @@ class DeepWikiError(Exception):
     """Base exception for DeepWiki client errors."""
     pass
 
-class MessageHandlerRegistry:
-    """Registry for mapping message types to handlers."""
-    def __init__(self) -> None:
-        # Use BaseHandler from handlers.py if defined, otherwise adjust type hint
-        self.handlers: Dict[str, BaseHandler] = {}
-
-    def register(self, message_type: str, handler: BaseHandler) -> None:
-        """Register a message handler for a specific message type.
-        
-        Args:
-            message_type: The type of message to handle
-            handler: The handler instance for this message type
-        """
-        self.handlers[message_type] = handler
-
-    def get(self, message_type: str) -> Optional[BaseHandler]:
-        """Get the handler for a message type.
-        
-        Args:
-            message_type: The type of message to get handler for
-            
-        Returns:
-            The registered handler or None if not found
-        """
-        return self.handlers.get(message_type)
 
 class DeepWikiClient:
     """Client for interacting with the DeepWiki API."""
-    def __init__(self, config: DeepWikiConfig = None):
-        """Initialize the DeepWiki client.
-        
-        Args:
-            config: Optional configuration settings (uses defaults if None)
-        """
-        # Now uses the DeepWikiConfig defined above
-        self.config = config or DeepWikiConfig() 
+
+    def __init__(self, config: Optional[DeepWikiConfig] = None):
+        """Initialize the client with optional configuration."""
+        self.config = config or DeepWikiConfig()
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': self.config.DEFAULT_USER_AGENT,
-            'Origin': self.config.DEFAULT_ORIGIN
-        })
-        # Ensure ssl_verify is set on the config instance
-        if not hasattr(self.config, 'ssl_verify'):
-             self.config.ssl_verify = True # Set default if missing
+        self.session.headers.update(self._get_common_headers())
+        self._init_message_handlers()
 
-        self.user_agent = self.config.DEFAULT_USER_AGENT
-        self.origin = self.config.DEFAULT_ORIGIN
-        self._message_handlers = MessageHandlerRegistry()
-        # Register imported handlers
-        self._message_handlers.register('file_contents', FileContentsHandler())
-        self._message_handlers.register('code_chunks', ListAppendHandler('code_chunks'))
-        self._message_handlers.register('summary_chunks', ListAppendHandler('summary_chunks'))
-        self._message_handlers.register('chunk', ChunkHandler())
-        self._message_handlers.register('done', LoggingHandler(self.config.MSG_DONE))
-        self._message_handlers.register('reference', ReferenceHandler())
-        self._message_handlers.register('loading_indexes', LoggingHandler(self.config.MSG_LOADING_INDEXES))
+    def _init_message_handlers(self) -> None:
+        """Initialize the message handlers dictionary."""
+        self._message_handlers = {
+            'file_contents': FileContentsHandler(),
+            'code_chunks': ListAppendHandler('code_chunks'),
+            'summary_chunks': ListAppendHandler('summary_chunks'),
+            'chunk': ChunkHandler(),
+            'done': LoggingHandler(self.config.MSG_DONE),
+            'reference': ReferenceHandler(),
+            'loading_indexes': LoggingHandler(self.config.MSG_LOADING_INDEXES),
+        }
 
-    def _generate_query_prefix(self, search_terms: str) -> str:
-        p = re.sub(r'[^a-z0-9\s]', '', search_terms.lower().encode('ascii', 'ignore').decode())
-        return re.sub(r'\s+', '-', p).strip('-')[:30]
-
-    def _generate_query_details(self, search_terms: str, context: str, repos: Optional[List[str]] = None) -> Dict[str, Any]:
-        query_id = f"{self._generate_query_prefix(search_terms)}_{uuid.uuid4()}"
+    def _get_common_headers(self) -> Dict[str, str]:
+        """Return common headers for API requests."""
         return {
-            "payload": {
-                "engine_id": self.config.DEFAULT_ENGINE_ID,
-                "user_query": f"<relevant_context>{context}</relevant_context>{search_terms}",
-                "query_id": query_id,
-                "repo_names": repos or self.config.DEFAULT_REPO,
-                "keywords": [],
-                "additional_context": "",
-                "use_notes": False,
-                "generate_summary": False
-            },
+            'Origin': f"{self.config.DEFAULT_ORIGIN}",
+            'Referer': f"{self.config.DEFAULT_ORIGIN}/",
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Content-Type': 'application/json',
+            'DNT': '1',
+            'Sec-GPC': '1',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site',
+            'Priority': 'u=0',
+            'TE': 'trailers'
+        }
+
+    def generate_query_prefix(self, search_terms: str) -> str:
+        """Generate a standardized query prefix from search terms."""
+        return re.sub(r"[^a-z0-9-]", '', search_terms.lower().replace(' ', '-'))[:30]  # Keep only allowed chars and truncate
+
+    def generate_query_details(
+        self,
+        search_terms: str,
+        context: str,
+        repos: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Generate payload and URL details for a query."""
+        query_id = f"{self.generate_query_prefix(search_terms)}_{uuid.uuid4()}"
+        payload = {
+            "engine_id": self.config.DEFAULT_ENGINE_ID,
+            "user_query": f"<relevant_context>{context}</relevant_context>{search_terms}",
+            "query_id": query_id,
+            "repo_names": repos or self.config.DEFAULT_REPO,
+            "keywords": [],
+            "additional_context": "",
+            "use_notes": False,
+            "generate_summary": False
+        }
+        return {
+            "payload": payload,
             "deepwiki_url": self.config.SEARCH_URL_FORMAT.format(query_id=query_id),
             "ws_url": self.config.WS_ENDPOINT_FORMAT.format(query_id=query_id),
             "query_id": query_id
         }
 
-    def _make_api_request(self, url: str, method: str = 'GET', json_data: Optional[Dict[str, Any]] = None, timeout: Optional[int] = None) -> requests.Response:
-        t = timeout if timeout is not None else self.config.HTTP_TIMEOUT
+    def _handle_api_response(self, response: requests.Response) -> requests.Response:
+        """Handle common API response patterns and raise appropriate errors."""
+        response.raise_for_status()
+        
+        if 200 <= response.status_code < 300:
+            self._check_response_errors(response)
+        
+        return response
+
+    def _check_response_errors(self, response: requests.Response) -> None:
+        """Check response for common error patterns."""
         try:
-            # Pass verify=self.config.ssl_verify to requests
-            r = self.session.request(method, url, json=json_data, timeout=t, verify=self.config.ssl_verify)
-            r.raise_for_status()
-            return r
-        except requests.exceptions.Timeout:
-            raise DeepWikiError(f"Request timed out after {t}s")
+            response_data = response.json()
+            if not isinstance(response_data, dict):
+                return
+
+            if response_data.get('success') is False:
+                raise DeepWikiError(f"API Error: {response_data.get('message', response.text)}")
+            if 'error' in response_data:
+                raise DeepWikiError(f"API Error: {response_data.get('error', response.text)}")
+            if 'detail' in response_data and response.request.method == 'POST':
+                if "Query not found" not in str(response_data.get('detail')):
+                    raise DeepWikiError(f"API Error: {response_data.get('detail', response.text)}")
+        except ValueError:
+            pass  # Not JSON or not an error structure we recognize
+
+    def make_api_request(
+        self,
+        url: str,
+        method: str = 'GET',
+        json_data: Optional[Dict[str, Any]] = None,
+        timeout: Optional[int] = None
+    ) -> requests.Response:
+        """Make an API request with proper error handling."""
+        try:
+            headers = self._get_common_headers()
+            response = self.session.request(
+                method, url,
+                json=json_data,
+                headers=headers,
+                timeout=timeout or self.config.HTTP_TIMEOUT,
+                verify=self.config.SSL_VERIFY
+            )
+            return self._handle_api_response(response)
+        except requests.exceptions.Timeout as e:
+            raise DeepWikiError(f"Request timed out after {timeout or self.config.HTTP_TIMEOUT}s")
         except requests.exceptions.HTTPError as e:
-            txt = e.response.text[:500] + ('...' if len(e.response.text) > 500 else '')
-            raise DeepWikiError(f"HTTP {e.response.status_code}: {txt}")
+            error_text = e.response.text[:500] + ('...' * (len(e.response.text) > 500))
+            raise DeepWikiError(f"HTTP {e.response.status_code}: {error_text}")
         except requests.exceptions.RequestException as e:
             raise DeepWikiError(f"Network error: {e}")
 
-
-    def _process_websocket_message(self, msg: str, response: QueryResponse) -> None:
+    def process_websocket_message(self, msg: str, response: QueryResponse) -> None:
+        """Process a WebSocket message using the appropriate handler."""
         try:
-            # Basic parsing to get type and data
             ws_msg = WebSocketMessage.parse_raw(msg)
-            
-            # Use message type or title if type is missing
-            msg_type = ws_msg.type or ws_msg.title 
-            if not msg_type:
-                 logger.warning(f"WebSocket message missing type/title: {msg[:100]}...")
-                 return
+            if not (msg_type := ws_msg.type or ws_msg.title):
+                logger.warning(f"WebSocket message missing type/title: {msg[:100]}...")
+                return
 
-            handler = self._message_handlers.get(msg_type)
-            if handler:
-                # Let the handler manage validation and processing of ws_msg.data
+            if handler := self._message_handlers.get(msg_type):
                 handler.handle(ws_msg.data, response)
             else:
                 logger.debug(f"No handler registered for message type: {msg_type}")
-        # Catch validation errors from Pydantic and other potential issues
-        except (ValidationError, ValueError, Exception) as e:
-            logger.warning(f"WebSocket message processing error: {e} - Message: {msg[:100]}...", exc_info=True)
+        except (ValidationError, ValueError) as e:
+            logger.warning(f"WebSocket message parsing error: {e} - Message: {msg[:100]}...")
+        except Exception as e:
+            logger.error(f"Error processing WebSocket message: {e} - Message: {msg[:100]}...")
 
-
-    def _stream_and_process_websocket(
+    def stream_and_process_websocket(
         self,
         ws_url: str,
         query_id: str,
         timeout: Optional[int] = None,
         on_update: Optional[Callable[[QueryResponse], None]] = None
     ) -> QueryResponse:
-        t = timeout if timeout is not None else self.config.WEBSOCKET_TIMEOUT
-        # Pass ssl_verify directly
-        ws_manager = WebSocketManager(self.config.ssl_verify, self.user_agent, self.origin)
-        response = QueryResponse(query_id=query_id)
+        """Stream and process WebSocket messages for a query."""
+        ws_manager = WebSocketManager(
+            self.config.SSL_VERIFY,
+            self.config.DEFAULT_USER_AGENT,
+            self.config.DEFAULT_ORIGIN
+        )
+        query_response = QueryResponse(query_id=query_id)
 
         try:
-            ws_manager.connect(ws_url, t)
+            ws_manager.connect(ws_url, timeout or self.config.WEBSOCKET_TIMEOUT)
             ws_manager.receive_messages(
-                t,
-                lambda msg: self._process_websocket_message(msg, response),
-                lambda: on_update(response) if on_update else None
+                timeout or self.config.WEBSOCKET_TIMEOUT,
+                lambda msg: self.process_websocket_message(msg, query_response),
+                lambda: on_update and on_update(query_response)
             )
-            response.done = True
+            query_response.done = True
             if on_update:
-                on_update(response)  # Final update with done=True
-            return response
-        # Catch specific WebSocket errors
+                on_update(query_response)
+            return query_response
         except WebSocketManagerError as e:
-             logger.error(f"WebSocket operation failed: {e}")
-             raise DeepWikiError(f"WebSocket error: {e}") from e
+            logger.error(f"WebSocket error: {e}")
+            raise DeepWikiError(f"WebSocket error: {e}") from e
         finally:
             ws_manager.close()
 
-    def _initiate_query(self, payload: Dict[str, Any]) -> None:
-        self._make_api_request(self.config.QUERY_ENDPOINT, method='POST', json_data=payload)
-
-    def query(self, search_terms: str, context: str, repos: Optional[List[str]] = None, on_update: Optional[Callable[[QueryResponse], None]] = None) -> Optional[QueryResponse]:
-        """Execute a query against the DeepWiki API.
-        
-        Args:
-            search_terms: The search query terms
-            context: Additional context for the query
-            repos: Optional list of repositories to search
-            on_update: Optional callback for query progress updates
-            
-        Returns:
-            QueryResponse with results, or None if query failed
-        """
+    def query(
+        self,
+        search_terms: str,
+        context: str,
+        repos: Optional[List[str]] = None,
+        on_update: Optional[Callable[[QueryResponse], None]] = None
+    ) -> Optional[QueryResponse]:
+        """Execute a query and process the results."""
         try:
-            d = self._generate_query_details(search_terms, context, repos)
-            self._initiate_query(d['payload'])
-            r = self._stream_and_process_websocket(d['ws_url'], d['query_id'], on_update=on_update)
-            return r
+            query_details = self.generate_query_details(search_terms, context, repos)
+            
+            post_response = self.make_api_request(
+                self.config.QUERY_ENDPOINT,
+                'POST',
+                query_details['payload']
+            )
+            post_data = post_response.json()
+            if not post_data.get('status') == 'success':
+                raise DeepWikiError(f"Query registration failed: {post_data}")
+
+            # Exponential backoff for query processing (max 3 attempts, starting at 1s)
+            for attempt in range(3):
+                time.sleep(1 * (attempt + 1))
+                status_check = self.make_api_request(
+                    f"{self.config.QUERY_ENDPOINT}/{query_details['query_id']}"
+                )
+                if status_check.json().get('status') == 'ready':
+                    break
+            
+            return self.stream_and_process_websocket(
+                query_details['ws_url'],
+                query_details['query_id'],
+                on_update=on_update
+            )
         except DeepWikiError as e:
-            logger.error(f"DeepWiki query failed: {e}")
+            logger.error(f"Query failed: {e}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error during query: {e}")
+            logger.error(f"Unexpected query error: {e}")
             return None
+
+    def _should_include_element(
+        self,
+        element: Union[TextBlock, SearchMarkerBlock, NewlineBlock],
+        filter_show_text: bool,
+        filter_show_markers: bool,
+        filter_show_newlines: bool
+    ) -> bool:
+        """Determine if an element should be included in the formatted output."""
+        if isinstance(element, TextBlock):
+            return filter_show_text and self._should_include_text(element, filter_show_markers)
+        elif isinstance(element, SearchMarkerBlock):
+            return filter_show_markers and bool(element.marker_text)
+        elif isinstance(element, NewlineBlock):
+            return filter_show_newlines
+        return False
+
+    def _should_include_text(self, element: TextBlock, filter_show_markers: bool) -> bool:
+        """Determine if text element should be included."""
+        check_text = element.content.strip()
+        return not (not filter_show_markers and
+                  (check_text.startswith("Let me") or check_text.startswith("I'll")))
+
+    def _clean_text(self, text: str) -> str:
+        """Clean text by normalizing and collapsing excessive line breaks.
+        
+        Args:
+            text: Input text to clean
+            
+        Returns:
+            Cleaned text with normalized line endings and collapsed excessive newlines
+        """
+        # 1. Normalize \r\n to \n
+        text = re.sub(r'\r\n', '\n', text)
+        # 2. Remove lines with only spaces/tabs between newlines
+        text = re.sub(r'\n[ \t]+\n', '\n\n', text)
+        # 3. Collapse three or more newlines to two
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text
+
+    def _format_element_content(
+        self,
+        element: Union[TextBlock, SearchMarkerBlock, NewlineBlock],
+        consecutive_newlines: int,
+        max_newlines: int
+    ) -> Optional[str]:
+        """Format the content of a single element for output."""
+        if isinstance(element, TextBlock):
+            text = element.content.rstrip('\n')
+            return text if text else None
+        elif isinstance(element, SearchMarkerBlock):
+            marker_text = element.marker_text[0] if isinstance(element.marker_text, list) else element.marker_text
+            return marker_text.rstrip('\n') if marker_text else None
+        elif isinstance(element, NewlineBlock):
+            return "\n" if consecutive_newlines < max_newlines else None
+        return None
+
+    def format_query_response(
+        self,
+        query_response: QueryResponse,
+        display_raw: bool = True,
+        display_filtered: bool = True,
+        filter_show_text: bool = True,
+        filter_show_markers: bool = False,
+        filter_show_newlines: bool = True,
+        display_references: bool = True,
+        display_query_id: bool = True,
+        display_query_url: bool = True
+    ) -> Optional[str]:
+        """Format the query response according to specified display options."""
+        if not query_response:
+            return None
+
+        output_parts = []
+        consecutive_newlines = 0
+        max_newlines = 2
+
+        # Add query metadata if requested
+        if display_query_id:
+            output_parts.append(f"Query ID: {query_response.query_id}")
+        if display_query_url:
+            output_parts.append(f"Query URL: {self.config.SEARCH_URL_FORMAT.format(query_id=query_response.query_id)}")
+        
+        if (display_query_id or display_query_url) and any([
+            display_raw and query_response.raw_answer,
+            display_filtered and query_response.content_elements,
+            display_references and query_response.references
+        ]):
+            output_parts.append("")
+
+        # Add raw answer if requested
+        if display_raw and query_response.raw_answer:
+            output_parts.append(query_response.raw_answer.rstrip('\n'))
+
+        # Add filtered content if requested
+        if display_filtered and query_response.content_elements:
+            for element in query_response.content_elements:
+                if not self._should_include_element(element, filter_show_text, 
+                                                  filter_show_markers, filter_show_newlines):
+                    continue
+
+                content = self._format_element_content(element, consecutive_newlines, max_newlines)
+                if content is not None:
+                    output_parts.append(content)
+                    if content != "\n":
+                        consecutive_newlines = 0
+                    elif content == "\n":
+                        consecutive_newlines += 1
+
+            if output_parts:
+                full_text = "\n".join(str(p) for p in output_parts if p is not None)
+                output_parts = [self._clean_text(full_text)]
+
+        # Add references if requested
+        if display_references and query_response.references:
+            if output_parts and output_parts[0].strip():
+                content_str = output_parts[0]
+                if content_str.endswith("\n\n"):
+                    pass
+                elif content_str.endswith("\n"):
+                    output_parts[0] = content_str + "\n"
+                else:
+                    output_parts[0] = content_str + "\n\n"
+
+            for i, ref in enumerate(query_response.references, 1):
+                path = ref._path or ref.file_path
+                line_range = f"{ref.range_start}-{ref.range_end}"
+                ref_str = f"{i}. Path: {path} (Lines {line_range})"
+                if ref.github_url:
+                    ref_str += f" - {ref.github_url}"
+                output_parts.append(ref_str)
+
+        return "\n".join(output_parts) if output_parts else None

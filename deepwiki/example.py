@@ -1,22 +1,28 @@
 from .deepwiki import DeepWikiClient
 
-# search_terms = "what to search for"
-# context = "additional context about the query" 
-response = DeepWikiClient().query(
-    search_terms="short paragraph about speed limit controller", 
-    context="overview of functionality"
-)
-print(response.raw_answer if response else "Query failed")
+if __name__ == "__main__":
+    search_terms = "Differences in MTSC and VTSC. Short paragraph"
+    context = ""
+    client = DeepWikiClient()
 
-if response and response.references:
-    print("\n--- References ---")
-    for i, ref in enumerate(response.references, 1):
-         url = ref.github_url
-         if url:
-             display_path = ref._path if ref._path else ref.file_path
-             print(f"{i}. Path: {display_path}")
-             print(f"   Lines: {ref.range_start}-{ref.range_end}")
-             print(f"   URL: {url}")
-         else:
-             print(f"{i}. Path: {ref.file_path}")
-             print(f"   Lines: {ref.range_start}-{ref.range_end}")
+    print(f"Querying DeepWiki with: {search_terms!r}...")
+    
+    if response := client.query(
+        search_terms=search_terms,
+        context=context
+    ):
+        format_options = {
+            'query_response': response,
+            'display_raw': False,
+            'display_filtered': True,
+            'filter_show_text': True,
+            'filter_show_markers': False,
+            'filter_show_newlines': True,
+            'display_references': True,
+            'display_query_id': False,
+            'display_query_url': True
+        }
+        print(client.format_query_response(**format_options))
+
+    else:
+        print("Query failed or returned no response.")

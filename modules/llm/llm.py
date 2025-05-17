@@ -898,39 +898,27 @@ Be conservative about cancelling. Do NOT cancel if MESSAGE_B is merely related, 
                 "" 
             )
             formatted_message_text = ""
-            if wiki_response and (wiki_response.raw_answer or wiki_response.references):
+            if wiki_response and (wiki_response.raw_answer or wiki_response.references or wiki_response.content_elements):
                 self.logger.info(f"FrogPilot Wiki search completed successfully for query: '{query}'.")
                 formatted_message_text = f"{author_mention}, here are the FrogPilot Wiki results for your query:\n> {query}\n\n"
-                summary_to_use = ""
-                raw_summary = wiki_response.raw_answer.strip() if wiki_response.raw_answer else ""
-                self.logger.debug(f"Full raw_answer from DeepWiki for query '{query}':\n------BEGIN RAW WIKI ANSWER------\n{raw_summary}\n------END RAW WIKI ANSWER------")
-                if raw_summary:
-                    marker = "> Searching codebase..."
-                    last_marker_index = raw_summary.rfind(marker)
-                    if last_marker_index != -1:
-                        cleaned_summary_attempt1 = raw_summary[last_marker_index + len(marker):].lstrip(' \n')
-                        if cleaned_summary_attempt1 and not cleaned_summary_attempt1.isspace():
-                            summary_to_use = cleaned_summary_attempt1
-                        else:
-                            self.logger.warning(f"Attempt 1: Cleaning summary for '{query}' after last '{marker}' resulted in empty/whitespace. Trying alternative.")
-                    else:
-                        summary_to_use = raw_summary
-                        self.logger.info(f"Marker '{marker}' not found in summary for '{query}'. Using raw summary.")
-                    if not summary_to_use and marker in raw_summary:
-                        first_marker_index = raw_summary.find(marker)
-                        cleaned_summary_attempt2 = raw_summary[first_marker_index + len(marker):].lstrip(' \n')
-                        if cleaned_summary_attempt2 and not cleaned_summary_attempt2.isspace():
-                            summary_to_use = cleaned_summary_attempt2
-                            self.logger.info(f"Attempt 2: Used content after first '{marker}' for '{query}'.")
-                        else:
-                            self.logger.warning(f"Attempt 2: Cleaning summary for '{query}' after first '{marker}' also resulted in empty/whitespace. Falling back to raw summary.")
-                            summary_to_use = raw_summary 
-                    elif not summary_to_use: 
-                         summary_to_use = raw_summary
+                summary_to_use = self.frogpilot_wiki_client.format_query_response(
+                    query_response=wiki_response,
+                    display_raw=False,
+                    display_filtered=True,
+                    filter_show_text=True,
+                    filter_show_markers=False,
+                    filter_show_newlines=True,
+                    display_references=False,
+                    display_query_id=False,
+                    display_query_url=False
+                )
+                if summary_to_use:
+                    summary_to_use = summary_to_use.strip()
+                self.logger.debug(f"Formatted summary from DeepWiki for query '{query}':\n------BEGIN FORMATTED WIKI SUMMARY------\n{summary_to_use}\n------END FORMATTED WIKI SUMMARY------")
                 if summary_to_use:
                     formatted_message_text += f"# **Summary:**\n{summary_to_use}\n\n"
-                elif raw_summary:
-                    self.logger.warning(f"Final summary for '{query}' was empty after cleaning attempts, but raw_summary had content. Raw summary logged for review: '{raw_summary[:200]}...'")
+                elif wiki_response.raw_answer:
+                    self.logger.warning(f"Formatted summary for '{query}' was empty/None, but raw_answer had content. Raw answer logged for review: '{wiki_response.raw_answer[:200]}...'")
                 if wiki_response.references:
                     from deepwiki.models import Reference
                     formatted_message_text += "**References:**\n"
@@ -943,10 +931,10 @@ Be conservative about cancelling. Do NOT cancel if MESSAGE_B is merely related, 
                         else:
                             self.logger.warning(f"Unexpected item in references list: {ref_obj}")
                             formatted_message_text += f"{i+1}. [Unexpected reference format]\n"
-                if not summary_to_use and not wiki_response.references and raw_summary:
+                if not summary_to_use and not wiki_response.references and wiki_response.raw_answer:
                     self.logger.info(f"Wiki search for '{query}' had a raw answer but summary extraction and references were empty. Adding raw answer snippet.")
-                    formatted_message_text += f"\n**Details from Wiki:**\n{raw_summary[:1000]}...\n(Summary extraction was inconclusive)"
-                elif not summary_to_use and not wiki_response.references and not raw_summary:
+                    formatted_message_text += f"\n**Details from Wiki:**\n{wiki_response.raw_answer[:1000]}...\n(Summary extraction was inconclusive)"
+                elif not summary_to_use and not wiki_response.references and not wiki_response.raw_answer:
                      formatted_message_text += "The search completed, but I couldn't extract a clear summary or specific references for your query."
             elif wiki_response:
                 self.logger.warning(f"FrogPilot Wiki search for '{query}' for user {author_id} completed but yielded no usable answer or references.")
