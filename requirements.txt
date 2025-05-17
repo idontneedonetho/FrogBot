@@ -9,3 +9,4 @@ dateparser
 Pillow
 python-dotenv
 mem0ai
+websocket-client

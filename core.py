@@ -13,7 +13,7 @@ import yaml
 import sys
 
 CONFIG = {
-    'VERSION': 'v3.7',
+    'VERSION': 'v3.7.1',
     'CONFIG_FILE': Path('config.yaml'),
     'COGS_DIR': Path("modules"),
     'TEST_GUILDS': [698205243103641711, 1137853399715549214],
