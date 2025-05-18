@@ -99,7 +99,7 @@ class WikiSearch(commands.Cog):
                         'filter_show_newlines': False,
                         'display_references': True,
                         'display_query_id': False,
-                        'display_query_url': True
+                        'display_query_url': False
                     }
                     formatted_output = await asyncio.to_thread(self.client.format_query_response, **format_options)
                     if formatted_output:
