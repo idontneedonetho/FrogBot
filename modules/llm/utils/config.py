@@ -102,7 +102,10 @@ SAFETY_SETTINGS: list[SafetySettingDict] = [
 ]
 
 def get_formatted_system_prompt(bot_name: str) -> str:
-    current_time_str = f"{datetime.now().strftime("%I:%M %p")} on {datetime.now().strftime("%B %d, %Y")}"
+    now = datetime.now()
+    time_part = now.strftime("%I:%M %p")
+    date_part = now.strftime("%B %d, %Y")
+    current_time_str = f"{time_part} on {date_part}"
     return SYSTEM_PROMPT.format(
         bot_name=bot_name,
         current_time=current_time_str,
