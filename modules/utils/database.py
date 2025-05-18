@@ -95,6 +95,20 @@ async def initialize_database():
                     details TEXT
                 )
             ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS wiki_search_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    guild_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    query_text TEXT NOT NULL,
+                    request_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT NOT NULL DEFAULT 'queued', -- queued, processing, completed, failed, error
+                    message_id INTEGER, -- ID of the message confirming queue position
+                    result_message_id INTEGER, -- ID of the message containing the results
+                    details TEXT
+                )
+            ''')
             await conn.commit()
     except Exception as e:
         logging.error(f"Error initializing database: {e}")
@@ -202,7 +216,6 @@ async def get_thread_languages(thread_id: int) -> list[str]:
     return [row[0] for row in rows]
 
 async def clear_thread_data(thread_id: int):
-    """Centralized function to clear all data related to a thread"""
     async with aiosqlite.connect(DATABASE_FILE) as conn:
         await conn.execute('DELETE FROM translation_threads WHERE thread_id = ?', (thread_id,))
         await conn.execute('DELETE FROM user_language_preferences WHERE thread_id = ?', (thread_id,))
@@ -319,6 +332,110 @@ async def log_wiki_search_event(user_id: int, query_text: str, event_type: str, 
         )
     except Exception as e:
         logging.error(f"Failed to log wiki search event (user: {user_id}, query: '{query_text}', event: {event_type}): {e}", exc_info=True)
+
+async def add_to_wiki_queue(user_id: int, guild_id: int, channel_id: int, query_text: str, message_id: int) -> Optional[int]:
+    conn = None
+    try:
+        current_timestamp = int(time.time())
+        conn = await get_connection()
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                """INSERT INTO wiki_search_queue 
+                   (user_id, guild_id, channel_id, query_text, request_timestamp, message_id, status) 
+                   VALUES (?, ?, ?, ?, ?, ?, 'queued')""",
+                (user_id, guild_id, channel_id, query_text, current_timestamp, message_id)
+            )
+            await conn.commit()
+            request_id = cursor.lastrowid
+        return request_id
+    except Exception as e:
+        logging.error(f"Failed to add to wiki queue (user: {user_id}, query: '{query_text}'): {e}", exc_info=True)
+        return None
+    finally:
+        if conn:
+            await release_connection(conn)
+
+async def get_oldest_queued_wiki_request() -> Optional[Dict]:
+    conn = None
+    try:
+        conn = await get_connection()
+        conn.row_factory = aiosqlite.Row
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT id FROM wiki_search_queue WHERE status = 'queued' ORDER BY request_timestamp ASC LIMIT 1"
+            )
+            row_id_data = await cursor.fetchone()
+            if not row_id_data:
+                return None
+            request_id = row_id_data["id"]
+            await cursor.execute(
+                "UPDATE wiki_search_queue SET status = 'processing' WHERE id = ?",
+                (request_id,)
+            )
+            await cursor.execute("SELECT * FROM wiki_search_queue WHERE id = ?", (request_id,))
+            updated_row_data = await cursor.fetchone()
+            await conn.commit()
+            return dict(updated_row_data) if updated_row_data else None
+    except Exception as e:
+        logging.error(f"Error getting oldest queued wiki request: {e}", exc_info=True)
+        if conn:
+            await conn.rollback()
+        return None
+    finally:
+        if conn:
+            await release_connection(conn)
+
+async def update_wiki_request_status(request_id: int, status: str, result_message_id: Optional[int] = None, details: Optional[str] = None) -> bool:
+    try:
+        updates = ["status = ?"]
+        params = [status]
+        if details is not None:
+            updates.append("details = ?")
+            params.append(details)
+        if result_message_id is not None:
+            updates.append("result_message_id = ?")
+            params.append(result_message_id)
+        params.append(request_id)
+        sql = f"UPDATE wiki_search_queue SET {', '.join(updates)} WHERE id = ?"
+        await db_access_with_retry(sql, tuple(params))
+        return True
+    except Exception as e:
+        logging.error(f"Failed to update wiki request {request_id} to status {status}: {e}", exc_info=True)
+        return False
+
+async def get_wiki_queue_position(request_id: int) -> Optional[int]:
+    rows = await db_access_with_retry(
+        "SELECT COUNT(*) FROM wiki_search_queue WHERE status = 'queued' AND id <= ?",
+        (request_id,)
+    )
+    return rows[0][0] if rows and rows[0] else None
+
+async def get_wiki_queued_count() -> int:
+    rows = await db_access_with_retry(
+        "SELECT COUNT(*) FROM wiki_search_queue WHERE status = 'queued'"
+    )
+    return rows[0][0] if rows and rows[0] else 0
+
+async def get_wiki_processing_count() -> int:
+    rows = await db_access_with_retry(
+        "SELECT COUNT(*) FROM wiki_search_queue WHERE status = 'processing'"
+    )
+    return rows[0][0] if rows and rows[0] else 0
+    
+async def get_wiki_request_by_id(request_id: int) -> Optional[Dict]:
+    conn = await get_connection()
+    try:
+        conn.row_factory = aiosqlite.Row
+        async with conn.cursor() as cursor:
+            await cursor.execute("SELECT * FROM wiki_search_queue WHERE id = ?", (request_id,))
+            row = await cursor.fetchone()
+        await release_connection(conn)
+        return dict(row) if row else None
+    except Exception as e:
+        logging.error(f"Error fetching wiki request by ID {request_id}: {e}", exc_info=True)
+        if conn:
+            await release_connection(conn)
+        return None
 
 class ThreadCleanupManager:
     def __init__(self, bot):
