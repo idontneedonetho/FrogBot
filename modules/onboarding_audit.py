@@ -14,10 +14,7 @@ class OnboardingAuditCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.config_data = Config(CONFIG['CONFIG_FILE']).read()
-        self.dunce_role_id = self.config_data.get('DUNCE_ROLE_ID', 0)
         self.tadpole_role_id = self.config_data.get('TADPOLE_ROLE_ID', 0)
-        self.lost_channel_id = self.config_data.get('LOST_CHANNEL_ID', 0)
-        self.mentor_role_id = self.config_data.get('MENTOR_ROLE_ID', 0)
         self.role_clear_target_ids = self.config_data.get('ROLE_CLEAR_TARGET_IDS', [])
         self.welcome_channel_id = self.config_data.get('WELCOME_CHANNEL_ID', 0)
         self.enable_24h_onboarding_kick = self.config_data.get('ENABLE_24H_ONBOARDING_KICK', False)
@@ -28,8 +25,8 @@ class OnboardingAuditCog(commands.Cog):
             self.onboarding_kick_activation_timestamp = None
         if not hasattr(self.bot, 'config_data'):
             self.bot.config_data = self.config_data
-        if not all([self.dunce_role_id, self.tadpole_role_id, self.lost_channel_id, self.mentor_role_id]):
-            logging.error("Onboarding/Audit Cog: Critical role or channel IDs are not configured. Disabling tasks.")
+        if not self.tadpole_role_id:
+            logging.error("Onboarding/Audit Cog: Tadpole Role ID is not configured. Core functionality might be impaired.")
         else:
             if self.enable_24h_onboarding_kick:
                 self.check_pending_onboarding_task.start()
@@ -37,7 +34,7 @@ class OnboardingAuditCog(commands.Cog):
             else:
                 logging.info("24h onboarding kick task NOT started due to ENABLE_24H_ONBOARDING_KICK=false.")
             self.deadline_kick_task.start()
-        logging.info(f"OnboardingAuditCog initialized. Dunce Role ID: {self.dunce_role_id}, Tadpole Role ID: {self.tadpole_role_id}, Lost Channel ID: {self.lost_channel_id}, Mentor Role ID: {self.mentor_role_id}")
+        logging.info(f"OnboardingAuditCog initialized. Tadpole Role ID: {self.tadpole_role_id}")
 
     def cog_unload(self):
         self.check_pending_onboarding_task.cancel()
@@ -60,8 +57,8 @@ class OnboardingAuditCog(commands.Cog):
         if not guild:
             logging.error("Pending onboarding check: Guild not found.")
             return
-        if not self.dunce_role_id or not self.tadpole_role_id:
-            logging.warning("Pending onboarding check: Dunce or Tadpole role ID not set. Skipping.")
+        if not self.tadpole_role_id:
+            logging.warning("Pending onboarding check: Tadpole role ID not set. Skipping.")
             return
         now = datetime.now(timezone.utc)
         kick_threshold = now - timedelta(hours=24)
@@ -75,10 +72,9 @@ class OnboardingAuditCog(commands.Cog):
             if joined_at_utc < self.onboarding_kick_activation_timestamp:
                 continue
             if joined_at_utc < kick_threshold:
-                has_dunce_role = any(role.id == self.dunce_role_id for role in member.roles)
                 has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
-                if not has_dunce_role and not has_tadpole_role:
-                    logging.info(f"Kicking member {member.id} ({member.display_name}) for not completing onboarding within 24 hours.")
+                if not has_tadpole_role:
+                    logging.info(f"Kicking member {member.id} ({member.display_name}) for not completing onboarding within 24 hours (missing Tadpole role).")
                     try:
                         await member.kick(reason="Did not complete onboarding within 24 hours.")
                     except disnake.Forbidden:
@@ -88,39 +84,11 @@ class OnboardingAuditCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
-        if self.dunce_role_id == 0 or self.lost_channel_id == 0 or self.mentor_role_id == 0 or self.tadpole_role_id == 0:
-            logging.debug("OnboardingAuditCog.on_member_update: Skipping due to unconfigured role/channel IDs.")
+        if not self.tadpole_role_id:
+            logging.debug("OnboardingAuditCog.on_member_update: Skipping due to unconfigured Tadpole role ID.")
             return
         guild = after.guild
-        dunce_role = guild.get_role(self.dunce_role_id)
         tadpole_role = guild.get_role(self.tadpole_role_id)
-        lost_channel = guild.get_channel(self.lost_channel_id)
-        mentor_role = guild.get_role(self.mentor_role_id)
-        if dunce_role and dunce_role not in before.roles and dunce_role in after.roles:
-            if not lost_channel or not mentor_role:
-                logging.error("Dunce logic: Lost channel or mentor role not found in guild. Check config.")
-                return
-            logging.info(f"User {after.display_name} received Dunce role. Restricting access and notifying mentors.")
-            try:
-                await lost_channel.send(f"{mentor_role.mention} User {after.mention} (`{after.id}`) has received the Dunce role and may need vetting. They have been restricted to this channel.")
-                try:
-                    roles_to_remove = [r for r in after.roles if r.id != guild.id and r.id != self.dunce_role_id]
-                    if roles_to_remove:
-                        await after.remove_roles(*roles_to_remove, reason="User received Dunce role.")
-                    await lost_channel.set_permissions(after, read_messages=True, send_messages=True)
-                    for channel in guild.text_channels:
-                        if channel.id != self.lost_channel_id:
-                            await channel.set_permissions(after, read_messages=False)
-                    for channel in guild.voice_channels:
-                         await channel.set_permissions(after, connect=False)
-                except disnake.Forbidden:
-                    logging.error(f"Could not modify roles/permissions for {after.display_name} after Dunce role assignment.")
-                except Exception as e:
-                    logging.error(f"Error during Dunce role permission handling for {after.display_name}: {e}")
-            except disnake.Forbidden:
-                logging.error(f"Could not send Dunce alert to {lost_channel.name}: Missing permissions.")
-            except disnake.HTTPException as e:
-                logging.error(f"Could not send Dunce alert to {lost_channel.name}: {e}")
         if tadpole_role and tadpole_role not in before.roles and tadpole_role in after.roles:
             logging.info(f"User {after.display_name} received Tadpole role. Sending welcome.")
             welcome_cog = self.bot.get_cog("WelcomeCog")
@@ -160,7 +128,6 @@ class OnboardingAuditCog(commands.Cog):
         cleared_count = 0
         member_count = 0
         roles_removed_summary = {}
-        dunce_role_id_int = int(self.dunce_role_id) if isinstance(self.dunce_role_id, (int, str)) and str(self.dunce_role_id).isdigit() else 0
         tadpole_role_id_int = int(self.tadpole_role_id) if isinstance(self.tadpole_role_id, (int, str)) and str(self.tadpole_role_id).isdigit() else 0
 
         for member in guild.members:
@@ -168,9 +135,8 @@ class OnboardingAuditCog(commands.Cog):
                 continue
             member_count += 1
             member_role_ids = {role.id for role in member.roles}
-            if (dunce_role_id_int != 0 and dunce_role_id_int in member_role_ids) or \
-               (tadpole_role_id_int != 0 and tadpole_role_id_int in member_role_ids):
-                logging.info(f"Skipping role clear for member {member.display_name} because they have the Dunce or Tadpole role.")
+            if tadpole_role_id_int != 0 and tadpole_role_id_int in member_role_ids:
+                logging.info(f"Skipping role clear for member {member.display_name} because they have the Tadpole role.")
                 continue
             roles_to_remove_for_this_member = []
             for role in member.roles:
@@ -263,9 +229,9 @@ class OnboardingAuditCog(commands.Cog):
             message_suffix = f"The 24-hour onboarding kick rule for NEW members will become active starting {activation_time_str}."
             logging.info(f"24h onboarding kick activation timestamp set to: {next_midnight_utc}")
             if not self.check_pending_onboarding_task.is_running():
-                if not all([self.dunce_role_id, self.tadpole_role_id]):
-                    message = ("24-hour onboarding kick feature set to ENABLED, but Dunce or Tadpole Role ID is not configured. "
-                               "The task will not run effectively. Please configure them.")
+                if not self.tadpole_role_id:
+                    message = ("24-hour onboarding kick feature set to ENABLED, but Tadpole Role ID is not configured. "
+                               "The task will not run effectively. Please configure it.")
                     logging.warning(message)
                 else:
                     self.check_pending_onboarding_task.start()
@@ -290,10 +256,12 @@ class OnboardingAuditCog(commands.Cog):
     @deadline_kick_task.before_loop
     async def before_tasks(self):
         await self.bot.wait_until_ready()
-        if not all([self.dunce_role_id, self.tadpole_role_id, self.lost_channel_id, self.mentor_role_id]):
-            logging.error("Aborting onboarding/audit tasks due to missing critical configuration.")
-            self.check_pending_onboarding_task.cancel()
-            self.deadline_kick_task.cancel()
+        if not self.tadpole_role_id:
+            logging.error("Aborting onboarding/audit tasks: Tadpole Role ID is not configured.")
+            if self.check_pending_onboarding_task.is_running():
+                self.check_pending_onboarding_task.cancel()
+            if self.deadline_kick_task.is_running():
+                self.deadline_kick_task.cancel()
 
 def setup(bot: commands.Bot):
     bot.add_cog(OnboardingAuditCog(bot))

@@ -1,7 +1,8 @@
 # modules.llm.llm
 
-from typing import List, Optional, Tuple, Any, Dict
+from typing import List, Dict, Optional, Tuple, Any
 import modules.llm.utils.tools as tool_helpers
+from chromadb.utils import embedding_functions
 import modules.llm.utils.config as llmconfig
 from deepwiki.deepwiki import DeepWikiClient
 from deepwiki.models import QueryResponse
@@ -12,25 +13,27 @@ from disnake.ext import commands
 from datetime import datetime
 from google import genai
 from core import config
-from mem0 import Memory
 from PIL import Image
 import collections
+import chromadb
 import logging
 import asyncio
 import disnake
 import random
 import json
 import time
+import uuid
 import re
-import os
 
 logger = logging.getLogger(__name__)
 logging.getLogger('disnake').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
+logging.getLogger('chromadb').setLevel(logging.WARNING)
 
 class LLMCog(commands.Cog):
-    __slots__ = ('bot', 'genai_client', 'chat_session', 'last_message_canceled', 'message_history', 'frogpilot_wiki_client',
-                 'wiki_search_queue', 'is_wiki_search_active', '_current_active_query', 'mem0_memory')
+    __slots__ = ('bot', 'genai_client', 'chat_session', 'chroma_client', 'notes_collection', 
+                 'gemini_embedding_function', 'last_message_canceled', 'message_history', 'frogpilot_wiki_client',
+                 'wiki_search_queue', 'is_wiki_search_active', '_current_active_query')
 
     def __init__(self, bot):
         self.bot = bot
@@ -38,10 +41,13 @@ class LLMCog(commands.Cog):
         self.logger.info("Initializing LLM Cog...")
         self.gemini_api_key = config.read().get('GOOGLE_API_KEY')
         if not self.gemini_api_key:
-            self.logger.error("Google Gemini API key not found in config. Core LLM features (and Mem0) will likely be disabled or fail.")
+            self.logger.error("Google API key not found in config. LLM features will be disabled.")
+            return
         self.genai_client: Optional[genai.Client] = None
         self.chat_session: Optional[Any] = None
-        self.mem0_memory: Optional[Memory] = None
+        self.chroma_client: Optional[chromadb.Client] = None
+        self.notes_collection: Optional[chromadb.Collection] = None
+        self.gemini_embedding_function: Optional[embedding_functions.GoogleGenerativeAiEmbeddingFunction] = None
         self.last_message_canceled: bool = False
         self.message_history: List[genai.types.Part] = []
         self.frogpilot_wiki_client: Optional[DeepWikiClient] = None
@@ -51,15 +57,18 @@ class LLMCog(commands.Cog):
 
     async def cog_load(self):
         if not self.gemini_api_key:
-            self.logger.error("LLM Cog cannot load: Google Gemini API key is missing. This is required for Mem0 as well.")
+            self.logger.error("LLM Cog cannot load: Google API key is missing.")
             return
+
         self.logger.info("LLM Cog loading: Initializing external services...")
+
         try:
             self.genai_client = genai.Client(api_key=self.gemini_api_key)
             self.logger.info("Google GenAI Client initialized successfully.")
         except Exception as e:
             self.logger.error(f"Failed to initialize Google GenAI Client: {e}")
             self.genai_client = None
+
         self.logger.info("Initializing FrogPilot Wiki Client...")
         try:
             self.frogpilot_wiki_client = DeepWikiClient()
@@ -67,50 +76,29 @@ class LLMCog(commands.Cog):
         except Exception as e:
             self.logger.error(f"Failed to initialize FrogPilot Wiki Client: {e}", exc_info=True)
             self.frogpilot_wiki_client = None
-        self.logger.info("Initializing Mem0 Memory Layer...")
-        try:
-            if self.gemini_api_key:
-                mem0_llm_config = {
-                    "provider": "openai",
-                    "config": {
-                        "api_key": self.gemini_api_key,
-                        "model": "gemini-2.0-flash",
-                        "openai_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-                    }
-                }
-                mem0_embedder_config = {
-                    "provider": "openai",
-                    "config": {
-                        "api_key": self.gemini_api_key,
-                        "model": "gemini-embedding-exp-03-07",
-                        "openai_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", 
-                    }
-                }
-                qdrant_storage_path = "data/mem0_qdrant_storage"
-                os.makedirs(qdrant_storage_path, exist_ok=True)
-                self.logger.info(f"Ensuring Qdrant storage directory exists at: {os.path.abspath(qdrant_storage_path)}")
-                mem0_vector_store_config = {
-                    "provider": "qdrant",
-                    "config": {
-                        "path": qdrant_storage_path,
-                        "on_disk": True,
-                    }
-                }
-                mem0_config = {
-                    "llm": mem0_llm_config,
-                    "embedder": mem0_embedder_config,
-                    "vector_store": mem0_vector_store_config
-                }
-                self.mem0_memory = Memory.from_config(config_dict=mem0_config)
-                self.logger.info("Mem0 Memory Layer initialized successfully using Google Gemini (via OpenAI-compatible endpoint with dict config).")
-            else:
-                self.logger.error("Mem0 could not be initialized: Google Gemini API key was not available after the initial check.")
-                self.mem0_memory = None
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Mem0 Memory Layer: {e}", exc_info=True)
-            self.mem0_memory = None
-        if not self.mem0_memory:
-            self.logger.warning("Mem0 Memory Layer failed to initialize. Note-related features will be significantly impacted or disabled.")
+
+        if self.genai_client:
+            self.logger.info("Initializing Vector DB (ChromaDB & Gemini Embedding Function)...")
+            try:
+                self.gemini_embedding_function = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
+                    api_key=self.gemini_api_key,
+                    model_name=llmconfig.EMBEDDING_MODEL_NAME
+                )
+                self.chroma_client = chromadb.PersistentClient(path=llmconfig.CHROMA_DB_PATH)
+                self.notes_collection = self.chroma_client.get_or_create_collection(
+                    name=llmconfig.NOTE_COLLECTION_NAME,
+                    embedding_function=self.gemini_embedding_function
+                )
+                self.logger.info(f"ChromaDB client initialized. Collection '{llmconfig.NOTE_COLLECTION_NAME}' loaded/created.")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize ChromaDB or collections: {e}")
+                self.chroma_client = None
+                self.notes_collection = None
+                self.gemini_embedding_function = None
+        else:
+            self.logger.warning("Skipping Vector DB initialization because Google GenAI Client is not available.")
+        if not self.notes_collection:
+            self.logger.warning("Note collection failed to initialize or was skipped. Note-related features will be disabled.")
         self.logger.info("LLM Cog core services initialization complete in cog_load.")
 
     @commands.Cog.listener()
@@ -237,50 +225,26 @@ class LLMCog(commands.Cog):
                     self.logger.error(f"Failed to send critical error message to Discord: {discord_err}")
             return None
 
-    async def _get_memory_context(self, query: str, user_id: str, channel_id: Optional[str] = None) -> str:
-        self.logger.info(f"ENTERED _get_memory_context for user {user_id} in channel {channel_id}.")
-        memory_context = ""
-        if not self.mem0_memory:
-            self.logger.warning("Mem0 Memory Layer not available. Cannot retrieve memories.")
-            return memory_context
-        try:
-            search_query = query
-            if channel_id:
-                if query:
-                    search_query = f"Context: channel {channel_id}. Query: {query}"
-            self.logger.debug(f"Attempting to retrieve memories for user {user_id} with final search_query: '{search_query}'")
-            retrieved_memories = self.mem0_memory.search(query=search_query, user_id=user_id, limit=llmconfig.MAX_NOTES)
-            self.logger.debug(f"Raw retrieved_memories from mem0.search for user {user_id}: {retrieved_memories}")
-            if retrieved_memories and isinstance(retrieved_memories, dict) and retrieved_memories.get("results"):
-                memory_lines = []
-                for i, entry in enumerate(retrieved_memories["results"]):
-                    memory_id = entry.get('id', 'N/A')
-                    score = entry.get('score', 'N/A')
-                    timestamp = entry.get('timestamp', 'N/A')
-                    text = entry.get('memory', '')
-                    metadata = entry.get('metadata', {})
-                    mem_channel_id = metadata.get('channel_id', 'N/A')
-                    is_global_mem = metadata.get('is_global', False)
-                    try:
-                        score_float = float(score)
-                        score_str = f"{score_float:.4f}"
-                    except (ValueError, TypeError):
-                        score_str = str(score)
-
-                    memory_lines.append(
-                        f"[{i+1}] ID={memory_id} Score={score_str} (Taken {timestamp}, "
-                        f"Channel: {mem_channel_id}, Global: {is_global_mem}): {text}"
-                    )
-                if memory_lines:
-                    memory_context = f"[Retrieved Memories (mem0):]\\n" + "\n".join(memory_lines)
-                    self.logger.debug(f"Formatted {len(retrieved_memories['results'])} memories from mem0 for user {user_id}.")
-                else:
-                    self.logger.debug(f"No processable 'results' in retrieved_memories for user {user_id}, or results were empty.")
-            else:
-                self.logger.debug(f"mem0.search did not return a dict with a 'results' list for user {user_id}. Response: {retrieved_memories}")
-        except Exception as e:
-            self.logger.error(f"Error retrieving memories from Mem0 for user {user_id}, query '{query}': {e}", exc_info=True)
-        return memory_context
+    async def _get_notes_context(self, query: str, channel_id: int) -> str:
+        notes_context = ""
+        retrieved_notes = await self.retrieve_relevant_notes(
+            query=query,
+            channel_id=channel_id,
+            n_results=llmconfig.MAX_NOTES
+        )
+        if retrieved_notes:
+            note_lines = []
+            for i, note in enumerate(retrieved_notes):
+                note_id = note.get('id', 'N/A')
+                distance = note.get('distance')
+                distance_str = f"{distance:.4f}" if distance is not None else "N/A"
+                timestamp = note.get('timestamp', 'N/A')
+                context = note.get('context', 'N/A')
+                content = note.get('content', '')
+                note_lines.append(f"[{i+1}] ID={note_id} Dist={distance_str} (Taken {timestamp}, Context: {context}): {content}")
+            notes_context = f"[Relevant Notes Retrieved:]\n" + "\n".join(note_lines)
+            self.logger.debug(f"Retrieved {len(retrieved_notes)} notes for context.")
+        return notes_context
 
     def _get_wiki_status_context(self) -> str:
         ongoing_searches_for_prompt = []
@@ -345,11 +309,9 @@ class LLMCog(commands.Cog):
         initial_contents = []
         prompt_parts = []
         prompt_parts.append(llmconfig.get_formatted_system_prompt(self.bot.user.display_name))
-        user_id_str = str(message.author.id)
-        channel_id_str = str(message.channel.id)
-        memory_context_str = await self._get_memory_context(message.content or "", user_id=user_id_str, channel_id=channel_id_str)
-        if memory_context_str:
-            prompt_parts.append(memory_context_str)
+        notes_context = await self._get_notes_context(message.content or "", message.channel.id)
+        if notes_context:
+            prompt_parts.append(notes_context)
         wiki_status = self._get_wiki_status_context()
         if wiki_status:
             prompt_parts.append(wiki_status)
@@ -704,108 +666,120 @@ Be conservative about cancelling. Do NOT cancel if MESSAGE_B is merely related, 
                 except Exception as final_task_exc:
                     self.logger.warning(f"Error awaiting originally cancelled typing task for {message.id}: {final_task_exc}")
 
-    async def save_note(self, user_id: str, note_content: str, context: Optional[str] = None, channel_id: Optional[str] = None, is_global: bool = False):
-        if not self.mem0_memory:
-            self.logger.warning("Mem0 Memory Layer not available. Skipping saving note.")
-            return None
+    async def save_note(self, note_content: str, context: Optional[str] = None, channel_id: Optional[int] = None, is_global: bool = False):
+        if not self.notes_collection:
+            self.logger.warning("Notes collection not available. Skipping saving note.")
+            return
+        note_id = str(uuid.uuid4())
+        metadata = {"context": context or "", 
+                    "timestamp": datetime.now().isoformat(),
+                    "is_global": is_global}
+        if not is_global and channel_id is not None: 
+            metadata['channel_id'] = str(channel_id) 
         try:
-            data_to_add = f"{note_content}"
-            if context:
-                data_to_add = f"{context}: {note_content}"
-            metadata = {
-                "original_context": context or "",
-                "timestamp": datetime.now().isoformat(),
-                "is_global": is_global,
-                "source_system": "FrogBot_save_note"
-            }
-            if not is_global and channel_id:
-                metadata['channel_id'] = str(channel_id)
-            result = self.mem0_memory.add(
-                data_to_add,
-                user_id=user_id,
-                metadata=metadata
+            self.notes_collection.add(
+                documents=[note_content],
+                metadatas=[metadata],
+                ids=[note_id]
             )
-            memory_id = result.get('id', 'N/A') if isinstance(result, dict) else 'N/A (check mem0 docs for return type)'
             scope = "Global" if is_global else f"Channel {channel_id or 'N/A'}"
-            log_message = f"Note Saved to Mem0 (User: {user_id}, MemID: {memory_id}, Scope: {scope}): {note_content}"
+            log_message = f"Note Saved (ID: {note_id}, Scope: {scope}): {note_content}"
             if context:
                 log_message += f" (Context: {context})"
             self.logger.debug(log_message)
-            return memory_id
         except Exception as e:
-            self.logger.error(f"Failed to save note to Mem0 (User: {user_id}): {e}", exc_info=True)
-            return None
+            self.logger.error(f"Failed to save note to ChromaDB (ID: {note_id}): {e}")
 
-    async def commit_messages_to_memory(self, user_id: str, reason_to_remember: str, messages_to_commit: List[Dict[str, str]], is_global: bool = False, channel_id: Optional[str] = None):
-        if not self.mem0_memory:
-            self.logger.warning("Mem0 Memory Layer not available. Skipping committing messages to memory.")
-            return None
+    async def update_note_content(self, note_id: str, new_content: str, channel_id: Optional[int] = None):
+        if not self.notes_collection:
+            self.logger.warning(f"Notes collection not available. Skipping update for note {note_id}.")
+            return
         try:
-            metadata = {
-                "reason_provided_by_llm": reason_to_remember,
-                "timestamp": datetime.now().isoformat(),
-                "is_global": is_global,
-                "source_system": "FrogBot_commit_messages"
-            }
-            if not is_global and channel_id:
+            existing_note = self.notes_collection.get(ids=[note_id], include=['metadatas'])
+            metadata = {}
+            if existing_note and existing_note.get('metadatas') and existing_note['metadatas']:
+                metadata = existing_note['metadatas'][0] or {}
+            metadata['timestamp'] = datetime.now().isoformat()
+            if channel_id is not None:
                 metadata['channel_id'] = str(channel_id)
-            result = self.mem0_memory.add(
-                messages_to_commit,
-                user_id=user_id,
-                metadata=metadata
+            else:
+                metadata.pop('channel_id', None)
+            self.notes_collection.update(
+                ids=[note_id],
+                documents=[new_content],
+                metadatas=[metadata]
             )
-            memory_id_or_ids = "N/A (check mem0 result)"
-            if isinstance(result, dict):
-                if 'id' in result:
-                    memory_id_or_ids = result['id']
-                elif 'ids' in result:
-                    memory_id_or_ids = result['ids']
-                elif result.get('results') and isinstance(result['results'], list):
-                    memory_id_or_ids = [res.get('id') for res in result['results'] if isinstance(res, dict) and 'id' in res]
-            scope = "Global" if is_global else f"Channel {channel_id or 'N/A'}"
-            log_message = f"Committed context to Mem0 (User: {user_id}, MemID(s): {memory_id_or_ids}, Scope: {scope}): Reason: {reason_to_remember}, with {len(messages_to_commit)} messages."
-            self.logger.debug(log_message)
-            return memory_id_or_ids
+            self.logger.debug(f"Note Updated (ID: {note_id}, Channel: {channel_id or metadata.get('channel_id', 'N/A')}): {new_content}")
         except Exception as e:
-            self.logger.error(f"Failed to commit messages to Mem0 (User: {user_id}): {e}", exc_info=True)
-            return None
+            self.logger.error(f"Failed to update note in ChromaDB (ID: {note_id}): {e}")
 
-    async def update_note_content(self, user_id: str, memory_id: str, new_content: str, context: Optional[str] = None, channel_id: Optional[str] = None):
-        if not self.mem0_memory:
-            self.logger.warning(f"Mem0 Memory Layer not available. Skipping update for mem_id {memory_id}, user {user_id}.")
+    async def retrieve_relevant_notes(self, query: str, channel_id: Optional[int] = None, n_results: int = llmconfig.MAX_NOTES) -> List[Dict]:
+        if not self.notes_collection:
+            self.logger.debug("Notes collection not available for retrieval.")
+            return []
+        channel_notes = []
+        if channel_id is not None:
+            try:
+                where_filter = {
+                    "$and": [
+                        {"channel_id": str(channel_id)}, 
+                        {"is_global": False}
+                    ]
+                } 
+                self.logger.debug(f"Querying ChromaDB for '{query}' with channel filter: {where_filter}")
+                results = self.notes_collection.query(
+                    query_texts=[query],
+                    n_results=n_results,
+                    where=where_filter,
+                    include=['documents', 'metadatas', 'distances']
+                )
+                if results and results.get('ids') and results['ids'][0]:
+                    channel_notes = utils.parse_chromadb_query_results(results)
+                self.logger.debug(f"Retrieved {len(channel_notes)} channel-specific notes for query.")
+            except Exception as e:
+                self.logger.error(f"Error retrieving channel-specific notes from ChromaDB for query '{query}': {e}")
+        global_notes = []
+        num_global_needed = n_results - len(channel_notes)
+        if num_global_needed > 0:
+             try:
+                channel_note_ids = {note['id'] for note in channel_notes}
+                where_filter = {"is_global": True}
+                self.logger.debug(f"Querying ChromaDB for '{query}' for {num_global_needed} global results (is_global=True).")
+                results = self.notes_collection.query(
+                    query_texts=[query],
+                    n_results=num_global_needed, 
+                    where=where_filter, 
+                    include=['documents', 'metadatas', 'distances']
+                )
+                if results and results.get('ids') and results['ids'][0]:
+                    global_notes = utils.parse_chromadb_query_results(results, channel_note_ids)
+                self.logger.debug(f"Retrieved {len(global_notes)} additional global notes for query.")
+             except Exception as e:
+                self.logger.error(f"Error retrieving global notes from ChromaDB for query '{query}': {e}")
+        all_notes = channel_notes + global_notes
+        all_notes.sort(key=lambda x: x.get('distance') if x.get('distance') is not None else float('inf'))
+        final_results = all_notes[:n_results]
+        self.logger.debug(f"Returning final {len(final_results)} notes (channel+global) for query.")
+        return final_results
+
+    async def delete_note(self, note_id: str) -> bool:
+        if not self.notes_collection:
+            self.logger.warning(f"Notes collection not available. Skipping delete for note {note_id}.")
             return False
         try:
-            updated_metadata = {
-                "original_context": context or "",
-                "timestamp": datetime.now().isoformat(),
-            }
-            if channel_id:
-                 updated_metadata['channel_id'] = str(channel_id)
-            self.mem0_memory.update(memory_id=memory_id, data=new_content, user_id=user_id)
-            self.logger.debug(f"Note Updated in Mem0 (User: {user_id}, MemID: {memory_id}, Channel: {channel_id or 'N/A'}): {new_content}")
+            existing = self.notes_collection.get(ids=[note_id], limit=1)
+            if not existing or not existing.get('ids'):
+                self.logger.warning(f"Attempted to delete non-existent note (ID: {note_id}).")
+                return False
+            self.notes_collection.delete(ids=[note_id])
+            self.logger.debug(f"Note Deleted (ID: {note_id})")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to update note in Mem0 (User: {user_id}, MemID: {memory_id}): {e}", exc_info=True)
-            return False
-
-
-    async def delete_note(self, user_id: str, memory_id: str) -> bool:
-        if not self.mem0_memory:
-            self.logger.warning(f"Mem0 Memory Layer not available. Skipping delete for mem_id {memory_id}, user {user_id}.")
-            return False
-        try:
-            self.mem0_memory.delete(memory_id=memory_id, user_id=user_id)
-            self.logger.debug(f"Note Deleted from Mem0 (User: {user_id}, MemID: {memory_id})")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to delete note from Mem0 (User: {user_id}, MemID: {memory_id}): {e}", exc_info=True)
+            self.logger.error(f"Failed to delete note from ChromaDB (ID: {note_id}): {e}")
             return False
 
     def cog_unload(self):
-        self.logger.info("LLM Cog unloading...")
-        if self.frogpilot_wiki_client and hasattr(self.frogpilot_wiki_client, 'close'):
-             asyncio.create_task(self.frogpilot_wiki_client.close())
-        self.logger.info("LLM Cog unloading complete.")
+        self.logger.info("LLM Cog unloading. Chroma PersistentClient should handle persistence.")
 
     def _format_wiki_response_message(self, original_query: str, response: Optional[QueryResponse], author_mention: str, author_id: int) -> str:
         if not response:
