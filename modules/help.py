@@ -128,14 +128,14 @@ class HelpCog(commands.Cog):
                 "Check your points and rank. Admins can check other users' points.\n\n"
                 "**/translate message**\n"
                 "Translate text to another language using a modal interface.\n\n"
+                "**/wiki_search [query]**\n"
+                "Search the FrogPilot Wiki using DeepWiki. Results are queued if the system is busy.\n\n"
                 "**/tictactoe [user]**\n"
                 f"Initiates a game of Tic-Tac-Toe between you and another user. If {bot_name} is tagged, you will play against it.\n\n"
                 "**/help**\n"
                 "Display this help message.\n\n"
                 "--------\n\n"
                 "*Advanced commands need Admin permissions*\n\n"
-                "**AI Chat & Assistance**\n"
-                "You can chat with me by mentioning my name or in designated channels. I can assist with various queries, remember information (notes), and search the FrogPilot Wiki.\n\n"
             )
         )
         await inter.edit_original_message(embed=embed, view=self.get_help_view("general"))
