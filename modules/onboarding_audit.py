@@ -6,6 +6,7 @@ from disnake.ext import commands, tasks
 import asyncio
 import disnake
 import logging
+import random
 
 PHOENIX_TZ = timezone(timedelta(hours=-7))
 DEADLINE_KICK_DATETIME = datetime(2025, 8, 6, 14, 3, 10, tzinfo=PHOENIX_TZ)
@@ -81,35 +82,6 @@ class OnboardingAuditCog(commands.Cog):
                         logging.error(f"Failed to kick {member.display_name}: Missing permissions.")
                     except disnake.HTTPException as e:
                         logging.error(f"Failed to kick {member.display_name}: {e}")
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before: disnake.Member, after: disnake.Member):
-        if not self.tadpole_role_id:
-            logging.debug("OnboardingAuditCog.on_member_update: Skipping due to unconfigured Tadpole role ID.")
-            return
-        guild = after.guild
-        tadpole_role = guild.get_role(self.tadpole_role_id)
-        if tadpole_role and tadpole_role not in before.roles and tadpole_role in after.roles:
-            logging.info(f"User {after.display_name} received Tadpole role. Sending welcome.")
-            welcome_cog = self.bot.get_cog("WelcomeCog")
-            if not welcome_cog:
-                logging.error("WelcomeCog not found. Cannot send Tadpole welcome.")
-                return
-            target_channel = None
-            if self.welcome_channel_id != 0:
-                target_channel = guild.get_channel(self.welcome_channel_id)
-                if not target_channel:
-                    logging.warning(f"Configured WELCOME_CHANNEL_ID {self.welcome_channel_id} not found. Falling back to system channel.")
-            if not target_channel:
-                target_channel = guild.system_channel
-            if target_channel:
-                try:
-                    await welcome_cog.send_tadpole_welcome(target_channel, after)
-                    await welcome_cog.send_random_gif(target_channel, after) 
-                except Exception as e:
-                    logging.error(f"Error calling WelcomeCog methods for {after.display_name}: {e}")
-            else:
-                logging.warning(f"No suitable channel found to send Tadpole welcome for {after.display_name} in guild {guild.name}.")
 
     @commands.slash_command(name="clear_member_roles", description="Clears specified roles from all members, preserving certain roles.")
     @commands.has_permissions(administrator=True)

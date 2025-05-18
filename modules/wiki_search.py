@@ -78,7 +78,7 @@ class WikiSearch(commands.Cog):
                     try:
                         q_message = await original_channel.fetch_message(original_message_id)
                         if q_message:
-                            await q_message.edit(content=f':hourglass_flowing_sand: Processing your wiki search: "{query_text}"...')
+                            await q_message.edit(content=f':hourglass_flowing_sand: Processing your wiki search:\n```\n{query_text}\n```\nThis may take a few minutes. I\'ll tag you when it\'s done!')
                     except disnake.NotFound:
                         logger.warning(f'Queue confirmation message {original_message_id} not found for request {request_id}.')
                         q_message = None
@@ -99,38 +99,37 @@ class WikiSearch(commands.Cog):
                         'filter_show_newlines': False,
                         'display_references': True,
                         'display_query_id': False,
-                        'display_query_url': False
+                        'display_query_url': True
                     }
                     formatted_output = await asyncio.to_thread(self.client.format_query_response, **format_options)
                     if formatted_output:
                         logger.info(f'Successfully processed wiki request ID: {request_id}. Sending response.')
                         sent_messages = None
-                        tagged_output = f'<@{user_id}>, your wiki search results for "{query_text}":\n{formatted_output}'
+                        tagged_output = f':white_check_mark: <@{user_id}>, your wiki search results:\n```\n{query_text}\n```\n{formatted_output}'
                         if q_message:
                             sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
+                            try:
+                                await q_message.delete()
+                            except disnake.HTTPException as e:
+                                logger.warning(f'Failed to delete processing message {original_message_id}: {e}')
                         else:
                             logger.warning(f"q_message (ID: {original_message_id}) not available for request {request_id}. Sending to channel directly.")
                             sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
                         result_message_id = sent_messages[0].id if sent_messages and len(sent_messages) > 0 else None
                         await db.update_wiki_request_status(request_id, "completed", result_message_id=result_message_id)
-                        if q_message: 
-                            try:
-                                await q_message.edit(content=f':white_check_mark: Wiki search for "{query_text}" completed!')
-                            except disnake.HTTPException as e_edit:
-                                logger.warning(f'Failed to edit confirm message {original_message_id} to final completed state: {e_edit}')
                     else:
                         logger.warning(f'Wiki request ID: {request_id} processed but yielded no formatted output.')
                         await db.update_wiki_request_status(request_id, "failed", details="Query successful but no output to display.")
-                        await commons.send_message(original_channel, f'Sorry <@{user_id}>, your wiki search for "{query_text}" completed but produced no results to display.', False)
+                        await commons.send_message(original_channel, f':warning: <@{user_id}>, your wiki search:\n```\n{query_text}\n```\ncompleted but produced no results to display.', False)
                 else:
                     logger.error(f'Wiki query failed or did not complete for request ID: {request_id}.')
                     await db.update_wiki_request_status(request_id, "failed", details="DeepWiki query failed or timed out.")
-                    await commons.send_message(original_channel, f'Sorry <@{user_id}>, there was an error processing your wiki search for "{query_text}". Please try again later.', False)
+                    await commons.send_message(original_channel, f':x: <@{user_id}>, there was an error processing your wiki search:\n```\n{query_text}\n```\nPlease try again later.', False)
             except Exception as e:
                 logger.error(f'Unhandled error processing wiki request ID {request_id}: {e}', exc_info=True)
                 await db.update_wiki_request_status(request_id, "error", details=str(e))
                 try:
-                    await commons.send_message(original_channel, f'Sorry <@{user_id}>, an unexpected error occurred while processing your wiki search for "{query_text}".', False)
+                    await commons.send_message(original_channel, f':x: <@{user_id}>, an unexpected error occurred while processing your wiki search:\n```\n{query_text}\n```\nThe developers have been notified.', False)
                 except Exception as send_e:
                     logger.error(f'Failed to send error message for request {request_id}: {send_e}')
 
@@ -139,11 +138,11 @@ class WikiSearch(commands.Cog):
         await inter.response.defer()
         current_queued_count = await db.get_wiki_queued_count()
         if current_queued_count >= 20:
-            await inter.followup.send("The wiki search queue is currently very long. Please try again in a few minutes.", ephemeral=True)
+            await inter.followup.send(":hourglass: The wiki search queue is currently very long. Please try again in a few minutes.", ephemeral=True)
             return
         confirm_message = None
         try:
-            confirm_message = await inter.followup.send(f':page_facing_up: Your wiki search for "{query}" is being added to the queue...', wait=True)
+            confirm_message = await inter.followup.send(f':page_facing_up: Your wiki search has been queued:\n```\n{query}\n```\nThis may take a few minutes. I\'ll tag you when it\'s done!', wait=True)
         except disnake.HTTPException as e:
             logger.error(f'Failed to send initial confirmation for wiki search by {inter.author.id}: {e}')
             await inter.followup.send("Sorry, I couldn't queue your request right now due to a communication issue. Please try again.", ephemeral=True)
