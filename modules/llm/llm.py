@@ -308,7 +308,6 @@ class LLMCog(commands.Cog):
     async def process_media_content(self, message: disnake.Message) -> Tuple[List[Any], bool]:
         initial_contents = []
         prompt_parts = []
-        prompt_parts.append(llmconfig.get_formatted_system_prompt(self.bot.user.display_name))
         notes_context = await self._get_notes_context(message.content or "", message.channel.id)
         if notes_context:
             prompt_parts.append(notes_context)
