@@ -4,12 +4,18 @@ import logging
 import disnake
 import re
 
-async def send_message(message, content, should_reply):
+async def send_message(message_or_channel, content, should_reply):
     try:
-        if should_reply:
-            return await (message.send(content) if isinstance(message, disnake.Thread) else message.reply(content))
+        if isinstance(message_or_channel, disnake.Message):
+            if should_reply:
+                return await (message_or_channel.send(content) if isinstance(message_or_channel, disnake.Thread) else message_or_channel.reply(content))
+            else:
+                return await message_or_channel.channel.send(content)
+        elif isinstance(message_or_channel, disnake.TextChannel):
+            return await message_or_channel.send(content)
         else:
-            return await message.channel.send(content)
+            logging.error("Invalid input type for send_message. Expected disnake.Message or disnake.TextChannel.")
+            return None
     except Exception as e:
         logging.error(f"Error sending message: {e}")
         return None
@@ -41,14 +47,14 @@ def process_links(text):
     text = re.sub(r'\[([^\]]+)\]\((http[s]?://\S+)\)', r'\1 <\2>', text)
     return re.sub(r'(?<![<\(])http[s]?://\S+(?![>\)])', r'<\g<0>>', text)
 
-async def send_long_message(message, response, should_reply=True):
+async def send_long_message(message_or_channel, response, should_reply=True):
     try:
         response = process_links(response)
         parts = split_message(response)
         messages = []
         for i, part in enumerate(parts):
             if i == 0:
-                last_message = await send_message(message, part, should_reply)
+                last_message = await send_message(message_or_channel, part, should_reply)
             else:
                 last_message = await send_message(last_message, part, False)
             if last_message is None:

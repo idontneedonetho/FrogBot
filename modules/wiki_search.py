@@ -105,21 +105,17 @@ class WikiSearch(commands.Cog):
                     if formatted_output:
                         logger.info(f'Successfully processed wiki request ID: {request_id}. Sending response.')
                         sent_messages = None
+                        tagged_output = f'<@{user_id}>, your wiki search results for "{query_text}":\n{formatted_output}'
                         if q_message:
-                            sent_messages = await commons.send_long_message(q_message, formatted_output, should_reply=True)
+                            sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
                         else:
                             logger.warning(f"q_message (ID: {original_message_id}) not available for request {request_id}. Sending to channel directly.")
-                            sent_messages = await commons.send_long_message(original_channel, formatted_output, should_reply=False)
+                            sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
                         result_message_id = sent_messages[0].id if sent_messages and len(sent_messages) > 0 else None
                         await db.update_wiki_request_status(request_id, "completed", result_message_id=result_message_id)
                         if q_message: 
                             try:
-                                final_q_message_content = f':white_check_mark: Wiki search for "{query_text}" completed!'
-                                if sent_messages:
-                                     final_q_message_content += f' See results above (or in reply to this message).'
-                                else:
-                                     final_q_message_content += ' But there was no output to display.' if not formatted_output else ' Error sending results.'
-                                await q_message.edit(content=final_q_message_content)
+                                await q_message.edit(content=f':white_check_mark: Wiki search for "{query_text}" completed!')
                             except disnake.HTTPException as e_edit:
                                 logger.warning(f'Failed to edit confirm message {original_message_id} to final completed state: {e_edit}')
                     else:
@@ -134,7 +130,7 @@ class WikiSearch(commands.Cog):
                 logger.error(f'Unhandled error processing wiki request ID {request_id}: {e}', exc_info=True)
                 await db.update_wiki_request_status(request_id, "error", details=str(e))
                 try:
-                    await commons.send_message(original_channel, f'Sorry <@{user_id}>, an unexpected error occurred while processing your wiki search for "{query_text}". The developers have been notified.', False)
+                    await commons.send_message(original_channel, f'Sorry <@{user_id}>, an unexpected error occurred while processing your wiki search for "{query_text}".', False)
                 except Exception as send_e:
                     logger.error(f'Failed to send error message for request {request_id}: {send_e}')
 
