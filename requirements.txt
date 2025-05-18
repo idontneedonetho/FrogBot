@@ -1,5 +1,6 @@
 disnake
 aiosqlite
+chromadb
 google-generativeai
 google-genai
 psutil
@@ -8,5 +9,4 @@ pytz
 dateparser
 Pillow
 python-dotenv
-mem0ai
 websocket-client
