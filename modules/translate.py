@@ -15,7 +15,7 @@ import logging
 import json
 
 class TranslationConfig:
-    MODEL_NAME = "gemini-2.0-flash"
+    MODEL_NAME = "gemini-2.5-flash-preview-04-17"
     CONTEXT_MESSAGES = 7
     NUM_WORKERS = 3
     SAFETY_SETTINGS = [
@@ -24,7 +24,7 @@ class TranslationConfig:
                    "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]
     ]
     SYSTEM_PROMPT = """You are a translation assistant. Your job is to:
-1. Translate messages while maintaining context and nuance
+1. Translate messages while maintaining context, nuance and accuracy
 2. Never add commentary or additional messages
 3. Always use full language names
 4. Never translate into the source language - only translate into the target languages.
