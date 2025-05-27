@@ -11,7 +11,7 @@ class TextBlock(BaseModel):
 class SearchMarkerBlock(BaseModel):
     type: Literal["search_marker"] = "search_marker"
     marker_text: Union[str, List[str]] = Field(
-        default=["> Searching codebase...", r"^Let'?s? .*:$"],
+        default=["> Searching codebase...", r"(?i)^(let'?s?|now[,\s]*let'?s?).*:$"],
         description="Text patterns that identify search marker blocks"
     )
 
