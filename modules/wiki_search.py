@@ -1,9 +1,9 @@
 # modules.wiki_search
 
-from deepwiki.deepwiki import DeepWikiClient, QueryResponse
 from modules.utils import commons, database as db
+from deepwiki.deepwiki import DeepWikiClient
 from disnake.ext import commands
-from typing import Optional
+from typing import Union
 import disnake
 import asyncio
 import logging
@@ -14,172 +14,155 @@ class WikiSearch(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.client = DeepWikiClient()
-        self._processing_lock = asyncio.Lock()
         self._queue_processor_task = None
+        self.bot.loop.create_task(self._start_queue_processor())
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        logger.info("WikiSearch cog is ready, starting queue processor.")
-        self.start_queue_processor()
+    async def _start_queue_processor(self):
+        await self.bot.wait_until_ready()
+        self._queue_processor_task = asyncio.create_task(self._process_queue_loop())
 
     def cog_unload(self):
         if self._queue_processor_task:
             self._queue_processor_task.cancel()
 
-    def start_queue_processor(self):
-        if self._queue_processor_task is None or self._queue_processor_task.done():
-            self._queue_processor_task = asyncio.create_task(self._process_queue_loop())
-            logger.info("Wiki search queue processor task (re)started.")
-
     async def _process_queue_loop(self):
         while True:
             try:
-                await self._process_single_queue_item()
-                queued_count = await db.get_wiki_queued_count()
-                processing_count = await db.get_wiki_processing_count()
-                if queued_count > 0 or processing_count > 0:
-                    await asyncio.sleep(1)
-                else:
+                request_data = await db.get_oldest_queued_wiki_request()
+                if not request_data:
                     await asyncio.sleep(10)
-            except asyncio.CancelledError:
-                logger.info("Wiki search queue processor task cancelled.")
-                break
-            except Exception as e:
-                logger.error(f'Error in wiki queue processor loop: {e}', exc_info=True)
-                await asyncio.sleep(60)
-
-    async def _process_single_queue_item(self):
-        if self._processing_lock.locked():
-            return
-        async with self._processing_lock:
-            request_data = await db.get_oldest_queued_wiki_request()
-            if not request_data:
-                return
-            request_id = request_data["id"]
-            user_id = request_data["user_id"]
-            channel_id = request_data["channel_id"]
-            query_text = request_data["query_text"]
-            original_message_id = request_data["message_id"]
-            q_message = None
-            logger.info(f"Processing wiki request ID: {request_id} for user {user_id} - Query: '{query_text}'")
-            original_channel = self.bot.get_channel(channel_id)
-            if not original_channel:
-                logger.warning(f'Original channel {channel_id} not found for request {request_id}. Marking as failed.')
-                await db.update_wiki_request_status(request_id, "failed", details="Original channel not found.")
-                user = self.bot.get_user(user_id)
-                if user:
-                    try:
-                        await user.send(f'Sorry, I couldn\'t process your wiki search "{query_text}" because the original channel is no longer accessible.')
-                    except disnake.HTTPException:
-                        logger.warning(f'Failed to DM user {user_id} about missing channel for request {request_id}')
-                return
-            try:
+                    continue
+                request_id = request_data["id"]
+                user_id = request_data["user_id"]
+                channel_id = request_data["channel_id"]
+                query_text = request_data["query_text"]
+                original_message_id = request_data["message_id"]
+                channel = self.bot.get_channel(channel_id)
+                if not channel:
+                    await db.update_wiki_request_status(request_id, "failed", details="Channel not found")
+                    continue
                 if original_message_id:
                     try:
-                        q_message = await original_channel.fetch_message(original_message_id)
-                        if q_message:
-                            await q_message.edit(content=f':hourglass_flowing_sand: Processing your wiki search:\n```\n{query_text}\n```\nThis may take a few minutes. I\'ll tag you when it\'s done!')
-                    except disnake.NotFound:
-                        logger.warning(f'Queue confirmation message {original_message_id} not found for request {request_id}.')
-                        q_message = None
-                    except disnake.HTTPException as e:
-                        logger.warning(f'Failed to edit queue confirmation message {original_message_id}: {e}')
-                response: Optional[QueryResponse] = await asyncio.to_thread(
-                    self.client.query,
-                    search_terms=query_text,
-                    context=""
-                )
-                if response and response.done:
-                    format_options = {
-                        'query_response': response,
-                        'display_raw': False,
-                        'display_filtered': True,
-                        'filter_show_text': True,
-                        'filter_show_markers': False,
-                        'filter_show_newlines': False,
-                        'display_references': True,
-                        'display_query_id': False,
-                        'display_query_url': True
-                    }
-                    formatted_output = await asyncio.to_thread(self.client.format_query_response, **format_options)
-                    if formatted_output:
-                        logger.info(f'Successfully processed wiki request ID: {request_id}. Sending response.')
-                        sent_messages = None
-                        tagged_output = f':white_check_mark: <@{user_id}>, your wiki search results:\n```\n{query_text}\n```\n{formatted_output}'
-                        if q_message:
-                            sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
-                            try:
-                                await q_message.delete()
-                            except disnake.HTTPException as e:
-                                logger.warning(f'Failed to delete processing message {original_message_id}: {e}')
-                        else:
-                            logger.warning(f"q_message (ID: {original_message_id}) not available for request {request_id}. Sending to channel directly.")
-                            sent_messages = await commons.send_long_message(original_channel, tagged_output, should_reply=False)
-                        result_message_id = sent_messages[0].id if sent_messages and len(sent_messages) > 0 else None
-                        await db.update_wiki_request_status(request_id, "completed", result_message_id=result_message_id)
-                    else:
-                        logger.warning(f'Wiki request ID: {request_id} processed but yielded no formatted output.')
-                        await db.update_wiki_request_status(request_id, "failed", details="Query successful but no output to display.")
-                        await commons.send_message(original_channel, f':warning: <@{user_id}>, your wiki search:\n```\n{query_text}\n```\ncompleted but produced no results to display.', False)
-                else:
-                    logger.error(f'Wiki query failed or did not complete for request ID: {request_id}.')
-                    await db.update_wiki_request_status(request_id, "failed", details="DeepWiki query failed or timed out.")
-                    await commons.send_message(original_channel, f':x: <@{user_id}>, there was an error processing your wiki search:\n```\n{query_text}\n```\nPlease try again later.', False)
-            except Exception as e:
-                logger.error(f'Unhandled error processing wiki request ID {request_id}: {e}', exc_info=True)
-                await db.update_wiki_request_status(request_id, "error", details=str(e))
+                        msg = await channel.fetch_message(original_message_id)
+                        await msg.edit(content=f':hourglass_flowing_sand: Processing: ```{query_text}```\nThis will take a few minutes. Check back here in a little while.')
+                    except (disnake.NotFound, disnake.HTTPException):
+                        pass
                 try:
-                    await commons.send_message(original_channel, f':x: <@{user_id}>, an unexpected error occurred while processing your wiki search:\n```\n{query_text}\n```\nThe developers have been notified.', False)
-                except Exception as send_e:
-                    logger.error(f'Failed to send error message for request {request_id}: {send_e}')
+                    response = await asyncio.to_thread(
+                        self.client.query,
+                        search_terms=query_text,
+                        context=""
+                    )
+                    if not response or not response.done:
+                        await self._send_error(channel, user_id, query_text, "Query failed")
+                        await db.update_wiki_request_status(request_id, "failed")
+                        continue
+                    if original_message_id:
+                        try:
+                            original_msg = await channel.fetch_message(original_message_id)
+                            await original_msg.edit(content=f':white_check_mark: Processed: ```{query_text}```')
+                        except (disnake.NotFound, disnake.HTTPException):
+                            pass
+                    if not isinstance(channel, disnake.Thread):
+                        thread_name = f"Wiki Results: {query_text[:50]}"
+                        try:
+                            original_msg = await channel.fetch_message(original_message_id)
+                            channel = await original_msg.create_thread(name=thread_name)
+                        except (disnake.NotFound, disnake.HTTPException):
+                            channel = await channel.create_thread(name=thread_name, type=disnake.ChannelType.public_thread)
+                    formatted = await asyncio.to_thread(
+                        self.client.format_query_response,
+                        query_response=response,
+                        display_raw=False,
+                        display_filtered=True,
+                        filter_show_text=True,
+                        filter_show_markers=False,
+                        filter_show_newlines=False,
+                        display_references=True,
+                        display_query_id=False,
+                        display_query_url=True
+                    )
+                    if formatted:
+                        header = f':white_check_mark: <@{user_id}>, results:\n'
+                        messages = await commons.send_long_message(channel, header + formatted, should_reply=False)
+                        if messages:
+                            await db.update_wiki_request_status(request_id, "completed", result_message_id=messages[0].id)
+                    else:
+                        await self._send_error(channel, user_id, query_text, "No results found")
+                        await db.update_wiki_request_status(request_id, "failed")
+                except Exception as e:
+                    logger.error(f'Error processing request {request_id}: {e}')
+                    await self._send_error(channel, user_id, query_text, "Processing error")
+                    await db.update_wiki_request_status(request_id, "error", details=str(e))
+                if original_message_id:
+                    try:
+                        msg = await channel.fetch_message(original_message_id)
+                        await msg.delete()
+                    except (disnake.NotFound, disnake.HTTPException):
+                        pass
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f'Queue processor error: {e}')
+                await asyncio.sleep(60)
+
+    async def _send_error(self, channel, user_id, query_text, error_type):
+        messages = {
+            "Query failed": f':x: <@{user_id}>, query failed for:\n```{query_text}```',
+            "No results found": f':warning: <@{user_id}>, no results for:\n```{query_text}```',
+            "Processing error": f':x: <@{user_id}>, error processing:\n```{query_text}```'
+        }
+        await channel.send(messages.get(error_type, messages["Processing error"]))
+
+    async def _queue_wiki_search(self, interaction_or_message: Union[disnake.ApplicationCommandInteraction, disnake.Message], query: str):
+        user = interaction_or_message.author
+        channel = interaction_or_message.channel
+        if await db.get_wiki_queued_count() >= 20:
+            msg = ":hourglass: Queue is full. Please try again later."
+            if isinstance(interaction_or_message, disnake.ApplicationCommandInteraction):
+                await interaction_or_message.followup.send(msg, ephemeral=True)
+            else:
+                await channel.send(f"{user.mention} {msg}", delete_after=30)
+            return
+        queue_msg = None
+        try:
+            position = await db.get_wiki_queued_count()
+            msg = f':hourglass_flowing_sand: Added to queue:\n```{query}```\nYou\'re {"next" if position == 0 else f"position in the queue is {position}"}.'
+            if isinstance(interaction_or_message, disnake.ApplicationCommandInteraction):
+                await interaction_or_message.response.defer()
+                queue_msg = await interaction_or_message.followup.send(msg, wait=True)
+            else:
+                queue_msg = await channel.send(
+                    msg,
+                    reference=interaction_or_message if not isinstance(channel, disnake.DMChannel) else None
+                )
+        except disnake.HTTPException:
+            pass
+        request_id = await db.add_to_wiki_queue(
+            user_id=user.id,
+            guild_id=interaction_or_message.guild.id if interaction_or_message.guild else 0,
+            channel_id=channel.id,
+            query_text=query,
+            message_id=queue_msg.id if queue_msg else None
+        )
+        if not request_id:
+            error = f'Sorry <@{user.id}>, failed to queue your search for "{query}"'
+            if queue_msg:
+                await queue_msg.edit(content=error)
+            else:
+                await channel.send(error)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: disnake.Message):
+        if message.author.bot or not self.bot.user.mentioned_in(message):
+            return
+        query = message.content.replace(f"<@!{self.bot.user.id}>", "").replace(f"<@{self.bot.user.id}>", "").strip()
+        if query:
+            await self._queue_wiki_search(message, query)
 
     @commands.slash_command(name="wiki_search", description="Search the wiki using DeepWiki.")
     async def wiki_search_command(self, inter: disnake.ApplicationCommandInteraction, query: str):
-        await inter.response.defer()
-        current_queued_count = await db.get_wiki_queued_count()
-        if current_queued_count >= 20:
-            await inter.followup.send(":hourglass: The wiki search queue is currently very long. Please try again in a few minutes.", ephemeral=True)
-            return
-        confirm_message = None
-        try:
-            confirm_message = await inter.followup.send(f':page_facing_up: Your wiki search has been queued:\n```\n{query}\n```\nThis may take a few minutes. I\'ll tag you when it\'s done!', wait=True)
-        except disnake.HTTPException as e:
-            logger.error(f'Failed to send initial confirmation for wiki search by {inter.author.id}: {e}')
-            await inter.followup.send("Sorry, I couldn't queue your request right now due to a communication issue. Please try again.", ephemeral=True)
-            return
-        confirm_message_id = confirm_message.id if confirm_message else None
-        request_id = await db.add_to_wiki_queue(
-            user_id=inter.author.id,
-            guild_id=inter.guild.id if inter.guild else 0,
-            channel_id=inter.channel.id,
-            query_text=query,
-            message_id=confirm_message_id
-        )
-        if request_id:
-            processing_now_count = await db.get_wiki_processing_count()
-            current_item_position = await db.get_wiki_queue_position(request_id)
-            base_query_text = f'Your wiki search for "{query}"'
-            current_status_msg = f'{base_query_text} has been queued!'
-            if current_item_position == 1:
-                if processing_now_count == 0:
-                    current_status_msg = f':hourglass_flowing_sand: {base_query_text} is now being processed...'
-                else:
-                    current_status_msg = f'{base_query_text} is next in line!'
-            elif current_item_position and current_item_position > 1:
-                current_status_msg = f'{base_query_text} has been queued! You are number {current_item_position} in the queue.'
-            if confirm_message:
-                await confirm_message.edit(content=current_status_msg)
-            else:
-                await inter.channel.send(current_status_msg)
-            if not self._processing_lock.locked():
-                 asyncio.create_task(self._process_single_queue_item())
-            self.start_queue_processor() 
-        else:
-            error_msg = f'Sorry, <@{inter.author.id}>, I couldn\'t queue your wiki search for "{query}". Please try again later.'
-            if confirm_message:
-                await confirm_message.edit(content=error_msg)
-            else:
-                await inter.followup.send(error_msg, ephemeral=True)
+        await self._queue_wiki_search(inter, query)
 
 def setup(bot: commands.Bot):
     bot.add_cog(WikiSearch(bot))

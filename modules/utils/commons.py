@@ -11,10 +11,10 @@ async def send_message(message_or_channel, content, should_reply):
                 return await (message_or_channel.send(content) if isinstance(message_or_channel, disnake.Thread) else message_or_channel.reply(content))
             else:
                 return await message_or_channel.channel.send(content)
-        elif isinstance(message_or_channel, disnake.TextChannel):
+        elif isinstance(message_or_channel, (disnake.TextChannel, disnake.Thread)):
             return await message_or_channel.send(content)
         else:
-            logging.error("Invalid input type for send_message. Expected disnake.Message or disnake.TextChannel.")
+            logging.error("Invalid input type for send_message. Expected disnake.Message, disnake.TextChannel, or disnake.Thread.")
             return None
     except Exception as e:
         logging.error(f"Error sending message: {e}")
