@@ -3,9 +3,9 @@
 from disnake.ext import commands
 from core import config
 import asyncio
-import random
 import disnake
 import logging
+import random
 
 class WelcomeCog(commands.Cog):
     GIF_LINKS = [
@@ -16,6 +16,7 @@ class WelcomeCog(commands.Cog):
     GIF_WEIGHTS = [49, 49, 1]
     DUNCE_ROLE_ID = 1372745158113759313
     MARSH_MENTOR_ROLE_ID = 1198482895342411846
+    SPECIAL_GIF_ROLE_ID = 1333890145635799201
 
     def __init__(self, bot):
         self.bot = bot
@@ -83,11 +84,8 @@ class WelcomeCog(commands.Cog):
                 selected_gif = random.choices(self.GIF_LINKS, weights=self.GIF_WEIGHTS, k=1)[0]
                 await self.send_welcome_message(welcome_channel, member, selected_gif)
                 if selected_gif == "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExYzhsN3Fnd2c1MG1hcmhwMG00czE5ZHZoZmZsa3k4N3hqcWJya2NwdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5xtDarIELDLO7lSFQJi/giphy.gif":
-                    role = member.guild.get_role(1333890145635799201)
-                    if role:
-                        await member.add_roles(role)
-                    else:
-                        print(f"Role with ID 1333890145635799201 not found.")
+                    role = member.guild.get_role(self.SPECIAL_GIF_ROLE_ID)
+                    await member.add_roles(role)
             else:
                 non_successful_spawns += 1
                 self.save_state(non_successful_spawns)
