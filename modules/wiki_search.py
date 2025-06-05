@@ -164,6 +164,17 @@ class WikiSearch(commands.Cog):
     async def wiki_search_command(self, inter: disnake.ApplicationCommandInteraction, query: str):
         await self._queue_wiki_search(inter, query)
 
+    @commands.message_command(name="Wiki Search")
+    async def wiki_search_context_menu(self, inter: disnake.MessageCommandInteraction, message: disnake.Message):
+        if message.author.bot:
+            await inter.response.send_message("Cannot search content from bot messages.", ephemeral=True)
+            return
+        query = message.content.strip()
+        if not query:
+            await inter.response.send_message("The selected message has no text to search.", ephemeral=True)
+            return
+        await self._queue_wiki_search(inter, query)
+
 def setup(bot: commands.Bot):
     bot.add_cog(WikiSearch(bot))
-    logger.info("WikiSearch cog has been loaded.") 
+    logger.info("WikiSearch cog has been loaded.")
