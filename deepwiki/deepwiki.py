@@ -7,16 +7,16 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import requests
 from pydantic import ValidationError
 
-from .models import WebSocketMessage, QueryResponse
-from .models import TextBlock, SearchMarkerBlock, NewlineBlock
-from .handlers import (
+from models import WebSocketMessage, QueryResponse
+from models import TextBlock, SearchMarkerBlock, NewlineBlock
+from handlers import (
     FileContentsHandler,
     ReferenceHandler,
     ListAppendHandler,
     ChunkHandler,
     LoggingHandler
 )
-from .websocket_manager import WebSocketManager, WebSocketError as WebSocketManagerError
+from websocket_manager import WebSocketManager, WebSocketError as WebSocketManagerError
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +255,15 @@ class DeepWikiClient:
             logger.error(f"Unexpected query error: {e}")
             return None
 
+    def _matches_any_marker(self, text: str) -> bool:
+        """Check if text matches any marker pattern."""
+        # Use default marker patterns
+        patterns = ["> Searching codebase...", r"(?i)^(let'?s?|now[,\s]*let'?s?).*:$"]
+        for pattern in patterns:
+            if re.search(pattern, text):
+                return True
+        return False
+
     def _should_include_element(
         self,
         element: Union[TextBlock, SearchMarkerBlock, NewlineBlock],
@@ -264,18 +273,14 @@ class DeepWikiClient:
     ) -> bool:
         """Determine if an element should be included in the formatted output."""
         if isinstance(element, TextBlock):
-            return filter_show_text and self._should_include_text(element, filter_show_markers)
+            return filter_show_text and not (not filter_show_markers and self._matches_any_marker(element.content.strip()))
         elif isinstance(element, SearchMarkerBlock):
-            return filter_show_markers and bool(element.marker_text)
+            return filter_show_markers and not self._matches_any_marker(
+                element.marker_text[0] if isinstance(element.marker_text, list) else element.marker_text
+            )
         elif isinstance(element, NewlineBlock):
             return filter_show_newlines
         return False
-
-    def _should_include_text(self, element: TextBlock, filter_show_markers: bool) -> bool:
-        """Determine if text element should be included."""
-        check_text = element.content.strip()
-        return not (not filter_show_markers and
-                  (check_text.startswith("Let me") or check_text.startswith("I'll")))
 
     def _clean_text(self, text: str) -> str:
         """Clean text by normalizing and collapsing excessive line breaks.
