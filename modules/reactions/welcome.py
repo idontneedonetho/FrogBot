@@ -15,7 +15,6 @@ class WelcomeCog(commands.Cog):
     BASE_SPECIAL_GIF_CHANCE = 0.01
     CHANCE_INCREMENT = 0.01
     DUNCE_ROLE_ID = 1372745158113759313
-    MARSH_MENTOR_ROLE_ID = 1198482895342411846
     SPECIAL_GIF_ROLE_ID = 1333890145635799201
     NOTIFICATION_CHANNEL_ID = 1373016990838423684
 
@@ -33,7 +32,7 @@ class WelcomeCog(commands.Cog):
             await self._handle_welcome(after)
         dunce_role = self.get_guild_object(after.guild, "role", self.DUNCE_ROLE_ID)
         if dunce_role and dunce_role not in before.roles and dunce_role in after.roles:
-            await self._notify_dunce_role_assignment(after, dunce_role)
+            await self._notify_dunce_role_assignment(after)
 
     async def _handle_welcome(self, member: disnake.Member):
         welcome_channel = member.guild.system_channel
@@ -52,16 +51,14 @@ class WelcomeCog(commands.Cog):
             self.save_state(non_successful_spawns + 1)
         await self.send_welcome_message(welcome_channel, member, selected_gif)
 
-    async def _notify_dunce_role_assignment(self, member: disnake.Member, dunce_role: disnake.Role):
+    async def _notify_dunce_role_assignment(self, member: disnake.Member):
         notification_channel = self.get_guild_object(member.guild, "channel", self.NOTIFICATION_CHANNEL_ID)
         if not notification_channel:
             return
-        mentor_role = self.get_guild_object(member.guild, "role", self.MARSH_MENTOR_ROLE_ID)
-        mentor_mention = mentor_role.mention if mentor_role else "Marsh Mentors"
         message = (
-            f"Hello {member.mention}, you've received the '{dunce_role.name}' role. To get full server access, "
+            f"Hello {member.mention}, you've received the 'Dunce' role. To get full server access, "
             "please revisit your onboarding answers and make them more realistic. The onboarding is at the "
-            f"top of the channel list. {mentor_mention} are here to help if you have questions!"
+            "top of the channel list. `@MarshMentors` are here to help if you have questions!"
         )
         await notification_channel.send(message)
 
