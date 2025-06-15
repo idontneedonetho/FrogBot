@@ -6,7 +6,6 @@ from disnake.ext import commands, tasks
 import asyncio
 import disnake
 import logging
-import random
 
 PHOENIX_TZ = timezone(timedelta(hours=-7))
 DEADLINE_KICK_DATETIME = datetime(2025, 8, 6, 14, 3, 10, tzinfo=PHOENIX_TZ)
@@ -17,7 +16,6 @@ class OnboardingAuditCog(commands.Cog):
         self.config_data = Config(CONFIG['CONFIG_FILE']).read()
         self.tadpole_role_id = self.config_data.get('TADPOLE_ROLE_ID', 0)
         self.role_clear_target_ids = self.config_data.get('ROLE_CLEAR_TARGET_IDS', [])
-        self.welcome_channel_id = self.config_data.get('WELCOME_CHANNEL_ID', 0)
         self.enable_24h_onboarding_kick = self.config_data.get('ENABLE_24H_ONBOARDING_KICK', False)
         self.onboarding_kick_activation_timestamp_float = self.config_data.get('ONBOARDING_KICK_ACTIVATION_TIMESTAMP', 0.0)
         if self.onboarding_kick_activation_timestamp_float > 0.0:

@@ -1,8 +1,6 @@
 disnake
 aiosqlite
 chromadb
-google-generativeai
-google-genai
 psutil
 PyYAML
 pytz
@@ -11,4 +9,4 @@ Pillow
 python-dotenv
 websocket-client
 llama-index-core
-llama-index-google-genai
+llama-index-llms-google_genai

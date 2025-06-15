@@ -1,9 +1,6 @@
 # modules.whiteboard
 
-from modules.utils.database import (
-    schedule_message, get_scheduled_message, 
-    get_user_scheduled_messages, cancel_scheduled_message, update_scheduled_message
-)
+from modules.utils.database import schedule_message, get_scheduled_message, get_user_scheduled_messages, cancel_scheduled_message, update_scheduled_message
 from disnake import TextInputStyle, ui, SelectOption
 from core import is_admin_or_privileged
 from disnake.ext import commands
