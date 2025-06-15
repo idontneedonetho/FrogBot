@@ -64,3 +64,10 @@ async def send_long_message(message_or_channel, response, should_reply=True):
     except Exception as e:
         logging.error(f"Error in send_long_message: {e}")
         return None
+
+async def pull_history_lines(channel: disnake.abc.Messageable, limit: int = 25):
+    return [
+        f"{m.author.display_name}: {m.content}"
+        async for m in channel.history(limit=limit)
+        if m.content
+    ]

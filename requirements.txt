@@ -10,3 +10,5 @@ dateparser
 Pillow
 python-dotenv
 websocket-client
+llama-index-core
+llama-index-google-genai
