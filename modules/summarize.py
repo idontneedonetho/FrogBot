@@ -31,7 +31,7 @@ class SummarizeCog(commands.Cog):
             logging.error(f"LLM error: {e}")
             return await inter.edit_original_response(content="Failed to generate summary.")
         embed = Embed(title="Conversation Summary", description=summary, color=Color.blue())
-        embed.set_footer(text=f"Summarised last {len(lines)} messages (newest first)")
+        embed.set_footer(text=f"Summarised last {len(lines)} messages (chronological order)")
         await inter.edit_original_response(embed=embed)
 
 def setup(bot):
