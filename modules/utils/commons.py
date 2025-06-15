@@ -68,6 +68,6 @@ async def send_long_message(message_or_channel, response, should_reply=True):
 async def pull_history_lines(channel: disnake.abc.Messageable, limit: int = 25):
     return [
         f"{m.author.display_name}: {m.content}"
-        async for m in channel.history(limit=limit)
+        async for m in channel.history(limit=limit, oldest_first=True)
         if m.content
     ]
