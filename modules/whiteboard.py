@@ -8,9 +8,9 @@ from datetime import datetime
 import dateparser
 import asyncio
 import disnake
+import logging
 import pytz
 import json
-import logging
 
 class WhiteboardModal(ui.Modal):
     def __init__(self, title="Whiteboard", default_values=None):
