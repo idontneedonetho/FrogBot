@@ -7,16 +7,16 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import requests
 from pydantic import ValidationError
 
-from models import WebSocketMessage, QueryResponse
-from models import TextBlock, SearchMarkerBlock, NewlineBlock
-from handlers import (
+from .models import WebSocketMessage, QueryResponse
+from .models import TextBlock, SearchMarkerBlock, NewlineBlock
+from .handlers import (
     FileContentsHandler,
     ReferenceHandler,
     ListAppendHandler,
     ChunkHandler,
     LoggingHandler
 )
-from websocket_manager import WebSocketManager, WebSocketError as WebSocketManagerError
+from .websocket_manager import WebSocketManager, WebSocketError as WebSocketManagerError
 
 logger = logging.getLogger(__name__)
 

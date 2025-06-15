@@ -269,7 +269,7 @@ class WhiteboardCog(commands.Cog):
                         default_values={
                             "content": whiteboard_data.get("content", message["content"]),
                             "scheduled_time": datetime.fromisoformat(message["scheduled_time"]).strftime("%Y-%m-%d %H:%M:%S"),
-                            "channel": message.get("channel", "")
+                            "channel": str(message.get("channel_id", ""))
                         }
                     )
                     modal.custom_id = f"edit_modal_{message_id}"

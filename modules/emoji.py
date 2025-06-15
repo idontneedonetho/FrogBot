@@ -219,7 +219,8 @@ class EmojiCog(commands.Cog):
         guild = self.bot.get_guild(payload.guild_id)
         user = guild.get_member(payload.user_id)
         authorized_role = guild.get_role(Config.ROLE_ID)
-        if not (user.guild_permissions.administrator or user.id == Config.ADMIN_USER_ID or authorized_role in user.roles):
+        is_thread_owner = isinstance(channel, Thread) and (channel.owner_id == user.id)
+        if not (user.guild_permissions.administrator or user.id == Config.ADMIN_USER_ID or authorized_role in user.roles or is_thread_owner):
             try:
                 await message.remove_reaction("❌", user)
             except:
@@ -273,7 +274,8 @@ class EmojiCog(commands.Cog):
             guild = self.bot.get_guild(payload.guild_id)
             user = guild.get_member(payload.user_id)
             authorized_role = guild.get_role(Config.ROLE_ID)
-            if not (user.guild_permissions.administrator or user.id == Config.ADMIN_USER_ID or authorized_role in user.roles):
+            is_thread_owner = isinstance(channel, Thread) and (channel.owner_id == user.id)
+            if not (user.guild_permissions.administrator or user.id == Config.ADMIN_USER_ID or authorized_role in user.roles or is_thread_owner):
                 try:
                     await message.remove_reaction("🏁", user)
                 except disnake.HTTPException:
