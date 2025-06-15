@@ -4,7 +4,6 @@ from llama_index.core.output_parsers import PydanticOutputParser
 from llama_index.core.chat_engine.utils import ChatMessage
 from llama_index.llms.google_genai import GoogleGenAI
 from modules.utils.commons import pull_history_lines
-from typing import Literal, Dict
 from disnake.ext import commands
 from pydantic import BaseModel
 from core import config
@@ -13,33 +12,25 @@ import logging
 import disnake
 import random
 
-STYLE = Literal["uwu", "owo"]
-
-STYLE_DESC: Dict[STYLE, str] = {
-    "uwu": "shy uwu-speak with frog sounds, tildes (~), and emojis",
-    "owo": "energetic owo-speak with frog sounds, *actions*, and emojis",
-}
-FALLBACKS: Dict[STYLE, list[str]] = {
-    "uwu": ["UwU~", "*ribbit*", "kero~"],
-    "owo": ["OwO!", "*hop*", "kero!"],
-}
-
 class _Out(BaseModel):
     reply: str
 
 _PARSER = PydanticOutputParser(_Out)
 _FMT = _PARSER.get_format_string()
-_LLM = GoogleGenAI(model_name="gemini-2.0-flash", api_key = config.read().get("GOOGLE_API_KEY"))
+_LLM = GoogleGenAI(model_name="gemini-2.0-flash", api_key=config.read().get("GOOGLE_API_KEY"))
+
+FALLBACKS = ["UwU~", "OwO!", "kero~", "*ribbit*"]
 
 class KawaiiReactionsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._last: Dict[STYLE, str | None] = {"uwu": None, "owo": None}
+        self._last: str | None = None
 
-    async def _ask(self, style: STYLE, lines: list[str]) -> str | None:
+    async def _ask(self, lines: list[str]) -> str | None:
         sys_prompt = (
-            f"You are a kawaii talking frog. Respond using {STYLE_DESC[style]}. "
-            f"Max 50 characters. {_FMT}"
+            "You are a cute frog. Reply to the user in ≤50 characters, "
+            "extra kawaii, with emoticons if you like. "
+            f"{_FMT}"
         )
         msgs = [ChatMessage(role="system", content=sys_prompt)] + [ChatMessage(role="user", content=l) for l in lines]
         try:
@@ -49,29 +40,24 @@ class KawaiiReactionsCog(commands.Cog):
             logging.debug("Kawaii LLM error: %s", e)
             return None
 
-    async def _reply(self, msg: disnake.Message, style: STYLE) -> str:
+    async def _build_reply(self, msg: disnake.Message) -> str:
         lines = list(reversed(await pull_history_lines(msg.channel, 3)))
-        if msg.content and msg.content not in lines:
+        if msg.content:
             lines.append(msg.content)
-        text = await self._ask(style, lines) or random.choice(FALLBACKS[style])
-        if text == self._last[style]:
-            text = random.choice([t for t in FALLBACKS[style] if t != text])
-        self._last[style] = text
+        text = await self._ask(lines) or random.choice(FALLBACKS)
+        if text == self._last:
+            text = random.choice([t for t in FALLBACKS if t != text])
+        self._last = text
         return text
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
         if message.author.id == self.bot.user.id:
             return
-        style: STYLE | None = None
-        low = message.content.lower()
-        if "uwu" in low:
-            style = "uwu"
-        elif "owo" in low:
-            style = "owo"
-        if not style:
+        content_lower = message.content.lower()
+        if "uwu" not in content_lower and "owo" not in content_lower:
             return
-        await message.reply(await self._reply(message, style))
+        await message.reply(await self._build_reply(message))
 
 def setup(bot):
     bot.add_cog(KawaiiReactionsCog(bot)) 
