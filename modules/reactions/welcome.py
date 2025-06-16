@@ -15,7 +15,6 @@ class WelcomeCog(commands.Cog):
     BASE_SPECIAL_GIF_CHANCE = 0.01
     CHANCE_INCREMENT = 0.01
     DUNCE_ROLE_ID = 1372745158113759313
-    MARSH_MENTOR_ROLE_ID = 1198482895342411846
     SPECIAL_GIF_ROLE_ID = 1333890145635799201
     NOTIFICATION_CHANNEL_ID = 1373016990838423684
 
@@ -56,12 +55,10 @@ class WelcomeCog(commands.Cog):
         notification_channel = self.get_guild_object(member.guild, "channel", self.NOTIFICATION_CHANNEL_ID)
         if not notification_channel:
             return
-        mentor_role = self.get_guild_object(member.guild, "role", self.MARSH_MENTOR_ROLE_ID)
-        mentor_mention = mentor_role.mention if mentor_role else "Marsh Mentors"
         message = (
             f"Hello {member.mention}, you've received the '{dunce_role.name}' role. To get full server access, "
             "please revisit your onboarding answers and make them more realistic. The onboarding is at the "
-            f"top of the channel list. {mentor_mention} are here to help if you have questions!"
+            f"top of the channel list. `@Marsh Mentors` are here to help if you have questions!"
         )
         await notification_channel.send(message)
 
