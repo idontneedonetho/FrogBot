@@ -5,6 +5,7 @@ from core import config
 import logging
 import disnake
 import random
+import time
 
 class WelcomeCog(commands.Cog):
     SPECIAL_GIF_URL = "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExYzhsN3Fnd2c1MG1hcmhwMG00czE5ZHZoZmZsa3k4N3hqcWJya2NwdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5xtDarIELDLO7lSFQJi/giphy.gif"
@@ -12,11 +13,12 @@ class WelcomeCog(commands.Cog):
         "https://cdn3.emoji.gg/emojis/1463-wave.gif",
         "https://i.pinimg.com/originals/ab/bd/b6/abbdb6e66ec39dc9262abc617fbc2b02.gif"
     ]
-    BASE_SPECIAL_GIF_CHANCE = 0.01
-    CHANCE_INCREMENT = 0.01
+    BASE_SPECIAL_GIF_CHANCE = 0.001
+    CHANCE_INCREMENT = 0.001
     DUNCE_ROLE_ID = 1372745158113759313
     SPECIAL_GIF_ROLE_ID = 1333890145635799201
     NOTIFICATION_CHANNEL_ID = 1373016990838423684
+    dunce_role_timestamps = {}
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -31,8 +33,16 @@ class WelcomeCog(commands.Cog):
         if before.pending and not after.pending:
             await self._handle_welcome(after)
         dunce_role = self.get_guild_object(after.guild, "role", self.DUNCE_ROLE_ID)
-        if dunce_role and dunce_role not in before.roles and dunce_role in after.roles:
-            await self._notify_dunce_role_assignment(after, dunce_role)
+        if dunce_role:
+            had_dunce_before = dunce_role in before.roles
+            has_dunce_now = dunce_role in after.roles
+            if not had_dunce_before and has_dunce_now:
+                self.dunce_role_timestamps[after.id] = time.time()
+            elif has_dunce_now:
+                assigned_time = self.dunce_role_timestamps.get(after.id)
+                if assigned_time and (time.time() - assigned_time) >= 3600:
+                    await self._notify_dunce_role_assignment(after, dunce_role)
+                    del self.dunce_role_timestamps[after.id]
 
     async def _handle_welcome(self, member: disnake.Member):
         welcome_channel = member.guild.system_channel
@@ -58,7 +68,7 @@ class WelcomeCog(commands.Cog):
         message = (
             f"Hello {member.mention}, you've received the '{dunce_role.name}' role. To get full server access, "
             "please revisit your onboarding answers and make them more realistic. The onboarding is at the "
-            f"top of the channel list. `@Marsh Mentors` are here to help if you have questions!"
+            "top of the channel list. `@Marsh Mentors` are here to help if you have questions!"
         )
         await notification_channel.send(message)
 

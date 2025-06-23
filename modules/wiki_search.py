@@ -114,8 +114,8 @@ class WikiSearch(commands.Cog):
         }
         await channel.send(messages.get(error_type, messages["Processing error"]))
 
-    async def _queue_wiki_search(self, interaction_or_message: Union[disnake.ApplicationCommandInteraction, disnake.Message], query: str):
-        user = interaction_or_message.author
+    async def _queue_wiki_search(self, interaction_or_message: Union[disnake.ApplicationCommandInteraction, disnake.Message], query: str, original_author: disnake.Member = None):
+        user = original_author if original_author else interaction_or_message.author
         channel = interaction_or_message.channel
         if await db.get_wiki_queued_count() >= 20:
             msg = ":hourglass: Queue is full. Please try again later."
@@ -173,7 +173,7 @@ class WikiSearch(commands.Cog):
         if not query:
             await inter.response.send_message("The selected message has no text to search.", ephemeral=True)
             return
-        await self._queue_wiki_search(inter, query)
+        await self._queue_wiki_search(inter, query, original_author=message.author)
 
 def setup(bot: commands.Bot):
     bot.add_cog(WikiSearch(bot))
