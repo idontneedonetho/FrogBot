@@ -506,7 +506,7 @@ async def control_panel(ctx):
 async def sync_commands(ctx):
     try:
         await ctx.send("🔄 Syncing commands for this server...")
-        await client.sync_commands(guild_id=ctx.guild.id)
+        await client.sync_all_application_commands(guild_id=ctx.guild.id)
         await ctx.send("✅ Commands have been synced for this server!")
     except Exception as e:
         await ctx.send(f"❌ Failed to sync commands: {str(e)}")
