@@ -16,7 +16,6 @@ CONFIG = {
     'VERSION': 'v3.7.1',
     'CONFIG_FILE': Path('config.yaml'),
     'COGS_DIR': Path("modules"),
-    'TEST_GUILDS': [698205243103641711, 1137853399715549214],
     'ADMIN_USER_ID': 126123710435295232,
 }
 
@@ -41,7 +40,8 @@ class Config:
         self.write({**self.read(), key: value})
 
     def setup_config(self):
-        if self._config_path.exists(): return
+        if self._config_path.exists():
+            return
         config_data = {}
         for field, (prompt, required) in self.DEFAULT_FIELDS.items():
             if value := input(f"\n{prompt}" if not required else prompt).strip():
@@ -180,7 +180,6 @@ client = commands.Bot(
     command_prefix='/',
     intents=intents,
     command_sync_flags=commands.CommandSyncFlags.default(),
-    test_guilds=CONFIG['TEST_GUILDS']
 )
 bot_manager = BotManager(client)
 
@@ -502,6 +501,17 @@ class ControlPanelView(disnake.ui.View):
 async def control_panel(ctx): 
     await ctx.send(f"🤖 {client.user.display_name} Control Panel", view=ControlPanelView(), ephemeral=True)
 
+@client.command(name="sync", description="Force sync commands for this server")
+@is_admin_or_privileged()
+async def sync_commands(ctx):
+    try:
+        await ctx.send("🔄 Syncing commands for this server...")
+        await client.sync_commands(guild_id=ctx.guild.id)
+        await ctx.send("✅ Commands have been synced for this server!")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to sync commands: {str(e)}")
+        logging.error(f"Error syncing commands: {e}")
+
 @client.event
 async def on_ready():
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
@@ -525,6 +535,7 @@ def main():
         print(f"Failed to start bot: {e}")
         sys.exit(1)
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
 
 '''Kaofui was here uwu'''
