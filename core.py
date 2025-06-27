@@ -501,6 +501,20 @@ class ControlPanelView(disnake.ui.View):
 async def control_panel(ctx): 
     await ctx.send(f"🤖 {client.user.display_name} Control Panel", view=ControlPanelView(), ephemeral=True)
 
+@client.command(name="resync", description="Force re-sync all commands by reloading modules.")
+@is_admin_or_privileged()
+async def resync_commands(ctx: commands.Context):
+    try:
+        await ctx.send(content="🔄 Reloading modules to re-sync commands...")
+        loaded_cogs = list(client.cogs.keys())
+        for cog_name in loaded_cogs:
+            client.remove_cog(cog_name)
+        ModuleLoader.load_all_modules(client)
+        await ctx.send(content="✅ All modules reloaded. Command sync has been initiated.")
+    except Exception as e:
+        await ctx.send(content=f"❌ Failed to re-sync commands: {str(e)}")
+        logging.error(f"Error re-syncing commands: {e}", exc_info=True)
+
 @client.event
 async def on_ready():
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
