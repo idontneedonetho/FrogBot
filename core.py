@@ -501,17 +501,6 @@ class ControlPanelView(disnake.ui.View):
 async def control_panel(ctx): 
     await ctx.send(f"🤖 {client.user.display_name} Control Panel", view=ControlPanelView(), ephemeral=True)
 
-@client.command(name="sync", description="Force sync commands for this server")
-@is_admin_or_privileged()
-async def sync_commands(ctx):
-    try:
-        await ctx.send("🔄 Syncing commands for this server...")
-        await client.sync_all_application_commands(guild_id=ctx.guild.id)
-        await ctx.send("✅ Commands have been synced for this server!")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to sync commands: {str(e)}")
-        logging.error(f"Error syncing commands: {e}")
-
 @client.event
 async def on_ready():
     await client.change_presence(activity=disnake.Game(name=f"/help | {GitManager.get_version()}"))
