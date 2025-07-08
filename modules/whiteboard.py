@@ -52,6 +52,7 @@ class WhiteboardCog(commands.Cog):
         self.client = client
         self.privileged_role_id = 1198482895342411846
         self.scheduled_tasks = {}
+        self.message_tasks = {}
         
     async def cog_load(self):
         await self._restore_scheduled_messages()
@@ -342,6 +343,41 @@ class WhiteboardCog(commands.Cog):
         except Exception as e:
             logging.error(f"Error handling edit submission: {e}")
             await modal_inter.response.send_message("Failed to update whiteboard. Please try again.", ephemeral=True)
+
+    @commands.message_command(name="Edit Whiteboard")
+    @is_admin_or_privileged(rank_id=1198482895342411846)
+    async def edit_posted_whiteboard(self, inter, message):
+        try:
+            content_parts = [message.content]
+            async for reply in message.channel.history(limit=50):
+                if reply.reference and reply.reference.message_id == message.id:
+                    content_parts.append(reply.content)
+            full_content = '\n'.join(content_parts)
+            modal = WhiteboardModal(
+                title="Edit Posted Whiteboard",
+                default_values={
+                    "content": full_content,
+                    "channel": str(message.channel.id)
+                }
+            )
+            modal.custom_id = f"edit_posted_{message.id}"
+            await inter.response.send_modal(modal)
+            try:
+                modal_inter = await self.client.wait_for(
+                    'modal_submit',
+                    check=lambda i: i.custom_id == modal.custom_id and i.author.id == inter.author.id,
+                    timeout=1200
+                )
+                await message.delete()
+                async for reply in message.channel.history(limit=50):
+                    if reply.reference and reply.reference.message_id == message.id:
+                        await reply.delete()
+                await self._split_and_send_message(modal_inter.text_values['content'].strip(), message.channel, modal_inter)
+            except asyncio.TimeoutError:
+                await inter.followup.send("Timed out waiting for modal response.", ephemeral=True)
+        except Exception as e:
+            logging.error(f"Error editing posted whiteboard: {e}")
+            await inter.response.send_message("An error occurred while editing the whiteboard.", ephemeral=True)
 
 def setup(client):
     client.add_cog(WhiteboardCog(client))
