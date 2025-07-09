@@ -166,7 +166,7 @@ class WhiteboardCog(commands.Cog):
         elif channel_input.isdigit():
             try:
                 target_channel = inter.guild.get_channel(int(channel_input))
-            except:
+            except AttributeError:
                 pass
         else:
             target_channel = None
