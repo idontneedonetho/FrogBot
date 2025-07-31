@@ -127,9 +127,13 @@ class WikiSearch(commands.Cog):
         queue_msg = None
         try:
             position = await db.get_wiki_queued_count()
+            status_msg = (
+                "You're up next! :rocket:"
+                if position == 0
+                else f"Your position in the queue is {position}."
+            )
             msg = (
-                f":hourglass_flowing_sand: Added to queue:\n```{query}```\n"
-                f"{'You\'re up next! :rocket:' if position == 0 else f'Your position in the queue is {position}.'}"
+                f":hourglass_flowing_sand: Added to queue:\n```{query}```\n{status_msg}"
             )
             if isinstance(interaction_or_message, disnake.ApplicationCommandInteraction):
                 await interaction_or_message.response.defer()
@@ -137,7 +141,9 @@ class WikiSearch(commands.Cog):
             else:
                 queue_msg = await channel.send(
                     msg,
-                    reference=interaction_or_message if not isinstance(channel, disnake.DMChannel) else None
+                    reference=interaction_or_message
+                    if not isinstance(channel, disnake.DMChannel)
+                    else None,
                 )
         except disnake.HTTPException:
             pass
@@ -154,7 +160,6 @@ class WikiSearch(commands.Cog):
                 await queue_msg.edit(content=error)
             else:
                 await channel.send(error)
-
 
     @commands.slash_command(name="wiki_search", description="Search the wiki using DeepWiki.")
     async def wiki_search_command(self, inter: disnake.ApplicationCommandInteraction, query: str):
