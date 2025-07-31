@@ -13,8 +13,8 @@ class WelcomeCog(commands.Cog):
         "https://cdn3.emoji.gg/emojis/1463-wave.gif",
         "https://i.pinimg.com/originals/ab/bd/b6/abbdb6e66ec39dc9262abc617fbc2b02.gif"
     ]
-    BASE_SPECIAL_GIF_CHANCE = 0.001
-    CHANCE_INCREMENT = 0.001
+    BASE_SPECIAL_GIF_CHANCE = 0.0001
+    CHANCE_INCREMENT = 0.0001
     DUNCE_ROLE_ID = 1372745158113759313
     SPECIAL_GIF_ROLE_ID = 1333890145635799201
     NOTIFICATION_CHANNEL_ID = 1373016990838423684
@@ -66,9 +66,10 @@ class WelcomeCog(commands.Cog):
         if not notification_channel:
             return
         message = (
-            f"Hello {member.mention}, you've received the '{dunce_role.name}' role. To get full server access, "
-            "please revisit your onboarding answers and make them more realistic. The onboarding is at the "
-            "top of the channel list. `@Marsh Mentors` are here to help if you have questions!"
+            f"Hello {member.mention}!\n\n"
+            "You've been given the \"Dunce\" role for now. No worries, it just means your onboarding answers could use a bit more thought!\n\n"
+            "To unlock full access to the server, please revisit your onboarding at the top of the channel list under \"Channels & Roles\".\n\n"
+            "If you're unsure what to change or need a hand, feel free to ping `@Marsh Mentors`!"
         )
         await notification_channel.send(message)
 

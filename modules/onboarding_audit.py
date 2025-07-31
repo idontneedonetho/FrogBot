@@ -61,6 +61,7 @@ class OnboardingAuditCog(commands.Cog):
             return
         now = datetime.now(timezone.utc)
         kick_threshold = now - timedelta(hours=24)
+        kicked_count = 0
         for member in guild.members:
             if member.bot:
                 continue
@@ -76,10 +77,17 @@ class OnboardingAuditCog(commands.Cog):
                     logging.info(f"Kicking member {member.id} ({member.display_name}) for not completing onboarding within 24 hours (missing Tadpole role).")
                     try:
                         await member.kick(reason="Did not complete onboarding within 24 hours.")
+                        kicked_count += 1
+                        await asyncio.sleep(1)
                     except disnake.Forbidden:
                         logging.error(f"Failed to kick {member.display_name}: Missing permissions.")
                     except disnake.HTTPException as e:
                         logging.error(f"Failed to kick {member.display_name}: {e}")
+                        if "429" in str(e):
+                            logging.warning("Rate limit hit during kicking, waiting 5 seconds...")
+                            await asyncio.sleep(5)
+        if kicked_count > 0:
+            logging.info(f"24h onboarding kick task completed. Kicked {kicked_count} members.")
 
     @commands.slash_command(name="clear_member_roles", description="Clears specified roles from all members, preserving certain roles.")
     @commands.has_permissions(administrator=True)
@@ -166,11 +174,16 @@ class OnboardingAuditCog(commands.Cog):
                         try:
                             await member.kick(reason=f"Did not complete onboarding by the {DEADLINE_KICK_DATETIME.strftime('%Y-%m-%d')} deadline.")
                             kicked_count += 1
+                            # Rate limiting: Wait 1 second between kicks to avoid Discord rate limits
+                            await asyncio.sleep(1)
                         except disnake.Forbidden:
                             logging.error(f"Deadline kick: Failed to kick {member.display_name}: Missing permissions.")
                         except disnake.HTTPException as e:
                             logging.error(f"Deadline kick: Failed to kick {member.display_name}: {e}")
-                        await asyncio.sleep(0.1)
+                            # If we hit rate limits, wait longer
+                            if "429" in str(e):
+                                logging.warning("Rate limit hit during deadline kicking, waiting 5 seconds...")
+                                await asyncio.sleep(5)
             logging.info(f"Deadline kick task finished. Kicked {kicked_count} members.")
             self.deadline_kick_task.stop()
 
@@ -180,47 +193,149 @@ class OnboardingAuditCog(commands.Cog):
     )
     @is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
     async def toggle_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction, enabled: bool):
+        if enabled:
+            await inter.response.send_modal(
+                title="Confirm 24-Hour Kick Enable",
+                custom_id="confirm_kick_enable",
+                components=[
+                    disnake.ui.TextInput(
+                        label="Type 'CONFIRM' to enable 24-hour kick",
+                        placeholder="This will kick users who don't complete onboarding within 24 hours",
+                        custom_id="confirmation",
+                        style=disnake.TextInputStyle.short,
+                        max_length=10,
+                        required=True
+                    )
+                ]
+            )
+        else:
+            await self._disable_onboarding_kick(inter)
+
+    @commands.slash_command(
+        name="test_onboarding_kick",
+        description="Test the onboarding kick system without actually kicking anyone."
+    )
+    @is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
+    async def test_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
+        await inter.response.defer(ephemeral=True)
+        guild = inter.guild
+        now = datetime.now(timezone.utc)
+        kick_threshold = now - timedelta(hours=24)
+        test_results = {
+            'total_members_checked': 0,
+            'members_with_tadpole': 0,
+            'members_eligible_for_kick': 0,
+            'members_that_would_be_kicked': []
+        }
+        for member in guild.members:
+            if member.bot:
+                continue
+            test_results['total_members_checked'] += 1
+            joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
+            if not joined_at_utc:
+                continue
+            has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
+            if has_tadpole_role:
+                test_results['members_with_tadpole'] += 1
+            else:
+                if joined_at_utc < kick_threshold:
+                    test_results['members_eligible_for_kick'] += 1
+                    test_results['members_that_would_be_kicked'].append({
+                        'name': member.display_name,
+                        'id': member.id,
+                        'joined': joined_at_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+                    })
+        members_without_tadpole = test_results['total_members_checked'] - test_results['members_with_tadpole']
+        embed = disnake.Embed(
+            title="Onboarding Kick Test Results",
+            description=f"The number without tadpole role can be calculated: {test_results['total_members_checked']} - {test_results['members_with_tadpole']} = {members_without_tadpole} members haven't completed onboarding yet",
+            color=disnake.Color.blue()
+        )
+        embed.add_field(
+            name="Summary",
+            value=f"**Total members checked:** {test_results['total_members_checked']}\n"
+                  f"**Members with Tadpole role:** {test_results['members_with_tadpole']}\n"
+                  f"**Members eligible for kick (joined >24h ago):** {test_results['members_eligible_for_kick']}",
+            inline=False
+        )
+        if test_results['members_that_would_be_kicked']:
+            kicked_list = "\n".join([
+                f"• {member['name']} (ID: {member['id']}) - Joined: {member['joined']}"
+                for member in test_results['members_that_would_be_kicked'][:10]
+            ])
+            if len(test_results['members_that_would_be_kicked']) > 10:
+                kicked_list += f"\n... and {len(test_results['members_that_would_be_kicked']) - 10} more"
+            embed.add_field(
+                name="Members That Would Be Kicked",
+                value=kicked_list,
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Members That Would Be Kicked",
+                value="None - all members either have the Tadpole role or joined less than 24 hours ago.",
+                inline=False
+            )
+        embed.set_footer(text=f"Test run at {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        await inter.edit_original_response(embed=embed)
+
+    async def _disable_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         current_config = Config(CONFIG['CONFIG_FILE'])
         config_data = current_config.read()
-        config_data['ENABLE_24H_ONBOARDING_KICK'] = enabled
-        self.enable_24h_onboarding_kick = enabled
-        message = ""
-        if enabled:
-            now = datetime.now(timezone.utc)
-            next_midnight_utc = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            if now >= next_midnight_utc:
-                next_midnight_utc += timedelta(days=1)
-            activation_timestamp_float = next_midnight_utc.timestamp()
-            config_data['ONBOARDING_KICK_ACTIVATION_TIMESTAMP'] = activation_timestamp_float
-            self.onboarding_kick_activation_timestamp = next_midnight_utc
-            self.onboarding_kick_activation_timestamp_float = activation_timestamp_float
-            activation_time_str = next_midnight_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-            message_suffix = f"The 24-hour onboarding kick rule for NEW members will become active starting {activation_time_str}."
-            logging.info(f"24h onboarding kick activation timestamp set to: {next_midnight_utc}")
-            if not self.check_pending_onboarding_task.is_running():
-                if not self.tadpole_role_id:
-                    message = ("24-hour onboarding kick feature set to ENABLED, but Tadpole Role ID is not configured. "
-                               "The task will not run effectively. Please configure it.")
-                    logging.warning(message)
-                else:
-                    self.check_pending_onboarding_task.start()
-                    message = f"24-hour onboarding kick feature ENABLED. {message_suffix} The task has been started."
-                    logging.info("24h onboarding kick task started by toggle command.")
-            else:
-                message = f"24-hour onboarding kick feature is already ENABLED and the task is running. {message_suffix}"
+        config_data['ENABLE_24H_ONBOARDING_KICK'] = False
+        self.enable_24h_onboarding_kick = False
+        config_data['ONBOARDING_KICK_ACTIVATION_TIMESTAMP'] = 0.0
+        self.onboarding_kick_activation_timestamp = None
+        self.onboarding_kick_activation_timestamp_float = 0.0
+        if self.check_pending_onboarding_task.is_running():
+            self.check_pending_onboarding_task.cancel()
+            message = "24-hour onboarding kick feature DISABLED. The task has been stopped."
+            logging.info("24h onboarding kick task stopped by toggle command.")
         else:
-            config_data['ONBOARDING_KICK_ACTIVATION_TIMESTAMP'] = 0.0
-            self.onboarding_kick_activation_timestamp = None
-            self.onboarding_kick_activation_timestamp_float = 0.0
-            if self.check_pending_onboarding_task.is_running():
-                self.check_pending_onboarding_task.cancel()
-                message = "24-hour onboarding kick feature DISABLED. The task has been stopped."
-                logging.info("24h onboarding kick task stopped by toggle command.")
-            else:
-                message = "24-hour onboarding kick feature is already DISABLED and the task is not running."
+            message = "24-hour onboarding kick feature is already DISABLED and the task is not running."
         current_config.write(config_data)
         await inter.edit_original_response(content=message)
+
+    async def _enable_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
+        await inter.response.defer(ephemeral=True)
+        current_config = Config(CONFIG['CONFIG_FILE'])
+        config_data = current_config.read()
+        config_data['ENABLE_24H_ONBOARDING_KICK'] = True
+        self.enable_24h_onboarding_kick = True
+        now = datetime.now(timezone.utc)
+        next_midnight_utc = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if now >= next_midnight_utc:
+            next_midnight_utc += timedelta(days=1)
+        activation_timestamp_float = next_midnight_utc.timestamp()
+        config_data['ONBOARDING_KICK_ACTIVATION_TIMESTAMP'] = activation_timestamp_float
+        self.onboarding_kick_activation_timestamp = next_midnight_utc
+        self.onboarding_kick_activation_timestamp_float = activation_timestamp_float
+        activation_time_str = next_midnight_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+        message_suffix = f"The 24-hour onboarding kick rule for NEW members will become active starting {activation_time_str}."
+        logging.info(f"24h onboarding kick activation timestamp set to: {next_midnight_utc}")
+        if not self.check_pending_onboarding_task.is_running():
+            if not self.tadpole_role_id:
+                message = ("24-hour onboarding kick feature set to ENABLED, but Tadpole Role ID is not configured. "
+                           "The task will not run effectively. Please configure it.")
+                logging.warning(message)
+            else:
+                self.check_pending_onboarding_task.start()
+                message = f"24-hour onboarding kick feature ENABLED. {message_suffix} The task has been started."
+                logging.info("24h onboarding kick task started by toggle command.")
+        else:
+            message = f"24-hour onboarding kick feature is already ENABLED and the task is running. {message_suffix}"
+        current_config.write(config_data)
+        await inter.edit_original_response(content=message)
+
+    @commands.Cog.listener()
+    async def on_modal_submit(self, inter: disnake.ModalInteraction):
+        if inter.custom_id == "confirm_kick_enable":
+            confirmation = inter.text_values.get("confirmation", "").strip().upper()
+            if confirmation == "CONFIRM":
+                await self._enable_onboarding_kick(inter)
+            else:
+                await inter.response.send_message("Confirmation failed. Please type 'CONFIRM' exactly to enable the 24-hour kick feature.", ephemeral=True)
 
     @check_pending_onboarding_task.before_loop
     @deadline_kick_task.before_loop

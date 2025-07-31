@@ -6,23 +6,9 @@ import logging
 import asyncio
 import disnake
 
-EMOJI_MAP = {
-    1294572834303119400: ["🐞", "📜", "📹", "✅"],
-    1162100167110053888: ["🐞", "📜", "📹", "✅"],
-    1160318669839147259: ["💡", "🧠", "✅"],
-}
-
 class ThreadCreateCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
-    async def add_reaction(self, message, emoji):
-        try:
-            await message.add_reaction(emoji)
-            await asyncio.sleep(0.5)
-        except Exception as e:
-            logging.error(f"Error adding reaction {emoji}: {e}")
-            await asyncio.sleep(2)
 
     class ConfirmationView(View):
         def __init__(self, message, original_poster_id):
@@ -65,14 +51,6 @@ class ThreadCreateCog(commands.Cog):
     async def on_thread_create(self, thread):
         try:
             await asyncio.sleep(1)
-            emojis_to_add = EMOJI_MAP.get(thread.parent_id, [])
-            first_non_bot_message = None
-            async for message in thread.history(limit=None):
-                if not message.author.bot:
-                    first_non_bot_message = message
-                    break
-            if first_non_bot_message:
-                await asyncio.gather(*(self.add_reaction(first_non_bot_message, emoji) for emoji in emojis_to_add))
             if thread.parent_id == 1162100167110053888:
                 await self.handle_bug_report(thread)
         except Exception as e:

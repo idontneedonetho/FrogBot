@@ -75,9 +75,14 @@ class HelpCog(commands.Cog):
                 "**/toggle_onboarding_kick [enabled]**\n"
                 "Enables or disables the 24-hour kick rule for new members who don't complete onboarding. "
                 "When enabled, the rule becomes active for members joining after the next 00:00 UTC.\n\n"
+                "**/test_onboarding_kick**\n"
+                "Test the onboarding kick system without actually kicking anyone. Shows which members would be affected.\n\n"
                 "**/clear_member_roles**\n"
                 "Removes a predefined list of roles (specified in `config.yaml` under `ROLE_CLEAR_TARGET_IDS`) "
                 "from all non-bot members.\n\n"
+                "**/thread_actions**\n"
+                "Opens a menu with buttons to manage thread actions (Report, Error Log, Evidence, Close). "
+                "Awards points to thread creators and can mark threads as resolved.\n\n"
             )
         )
         await inter.edit_original_message(embed=embed, view=self.get_help_view("advanced"))
