@@ -6,6 +6,8 @@ from disnake.ext import commands, tasks
 import asyncio
 import disnake
 import logging
+import csv
+import io
 
 PHOENIX_TZ = timezone(timedelta(hours=-7))
 DEADLINE_KICK_DATETIME = datetime(2025, 8, 6, 14, 3, 10, tzinfo=PHOENIX_TZ)
@@ -277,7 +279,27 @@ class OnboardingAuditCog(commands.Cog):
                 inline=False
             )
         embed.set_footer(text=f"Test run at {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-        await inter.edit_original_response(embed=embed)
+        if test_results['members_that_would_be_kicked']:
+            csv_buffer = io.StringIO()
+            csv_writer = csv.writer(csv_buffer)
+            csv_writer.writerow(['Display Name', 'User ID', 'Joined Date (UTC)', 'Days Since Joined'])
+            for member in test_results['members_that_would_be_kicked']:
+                joined_date = datetime.strptime(member['joined'], "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=timezone.utc)
+                days_since_joined = (now - joined_date).days
+                csv_writer.writerow([
+                    member['name'],
+                    member['id'],
+                    member['joined'],
+                    days_since_joined
+                ])
+            csv_buffer.seek(0)
+            csv_file = disnake.File(
+                io.BytesIO(csv_buffer.getvalue().encode('utf-8')),
+                filename=f"onboarding_kick_test_{now.strftime('%Y%m%d_%H%M%S')}.csv"
+            )
+            await inter.edit_original_response(embed=embed, file=csv_file)
+        else:
+            await inter.edit_original_response(embed=embed)
 
     async def _disable_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)

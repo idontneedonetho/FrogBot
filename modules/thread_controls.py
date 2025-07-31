@@ -188,7 +188,7 @@ class ThreadControlsCog(commands.Cog):
                     color=Color.orange()
                 )
                 await message.reply(embed=reminder_embed)
-            except:
+            except disnake.Forbidden:
                 pass
             await asyncio.sleep(2 * 24 * 60 * 60)  # 2 days
             results = await db_access_with_retry('SELECT message_id FROM checkmark_logs WHERE message_id = ?', (message.id,))
