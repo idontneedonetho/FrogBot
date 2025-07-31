@@ -127,7 +127,10 @@ class WikiSearch(commands.Cog):
         queue_msg = None
         try:
             position = await db.get_wiki_queued_count()
-            msg = f':hourglass_flowing_sand: Added to queue:\n```{query}```\n{"You\'re up next! :rocket:" if position == 0 else f"Your position in the queue is {position}"}.'
+            msg = (
+                f":hourglass_flowing_sand: Added to queue:\n```{query}```\n"
+                f"{'You\'re up next! :rocket:' if position == 0 else f'Your position in the queue is {position}.'}"
+            )
             if isinstance(interaction_or_message, disnake.ApplicationCommandInteraction):
                 await interaction_or_message.response.defer()
                 queue_msg = await interaction_or_message.followup.send(msg, wait=True)
