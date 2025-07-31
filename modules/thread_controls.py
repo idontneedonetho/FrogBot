@@ -113,11 +113,13 @@ class ThreadControlsCog(commands.Cog):
     async def handle_close_button(self, inter: disnake.MessageInteraction):
         embed = Embed(
             title="Issue/Request Resolution",
-            description="@here, this issue/request has been marked as *resolved!*\nNo further action is needed.\nThis thread will be automatically deleted in *7 days*.",
+            description="@here, this issue/request has been marked as *resolved!*\nNo further action is needed.\nThis thread will be automatically deleted in *7 days*.\n\n**Thread Owner Actions:**\n❌ **Cancel** - Keep the thread open\n🏁 **Close Now** - Close the thread immediately",
             color=Color.green()
         )
         embed.set_footer(text="Thread will be automatically closed in 7 days.")
         reply_message = await inter.channel.send(embed=embed)
+        await reply_message.add_reaction("❌")
+        await reply_message.add_reaction("🏁")
         current_timestamp = int(time.time())
         await log_checkmark_message_id(reply_message.id, inter.channel.id, current_timestamp)
         asyncio.create_task(self.resolution_countdown(reply_message, inter.channel.id))
@@ -199,6 +201,37 @@ class ThreadControlsCog(commands.Cog):
                 await channel.delete()
         except Exception as e:
             logging.error(f"Error in resolution countdown: {e}")
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: disnake.RawReactionActionEvent):
+        if payload.user_id == self.bot.user.id:
+            return
+        channel = self.bot.get_channel(payload.channel_id)
+        if not isinstance(channel, disnake.Thread):
+            return
+        results = await db_access_with_retry('SELECT message_id FROM checkmark_logs WHERE message_id = ?', (payload.message_id,))
+        if not results:
+            return
+        if payload.user_id != channel.owner_id:
+            return
+        if payload.emoji.name == "❌":
+            await db_access_with_retry('DELETE FROM checkmark_logs WHERE message_id = ?', (payload.message_id,))
+            try:
+                message = await channel.fetch_message(payload.message_id)
+                await message.delete()
+            except disnake.NotFound:
+                pass
+            await channel.send("Thread closure cancelled by thread owner.")
+        elif payload.emoji.name == "🏁":
+            await db_access_with_retry('DELETE FROM checkmark_logs WHERE message_id = ?', (payload.message_id,))
+            try:
+                message = await channel.fetch_message(payload.message_id)
+                await message.delete()
+            except disnake.NotFound:
+                pass
+            await channel.send("Thread closed immediately by thread owner.")
+            await asyncio.sleep(2)
+            await channel.delete()
 
 def setup(bot: commands.Bot) -> None:
     bot.add_cog(ThreadControlsCog(bot))
