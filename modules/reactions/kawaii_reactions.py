@@ -32,7 +32,7 @@ class KawaiiReactionsCog(commands.Cog):
             "extra kawaii, with emoticons if you like. "
             f"{_FMT}"
         )
-        msgs = [ChatMessage(role="system", content=sys_prompt)] + [ChatMessage(role="user", content=l) for l in lines]
+        msgs = [ChatMessage(role="system", content=sys_prompt)] + [ChatMessage(role="user", content=line) for line in lines]
         try:
             raw = (await _LLM.achat(msgs) if hasattr(_LLM, "achat") else await asyncio.to_thread(_LLM.chat, msgs)).message.content
             return _PARSER.parse(raw).reply.strip()
