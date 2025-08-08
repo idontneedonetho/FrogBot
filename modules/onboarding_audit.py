@@ -16,7 +16,18 @@ class OnboardingAuditCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.config_data = Config(CONFIG['CONFIG_FILE']).read()
-        self.tadpole_role_id = self.config_data.get('TADPOLE_ROLE_ID', 0)
+        raw_tadpole_role_id = self.config_data.get('TADPOLE_ROLE_ID', 0)
+        self.tadpole_role_id = (
+            int(raw_tadpole_role_id)
+            if isinstance(raw_tadpole_role_id, (int, str)) and str(raw_tadpole_role_id).isdigit()
+            else 0
+        )
+        raw_onboarding_kick_guild_id = self.config_data.get('ONBOARDING_KICK_GUILD_ID', 0)
+        self.onboarding_kick_guild_id = (
+            int(raw_onboarding_kick_guild_id)
+            if isinstance(raw_onboarding_kick_guild_id, (int, str)) and str(raw_onboarding_kick_guild_id).isdigit()
+            else 0
+        )
         self.role_clear_target_ids = self.config_data.get('ROLE_CLEAR_TARGET_IDS', [])
         self.enable_24h_onboarding_kick = self.config_data.get('ENABLE_24H_ONBOARDING_KICK', False)
         self.onboarding_kick_activation_timestamp_float = self.config_data.get('ONBOARDING_KICK_ACTIVATION_TIMESTAMP', 0.0)
@@ -49,12 +60,15 @@ class OnboardingAuditCog(commands.Cog):
         if self.onboarding_kick_activation_timestamp is None:
             logging.debug("24h onboarding kick: Enabled but no valid activation timestamp set. Task will do nothing until /toggle_onboarding_kick sets it.")
             return
+        if not self.onboarding_kick_guild_id:
+            logging.debug("24h onboarding kick: No target guild configured. Task will do nothing until /toggle_onboarding_kick is used in a guild.")
+            return
         now_utc = datetime.now(timezone.utc)
         if now_utc < self.onboarding_kick_activation_timestamp:
             logging.debug(f"24h onboarding kick: Waiting for activation time {self.onboarding_kick_activation_timestamp} to pass. Current time: {now_utc}")
             return
         logging.info(f"Running hourly check for pending onboarding (rule active since {self.onboarding_kick_activation_timestamp})...")
-        guild = self.bot.guilds[0] if self.bot.guilds else None
+        guild = self.bot.get_guild(self.onboarding_kick_guild_id)
         if not guild:
             logging.error("Pending onboarding check: Guild not found.")
             return
@@ -154,7 +168,11 @@ class OnboardingAuditCog(commands.Cog):
         now_utc = datetime.now(timezone.utc)
         if now_utc >= DEADLINE_KICK_DATETIME:
             logging.info(f"Deadline {DEADLINE_KICK_DATETIME} reached. Starting existing user audit.")
-            guild = self.bot.guilds[0] if self.bot.guilds else None
+            if not self.onboarding_kick_guild_id:
+                logging.error("Deadline kick: No target guild configured. Aborting.")
+                self.deadline_kick_task.stop()
+                return
+            guild = self.bot.get_guild(self.onboarding_kick_guild_id)
             if not guild:
                 logging.error("Deadline kick: Guild not found.")
                 self.deadline_kick_task.stop()
@@ -310,6 +328,8 @@ class OnboardingAuditCog(commands.Cog):
         config_data['ONBOARDING_KICK_ACTIVATION_TIMESTAMP'] = 0.0
         self.onboarding_kick_activation_timestamp = None
         self.onboarding_kick_activation_timestamp_float = 0.0
+        config_data['ONBOARDING_KICK_GUILD_ID'] = 0
+        self.onboarding_kick_guild_id = 0
         if self.check_pending_onboarding_task.is_running():
             self.check_pending_onboarding_task.cancel()
             message = "24-hour onboarding kick feature DISABLED. The task has been stopped."
@@ -325,6 +345,9 @@ class OnboardingAuditCog(commands.Cog):
         config_data = current_config.read()
         config_data['ENABLE_24H_ONBOARDING_KICK'] = True
         self.enable_24h_onboarding_kick = True
+        if inter.guild is not None:
+            config_data['ONBOARDING_KICK_GUILD_ID'] = int(inter.guild.id)
+            self.onboarding_kick_guild_id = int(inter.guild.id)
         now = datetime.now(timezone.utc)
         next_midnight_utc = now.replace(hour=0, minute=0, second=0, microsecond=0)
         if now >= next_midnight_utc:
