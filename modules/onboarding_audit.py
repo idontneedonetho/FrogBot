@@ -269,6 +269,58 @@ class OnboardingAuditCog(commands.Cog):
         else:
             await inter.edit_original_response(embed=embed)
 
+    @commands.slash_command(
+        name="run_onboarding_kick_now",
+        description="Run the onboarding kick check immediately (respects activation time)."
+    )
+    @is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
+    async def run_onboarding_kick_now(self, inter: disnake.ApplicationCommandInteraction):
+        await inter.response.defer(ephemeral=True)
+        if not self.enable_24h_onboarding_kick:
+            await inter.edit_original_response("The 24-hour onboarding kick feature is disabled. Use /toggle_onboarding_kick enabled:true in this server.")
+            return
+        if not inter.guild:
+            await inter.edit_original_response("This command must be used inside a server.")
+            return
+        if not self.onboarding_kick_guild_id or inter.guild.id != self.onboarding_kick_guild_id:
+            await inter.edit_original_response("The onboarding kick feature isn't enabled for this server. Use /toggle_onboarding_kick enabled:true here first.")
+            return
+        if not self.tadpole_role_id:
+            await inter.edit_original_response("Tadpole role ID is not configured. Set TADPOLE_ROLE_ID in the config.")
+            return
+        if self.onboarding_kick_activation_timestamp is None:
+            await inter.edit_original_response("Activation time is not set. Toggle the feature to set it, or set ONBOARDING_KICK_ACTIVATION_TIMESTAMP and restart.")
+            return
+        now_utc = datetime.now(timezone.utc)
+        if now_utc < self.onboarding_kick_activation_timestamp:
+            await inter.edit_original_response(f"Not active yet. Activation time is {self.onboarding_kick_activation_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            return
+        guild = inter.guild
+        kick_threshold = now_utc - timedelta(hours=24)
+        kicked_count = 0
+        for member in guild.members:
+            if member.bot:
+                continue
+            joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
+            if not joined_at_utc:
+                continue
+            if joined_at_utc < self.onboarding_kick_activation_timestamp:
+                continue
+            if joined_at_utc < kick_threshold:
+                has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
+                if not has_tadpole_role:
+                    try:
+                        await member.kick(reason="Did not complete onboarding within 24 hours.")
+                        kicked_count += 1
+                        await asyncio.sleep(1)
+                    except disnake.Forbidden:
+                        logging.error(f"Failed to kick {member.display_name}: Missing permissions.")
+                    except disnake.HTTPException as e:
+                        logging.error(f"Failed to kick {member.display_name}: {e}")
+                        if "429" in str(e):
+                            await asyncio.sleep(5)
+        await inter.edit_original_response(f"Onboarding kick check completed. Kicked {kicked_count} member(s).")
+
     async def _disable_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         current_config = Config(CONFIG['CONFIG_FILE'])
