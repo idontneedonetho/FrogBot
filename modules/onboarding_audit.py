@@ -9,9 +9,6 @@ import logging
 import csv
 import io
 
-PHOENIX_TZ = timezone(timedelta(hours=-7))
-DEADLINE_KICK_DATETIME = datetime(2025, 8, 6, 14, 3, 10, tzinfo=PHOENIX_TZ)
-
 class OnboardingAuditCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -45,12 +42,10 @@ class OnboardingAuditCog(commands.Cog):
                 logging.info("24h onboarding kick task started due to ENABLE_24H_ONBOARDING_KICK=true.")
             else:
                 logging.info("24h onboarding kick task NOT started due to ENABLE_24H_ONBOARDING_KICK=false.")
-            self.deadline_kick_task.start()
         logging.info(f"OnboardingAuditCog initialized. Tadpole Role ID: {self.tadpole_role_id}")
 
     def cog_unload(self):
         self.check_pending_onboarding_task.cancel()
-        self.deadline_kick_task.cancel()
 
     @tasks.loop(hours=1)
     async def check_pending_onboarding_task(self):
@@ -161,51 +156,6 @@ class OnboardingAuditCog(commands.Cog):
                             f"Targeted roles specified in config: {', '.join([r.name for r in actually_targeted_roles_in_guild if r]) or 'None found in guild'}.\n"
                             f"Summary of roles removed: {roles_removed_summary if roles_removed_summary else 'No targeted roles were found on members or could be removed.'}")
         await inter.edit_original_response(response_message)
-
-    @tasks.loop(hours=1)
-    async def deadline_kick_task(self):
-        await self.bot.wait_until_ready()
-        now_utc = datetime.now(timezone.utc)
-        if now_utc >= DEADLINE_KICK_DATETIME:
-            logging.info(f"Deadline {DEADLINE_KICK_DATETIME} reached. Starting existing user audit.")
-            if not self.onboarding_kick_guild_id:
-                logging.error("Deadline kick: No target guild configured. Aborting.")
-                self.deadline_kick_task.stop()
-                return
-            guild = self.bot.get_guild(self.onboarding_kick_guild_id)
-            if not guild:
-                logging.error("Deadline kick: Guild not found.")
-                self.deadline_kick_task.stop()
-                return
-            if not self.tadpole_role_id:
-                logging.error("Deadline kick: Tadpole role ID not configured. Aborting.")
-                self.deadline_kick_task.stop()
-                return
-            join_cutoff = now_utc - timedelta(hours=24)
-            kicked_count = 0
-            for member in list(guild.members):
-                if member.bot:
-                    continue
-                joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else now_utc
-                if joined_at_utc < join_cutoff:
-                    has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
-                    if not has_tadpole_role:
-                        logging.info(f"Deadline kick: Kicking member {member.id} ({member.display_name}) for not having Tadpole role.")
-                        try:
-                            await member.kick(reason=f"Did not complete onboarding by the {DEADLINE_KICK_DATETIME.strftime('%Y-%m-%d')} deadline.")
-                            kicked_count += 1
-                            # Rate limiting: Wait 1 second between kicks to avoid Discord rate limits
-                            await asyncio.sleep(1)
-                        except disnake.Forbidden:
-                            logging.error(f"Deadline kick: Failed to kick {member.display_name}: Missing permissions.")
-                        except disnake.HTTPException as e:
-                            logging.error(f"Deadline kick: Failed to kick {member.display_name}: {e}")
-                            # If we hit rate limits, wait longer
-                            if "429" in str(e):
-                                logging.warning("Rate limit hit during deadline kicking, waiting 5 seconds...")
-                                await asyncio.sleep(5)
-            logging.info(f"Deadline kick task finished. Kicked {kicked_count} members.")
-            self.deadline_kick_task.stop()
 
     @commands.slash_command(
         name="toggle_onboarding_kick",
@@ -383,15 +333,12 @@ class OnboardingAuditCog(commands.Cog):
                 await inter.response.send_message("Confirmation failed. Please type 'CONFIRM' exactly to enable the 24-hour kick feature.", ephemeral=True)
 
     @check_pending_onboarding_task.before_loop
-    @deadline_kick_task.before_loop
     async def before_tasks(self):
         await self.bot.wait_until_ready()
         if not self.tadpole_role_id:
             logging.error("Aborting onboarding/audit tasks: Tadpole Role ID is not configured.")
             if self.check_pending_onboarding_task.is_running():
                 self.check_pending_onboarding_task.cancel()
-            if self.deadline_kick_task.is_running():
-                self.deadline_kick_task.cancel()
 
 def setup(bot: commands.Bot):
     bot.add_cog(OnboardingAuditCog(bot))
