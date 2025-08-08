@@ -2,6 +2,7 @@
 
 from core import Config, CONFIG, is_admin_or_privileged
 from datetime import datetime, timedelta, timezone
+from typing import Optional, List
 from disnake.ext import commands, tasks
 import asyncio
 import disnake
@@ -47,6 +48,90 @@ class OnboardingAuditCog(commands.Cog):
     def cog_unload(self):
         self.check_pending_onboarding_task.cancel()
 
+    async def _iterate_members(self, guild: disnake.Guild):
+        try:
+            async for member in guild.fetch_members(limit=None):
+                yield member
+            return
+        except Exception:
+            for member in guild.members:
+                yield member
+
+    def _qualifies_for_kick(
+        self,
+        member: disnake.Member,
+        now_utc: datetime,
+        require_activation_gate: bool,
+    ) -> bool:
+        if member.bot:
+            return False
+        joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
+        if not joined_at_utc:
+            return False
+        if require_activation_gate and self.onboarding_kick_activation_timestamp and joined_at_utc < self.onboarding_kick_activation_timestamp:
+            return False
+        if joined_at_utc > (now_utc - timedelta(hours=24)):
+            return False
+        if any(role.id == self.tadpole_role_id for role in member.roles):
+            return False
+        return True
+
+    async def _kick_candidates(
+        self,
+        guild: disnake.Guild,
+        require_activation_gate: bool,
+        reason: str,
+        max_per_run: Optional[int] = None,
+    ) -> tuple[int, int]:
+        me = guild.me
+        if not me or not me.guild_permissions.kick_members:
+            logging.warning("Onboarding kick: Bot lacks 'Kick Members' permission.")
+            return 0, 0
+        kicked_count = 0
+        checked_count = 0
+        backoff_seconds = 1.0
+        now_utc = datetime.now(timezone.utc)
+        async for member in self._iterate_members(guild):
+            checked_count += 1
+            if not self._qualifies_for_kick(member, now_utc, require_activation_gate):
+                continue
+            try:
+                if me.top_role <= member.top_role:
+                    logging.debug(f"Onboarding kick: Skip {member.display_name} due to role hierarchy.")
+                    continue
+            except Exception:
+                continue
+            try:
+                await member.kick(reason=reason)
+                kicked_count += 1
+                await asyncio.sleep(0.5)
+            except disnake.Forbidden:
+                logging.error(f"Onboarding kick: Forbidden kicking {member.display_name}.")
+            except disnake.HTTPException as e:
+                status = getattr(e, 'status', None)
+                retry_after = getattr(e, 'retry_after', None) or backoff_seconds
+                logging.error(f"Onboarding kick: HTTP error kicking {member.display_name}: {e}")
+                if status == 429:
+                    await asyncio.sleep(min(60.0, float(retry_after)))
+                    backoff_seconds = min(60.0, backoff_seconds * 2)
+                else:
+                    await asyncio.sleep(1.0)
+            if max_per_run is not None and kicked_count >= max_per_run:
+                break
+        return kicked_count, checked_count
+
+    async def _scan_candidates(
+        self,
+        guild: disnake.Guild,
+        require_activation_gate: bool,
+    ) -> List[disnake.Member]:
+        now_utc = datetime.now(timezone.utc)
+        candidates: List[disnake.Member] = []
+        async for member in self._iterate_members(guild):
+            if self._qualifies_for_kick(member, now_utc, require_activation_gate):
+                candidates.append(member)
+        return candidates
+
     @tasks.loop(hours=1)
     async def check_pending_onboarding_task(self):
         await self.bot.wait_until_ready()
@@ -70,35 +155,15 @@ class OnboardingAuditCog(commands.Cog):
         if not self.tadpole_role_id:
             logging.warning("Pending onboarding check: Tadpole role ID not set. Skipping.")
             return
-        now = datetime.now(timezone.utc)
-        kick_threshold = now - timedelta(hours=24)
-        kicked_count = 0
-        for member in guild.members:
-            if member.bot:
-                continue
-            joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
-            if not joined_at_utc:
-                logging.warning(f"Member {member.id} ({member.display_name}) has no join timestamp. Skipping.")
-                continue
-            if joined_at_utc < self.onboarding_kick_activation_timestamp:
-                continue
-            if joined_at_utc < kick_threshold:
-                has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
-                if not has_tadpole_role:
-                    logging.info(f"Kicking member {member.id} ({member.display_name}) for not completing onboarding within 24 hours (missing Tadpole role).")
-                    try:
-                        await member.kick(reason="Did not complete onboarding within 24 hours.")
-                        kicked_count += 1
-                        await asyncio.sleep(1)
-                    except disnake.Forbidden:
-                        logging.error(f"Failed to kick {member.display_name}: Missing permissions.")
-                    except disnake.HTTPException as e:
-                        logging.error(f"Failed to kick {member.display_name}: {e}")
-                        if "429" in str(e):
-                            logging.warning("Rate limit hit during kicking, waiting 5 seconds...")
-                            await asyncio.sleep(5)
-        if kicked_count > 0:
-            logging.info(f"24h onboarding kick task completed. Kicked {kicked_count} members.")
+        kicked_count, checked_count = await self._kick_candidates(
+            guild=guild,
+            require_activation_gate=True,
+            reason="Did not complete onboarding within 24 hours.",
+            max_per_run=None,
+        )
+        logging.info(
+            f"24h onboarding kick task completed. Checked {checked_count} members, kicked {kicked_count}."
+        )
 
     @commands.slash_command(name="clear_member_roles", description="Clears specified roles from all members, preserving certain roles.")
     @commands.has_permissions(administrator=True)
@@ -118,7 +183,6 @@ class OnboardingAuditCog(commands.Cog):
         member_count = 0
         roles_removed_summary = {}
         tadpole_role_id_int = int(self.tadpole_role_id) if isinstance(self.tadpole_role_id, (int, str)) and str(self.tadpole_role_id).isdigit() else 0
-
         for member in guild.members:
             if member.bot:
                 continue
@@ -190,31 +254,26 @@ class OnboardingAuditCog(commands.Cog):
         await inter.response.defer(ephemeral=True)
         guild = inter.guild
         now = datetime.now(timezone.utc)
-        kick_threshold = now - timedelta(hours=24)
         test_results = {
             'total_members_checked': 0,
             'members_with_tadpole': 0,
             'members_eligible_for_kick': 0,
             'members_that_would_be_kicked': []
         }
-        for member in guild.members:
-            if member.bot:
-                continue
-            test_results['total_members_checked'] += 1
-            joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
-            if not joined_at_utc:
-                continue
-            has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
-            if has_tadpole_role:
-                test_results['members_with_tadpole'] += 1
-            else:
-                if joined_at_utc < kick_threshold:
-                    test_results['members_eligible_for_kick'] += 1
-                    test_results['members_that_would_be_kicked'].append({
-                        'name': member.display_name,
-                        'id': member.id,
-                        'joined': joined_at_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-                    })
+        candidates = await self._scan_candidates(guild=guild, require_activation_gate=False)
+        test_results['total_members_checked'] = sum(1 for m in guild.members if not m.bot)
+        test_results['members_that_would_be_kicked'] = [
+            {
+                'name': m.display_name,
+                'id': m.id,
+                'joined': (m.joined_at.astimezone(timezone.utc)).strftime("%Y-%m-%d %H:%M:%S UTC") if m.joined_at else "Unknown"
+            }
+            for m in candidates
+        ]
+        test_results['members_eligible_for_kick'] = len(candidates)
+        test_results['members_with_tadpole'] = sum(
+            1 for m in guild.members if (not m.bot) and any(r.id == self.tadpole_role_id for r in m.roles)
+        )
         members_without_tadpole = test_results['total_members_checked'] - test_results['members_with_tadpole']
         embed = disnake.Embed(
             title="Onboarding Kick Test Results",
@@ -282,33 +341,17 @@ class OnboardingAuditCog(commands.Cog):
         if not self.tadpole_role_id:
             await inter.edit_original_response("Tadpole role ID is not configured. Set TADPOLE_ROLE_ID in the config.")
             return
-        now_utc = datetime.now(timezone.utc)
         guild = inter.guild
-        kick_threshold = now_utc - timedelta(hours=24)
-        kicked_count = 0
-        checked_count = 0
-        for member in guild.members:
-            if member.bot:
-                continue
-            checked_count += 1
-            joined_at_utc = member.joined_at.astimezone(timezone.utc) if member.joined_at else None
-            if not joined_at_utc:
-                continue
-            if joined_at_utc <= kick_threshold:
-                has_tadpole_role = any(role.id == self.tadpole_role_id for role in member.roles)
-                if not has_tadpole_role:
-                    try:
-                        await member.kick(reason="Did not complete onboarding within 24 hours.")
-                        kicked_count += 1
-                        await asyncio.sleep(1)
-                    except disnake.Forbidden:
-                        logging.error(f"Failed to kick {member.display_name}: Missing permissions.")
-                    except disnake.HTTPException as e:
-                        logging.error(f"Failed to kick {member.display_name}: {e}")
-                        if "429" in str(e):
-                            await asyncio.sleep(5)
+        kicked_count, checked_count = await self._kick_candidates(
+            guild=guild,
+            require_activation_gate=False,
+            reason="Did not complete onboarding within 24 hours.",
+            max_per_run=None,
+        )
         logging.info(f"Manual onboarding kick run in guild {guild.id}. Checked {checked_count} members, kicked {kicked_count}.")
-        await inter.edit_original_response(f"Onboarding kick check completed. Checked {checked_count} members. Kicked {kicked_count} member(s).")
+        await inter.edit_original_response(
+            f"Onboarding kick check completed. Checked {checked_count} members. Kicked {kicked_count} member(s)."
+        )
 
     async def _disable_onboarding_kick(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
