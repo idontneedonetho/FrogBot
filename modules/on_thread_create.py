@@ -38,7 +38,7 @@ class ThreadCreateCog(commands.Cog):
                 '- Did you check for updates? Your bug may already be fixed!\n'
                 '- Which branch are you using? (e.g., FrogPilot, FrogPilot-Staging, or any other)\n'
                 '- Was there an error in the error log? You can find this in the "Software" panel!\n'
-                '- If you think it may be toggle related, post a copy of your toggles! You can find a copy of them in "Fleet Manager" in the "Tools" section!\n'
+                '- If you think it may be toggle related, post a copy of your toggles! You can find a copy of them in "The Pond" in the "Tools" section!\n'
             ),
             color=disnake.Color.blue()
         )
