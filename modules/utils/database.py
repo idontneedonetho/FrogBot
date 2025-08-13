@@ -109,6 +109,13 @@ async def initialize_database():
                     details TEXT
                 )
             ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS known_themes (
+                    theme_key TEXT PRIMARY KEY,
+                    theme_name TEXT NOT NULL,
+                    author_name TEXT NOT NULL
+                )
+            ''')
             await conn.commit()
     except Exception as e:
         logging.error(f"Error initializing database: {e}")
@@ -421,6 +428,23 @@ async def get_wiki_processing_count() -> int:
         "SELECT COUNT(*) FROM wiki_search_queue WHERE status = 'processing'"
     )
     return rows[0][0] if rows and rows[0] else 0
+
+async def is_theme_known(theme_key: str) -> bool:
+    rows = await db_access_with_retry(
+        'SELECT 1 FROM known_themes WHERE theme_key = ?',
+        (theme_key,)
+    )
+    return bool(rows)
+
+async def add_known_theme(theme_key: str, theme_name: str, author_name: str):
+    await db_access_with_retry(
+        'INSERT INTO known_themes (theme_key, theme_name, author_name) VALUES (?, ?, ?)',
+        (theme_key, theme_name, author_name)
+    )
+
+async def get_known_themes() -> list:
+    rows = await db_access_with_retry('SELECT theme_key FROM known_themes')
+    return [row[0] for row in rows] if rows else []
     
 async def get_wiki_request_by_id(request_id: int) -> Optional[Dict]:
     conn = await get_connection()
