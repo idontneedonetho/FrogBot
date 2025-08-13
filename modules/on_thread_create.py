@@ -30,7 +30,7 @@ class ThreadCreateCog(commands.Cog):
             await self.message.edit(embed=done_embed, view=None)
 
     async def handle_bug_report(self, thread):
-        original_message = await thread.fetch_message(thread.id)
+        thread_owner_id = thread.owner_id
         embed = disnake.Embed(
             title="Bug Report Assistance",
             description=(
@@ -43,8 +43,8 @@ class ThreadCreateCog(commands.Cog):
             color=disnake.Color.blue()
         )
         embed.set_footer(text="If you need help with any of these steps, please let someone with the 'MarshMentor' role know!")
-        view = self.ConfirmationView(None, original_message.author.id)
-        message = await original_message.reply(embed=embed, view=view)
+        view = self.ConfirmationView(None, thread_owner_id)
+        message = await thread.send(embed=embed, view=view)
         view.message = message
 
     @commands.Cog.listener()
