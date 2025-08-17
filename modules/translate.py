@@ -48,20 +48,19 @@ _translator = _Translator()
 def _format_language_name(lang: str) -> str:
     return " ".join(word.capitalize() for word in lang.split())
 
-def _build_prompt(history_lines: List[str], user_lang: str, target_langs: Set[str], content: str) -> str:
+def _build_prompt(history_lines: List[str], target_langs: Set[str], content: str) -> str:
     system_rules = (
         "You are a translation assistant. Your job is to:\n"
         "1. Translate messages while maintaining context, nuance and accuracy\n"
         "2. Never add commentary or additional messages\n"
         "3. Always use full language names\n"
-        "4. Never translate into the source language - only translate into the target languages.\n"
-        "5. Return translations ONLY as a valid JSON object containing a single key 'translations', which maps lowercase language names to translated text."
+        "4. Return translations ONLY as a valid JSON object containing a single key 'translations', which maps lowercase language names to translated text."
     )
     parts: List[str] = [system_rules]
     parts.extend(history_lines)
     targets = ", ".join(_format_language_name(t) for t in target_langs)
     parts.append(
-        f"Translate this message from {_format_language_name(user_lang)} to {targets}:\n{content}"
+        f"Translate this message to {targets}:\n{content}"
     )
     return "\n".join(parts)
 
@@ -96,15 +95,13 @@ class TranslationCog(commands.Cog):
                 content = (
                     content.replace(f"<@{m.id}>", m.display_name).replace(f"<@!{m.id}>", m.display_name)
                 )
-        thread_id = msg_or_inter.channel.id if isinstance(msg_or_inter.channel, disnake.Thread) else 0
-        user_lang = await database.get_user_language(thread_id, msg_or_inter.author.id) or "english"
         history = await pull_history_lines(msg_or_inter.channel, 7)
-        prompt = _build_prompt(history, user_lang, target_langs, content)
+        prompt = _build_prompt(history, target_langs, content)
         translations = await _translator.translate(prompt)
         return {
             lang.lower(): text
             for lang, text in translations.items()
-            if text.strip() and text.strip() != content.strip() and lang.lower() != user_lang.lower()
+            if text.strip() and text.strip() != content.strip()
         }
 
     async def _worker(self):
@@ -114,7 +111,6 @@ class TranslationCog(commands.Cog):
                 try:
                     if (
                         message.channel.locked
-                        or not await database.is_thread_active(message.channel.id)
                         or not message.content.strip()
                     ):
                         continue
@@ -137,7 +133,6 @@ class TranslationCog(commands.Cog):
         if (
             message.author.bot
             or not isinstance(message.channel, disnake.Thread)
-            or not await database.is_thread_active(message.channel.id)
         ):
             return
         langs = set(await database.get_thread_languages(message.channel.id) or [])
@@ -167,56 +162,34 @@ class TranslationCog(commands.Cog):
         )
         await inter.response.send_modal(modal)
 
-    @commands.slash_command(name="autotranslate", description="Manage automatic translation in the current thread")
+    @commands.slash_command(name="autotranslate", description="Manage auto-translation languages (auto-translation is active when languages are set)")
     async def autotranslate(self, inter: ApplicationCommandInteraction):
         pass
 
-    @autotranslate.sub_command(name="enable", description="Enable auto-translation in this thread")
-    async def at_enable(self, inter: ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
-        await database.set_thread_active(inter.channel.id, True)
-        await inter.response.send_message("🌐 Auto-translation enabled!", ephemeral=False)
-
-    @autotranslate.sub_command(name="disable", description="Disable auto-translation in this thread")
-    async def at_disable(self, inter: ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
-        await database.set_thread_active(inter.channel.id, False)
-        await inter.response.send_message("🌐 Auto-translation disabled", ephemeral=False)
-
-    @autotranslate.sub_command(name="status", description="Show auto-translation status for this thread")
-    async def at_status(self, inter: ApplicationCommandInteraction):
-        if not isinstance(inter.channel, disnake.Thread):
-            return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
-        active = await database.is_thread_active(inter.channel.id)
-        status = "enabled" if active else "disabled"
-        await inter.response.send_message(
-            f"Auto-translation is **{status}** in this thread.", ephemeral=True
-        )
-
-    @autotranslate.sub_command(name="add_language", description="Add a language to this thread")
+    @autotranslate.sub_command(name="add", description="Add a language to this thread")
     async def at_add_language(self, inter: ApplicationCommandInteraction, language: str):
         if not isinstance(inter.channel, disnake.Thread):
             return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
         await database.add_thread_language(inter.channel.id, language.lower().strip())
-        await inter.response.send_message(f"✅ Added {_format_language_name(language)}", ephemeral=False)
+        await inter.response.send_message(f"✅ Added {_format_language_name(language)} to this thread", ephemeral=False)
 
-    @autotranslate.sub_command(name="remove_language", description="Remove a language from this thread")
+    @autotranslate.sub_command(name="remove", description="Remove a language from this thread")
     async def at_remove_language(self, inter: ApplicationCommandInteraction, language: str):
         if not isinstance(inter.channel, disnake.Thread):
             return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
         await database.remove_thread_language(inter.channel.id, language.lower().strip())
-        await inter.response.send_message(f"🗑️ Removed {_format_language_name(language)}", ephemeral=False)
+        await inter.response.send_message(f"🗑️ Removed {_format_language_name(language)} from this thread", ephemeral=False)
 
-    @autotranslate.sub_command(name="set_my_language", description="Set your preferred language for this thread")
-    async def at_set_my_language(self, inter: ApplicationCommandInteraction, language: str):
+    @autotranslate.sub_command(name="status", description="Show current auto-translation status")
+    async def at_status(self, inter: ApplicationCommandInteraction):
         if not isinstance(inter.channel, disnake.Thread):
             return await inter.response.send_message("❌ Use this in a thread", ephemeral=True)
-        await database.set_user_language(inter.channel.id, inter.author.id, language.lower().strip())
-        await inter.response.send_message(
-            f"✅ Your language set to {_format_language_name(language)}", ephemeral=False
-        )
+        languages = await database.get_thread_languages(inter.channel.id) or []
+        if not languages:
+            await inter.response.send_message("🌐 Auto-translation is **disabled** (no target languages set)", ephemeral=True)
+        else:
+            lang_list = ", ".join(_format_language_name(lang) for lang in languages)
+            await inter.response.send_message(f"🌐 Auto-translation is **enabled** for: {lang_list}", ephemeral=True)
 
     @commands.message_command(name="Translate")
     async def translate_context_menu(self, inter: MessageCommandInteraction, message: Message):

@@ -42,20 +42,6 @@ async def initialize_database():
                 )
             ''')
             await conn.execute('''
-                CREATE TABLE IF NOT EXISTS translation_threads (
-                    thread_id INTEGER PRIMARY KEY,
-                    is_active BOOLEAN NOT NULL DEFAULT 1
-                )
-            ''')
-            await conn.execute('''
-                CREATE TABLE IF NOT EXISTS user_language_preferences (
-                    thread_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    language TEXT NOT NULL,
-                    PRIMARY KEY (thread_id, user_id)
-                )
-            ''')
-            await conn.execute('''
                 CREATE TABLE IF NOT EXISTS thread_languages (
                     thread_id INTEGER NOT NULL,
                     language TEXT NOT NULL,
@@ -171,34 +157,6 @@ async def log_checkmark_message_id(message_id, channel_id, timestamp):
         logging.error(f"Failed to log checkmark message ID: {e}")
         return False
 
-async def set_thread_active(thread_id: int, active: bool = True):
-    await db_access_with_retry(
-        'INSERT INTO translation_threads (thread_id, is_active) VALUES (?, ?) '
-        'ON CONFLICT(thread_id) DO UPDATE SET is_active = ?',
-        (thread_id, active, active)
-    )
-
-async def is_thread_active(thread_id: int) -> bool:
-    rows = await db_access_with_retry(
-        'SELECT is_active FROM translation_threads WHERE thread_id = ?',
-        (thread_id,)
-    )
-    return bool(rows and rows[0][0])
-
-async def set_user_language(thread_id: int, user_id: int, language: str):
-    await db_access_with_retry(
-        'INSERT INTO user_language_preferences (thread_id, user_id, language) VALUES (?, ?, ?) '
-        'ON CONFLICT(thread_id, user_id) DO UPDATE SET language = ?',
-        (thread_id, user_id, language, language)
-    )
-
-async def get_user_language(thread_id: int, user_id: int) -> str:
-    rows = await db_access_with_retry(
-        'SELECT language FROM user_language_preferences WHERE thread_id = ? AND user_id = ?',
-        (thread_id, user_id)
-    )
-    return rows[0][0] if rows else None
-
 async def add_thread_language(thread_id: int, language: str):
     async with aiosqlite.connect(DATABASE_FILE) as db:
         await db.execute(
@@ -224,8 +182,6 @@ async def get_thread_languages(thread_id: int) -> list[str]:
 
 async def clear_thread_data(thread_id: int):
     async with aiosqlite.connect(DATABASE_FILE) as conn:
-        await conn.execute('DELETE FROM translation_threads WHERE thread_id = ?', (thread_id,))
-        await conn.execute('DELETE FROM user_language_preferences WHERE thread_id = ?', (thread_id,))
         await conn.execute('DELETE FROM thread_languages WHERE thread_id = ?', (thread_id,))
         await conn.execute('DELETE FROM checkmark_logs WHERE channel_id = ?', (thread_id,))
         await conn.commit()
@@ -470,8 +426,8 @@ class ThreadCleanupManager:
     async def cleanup_threads(self) -> Dict[str, int]:
         stats = {'threads': 0, 'reactions': 0, 'checkmarks': 0}
         try:
-            trans_rows = await db_access_with_retry('SELECT thread_id FROM translation_threads')
-            for (thread_id,) in trans_rows:
+            thread_langs = await db_access_with_retry('SELECT DISTINCT thread_id FROM thread_languages')
+            for (thread_id,) in thread_langs:
                 if not self.bot.get_channel(thread_id):
                     await clear_thread_data(thread_id)
                     stats['threads'] += 1
