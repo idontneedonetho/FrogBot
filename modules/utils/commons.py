@@ -65,7 +65,12 @@ async def send_long_message(message_or_channel, response, should_reply=True):
         logging.error(f"Error in send_long_message: {e}")
         return None
 
+def replace_mentions(content, mentions):
+    for user in mentions:
+        content = content.replace(f'<@{user.id}>', f'@{user.display_name}')
+        content = content.replace(f'<@!{user.id}>', f'@{user.display_name}')
+    return content
+
 async def pull_history_lines(channel: disnake.abc.Messageable, limit: int = 25):
-    messages = [m async for m in channel.history(limit=limit)]
-    messages.reverse()
-    return [f"{m.author.display_name}: {m.content}" for m in messages if m.content]
+    messages = list(reversed([m async for m in channel.history(limit=limit)]))
+    return [f"{m.author.display_name}: {replace_mentions(m.content, m.mentions)}" for m in messages if m.content]

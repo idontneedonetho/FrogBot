@@ -1,10 +1,9 @@
 # modules.summarize
 
-from llama_index.llms.google_genai import GoogleGenAI
 from modules.utils.commons import pull_history_lines
 from disnake import Embed, Color
 from disnake.ext import commands
-from core import config
+from openai import OpenAI
 import disnake
 import logging
 
@@ -14,25 +13,28 @@ class SummarizeCog(commands.Cog):
 
     @commands.slash_command(name="summarize", description="Summarise recent messages (default 25, max 50)")
     async def summarize(self, inter: disnake.ApplicationCommandInteraction, num_messages: commands.Range[int, 1, 50] = 25):
+
         await inter.response.defer(ephemeral=True)
         lines = await pull_history_lines(inter.channel, num_messages)
+
         if not lines:
             return await inter.edit_original_response(content="No messages to summarise.")
-        if GoogleGenAI is None:
-            return await inter.edit_original_response(content="Missing dependencies: install llama_index and google-generativeai.")
-        api_key = config.read().get("GOOGLE_API_KEY")
-        if not api_key:
-            return await inter.edit_original_response(content="Google API key not configured. Use the control panel or update your config.yaml.")
-        llm = GoogleGenAI(model_name="models/gemini-2.0-flash", api_key=api_key)
-        prompt = "Summarise the following Discord conversation in under 200 words:\n\n" + "\n".join(lines) + "\n\nSummary:"
+        
+        llm = OpenAI(base_url="http://localhost:11434/v1/", api_key="ollama")
+
         try:
-            summary = llm.complete(prompt).text
+            response = llm.responses.create(
+                # model="granite4:1b-h",
+                model='gemma3:1b',
+                input='Summarize the following conversation in a concise manner:\n\n' + '\n'.join(lines),
+            )
         except Exception as e:
             logging.error(f"LLM error: {e}")
             return await inter.edit_original_response(content="Failed to generate summary.")
-        embed = Embed(title="Conversation Summary", description=summary, color=Color.blue())
+        
+        embed = Embed(title="Conversation Summary", description=response.output_text, color=Color.blue())
         embed.set_footer(text=f"Summarised last {len(lines)} messages (chronological order)")
         await inter.edit_original_response(embed=embed)
 
 def setup(bot):
-    bot.add_cog(SummarizeCog(bot)) 
+    bot.add_cog(SummarizeCog(bot))
