@@ -11,3 +11,4 @@ websocket-client
 llama-index-core
 llama-index-llms-google_genai
 PyGithub
+OpenAI
