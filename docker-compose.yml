@@ -11,6 +11,8 @@ services:
     working_dir: /app
     environment:
       - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: python core.py
     restart: unless-stopped
 

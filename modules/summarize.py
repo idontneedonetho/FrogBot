@@ -4,6 +4,7 @@ from modules.utils.commons import pull_history_lines
 from disnake import Embed, Color
 from disnake.ext import commands
 from openai import OpenAI
+from core import config
 import disnake
 import logging
 
@@ -20,7 +21,8 @@ class SummarizeCog(commands.Cog):
         if not lines:
             return await inter.edit_original_response(content="No messages to summarise.")
         
-        llm = OpenAI(base_url="http://localhost:11434/v1/", api_key="ollama")
+        ollama_url = config.read().get('OLLAMA_BASE_URL', 'http://localhost:11434/v1/')
+        llm = OpenAI(base_url=ollama_url, api_key="ollama")
 
         try:
             response = llm.responses.create(

@@ -3,10 +3,12 @@
 from modules.utils.commons import pull_history_lines
 from disnake.ext import commands
 from openai import OpenAI
+from core import config
 import logging
 import disnake
 
-llm = OpenAI(base_url="http://localhost:11434/v1/", api_key="ollama")
+
+# llm initialization is now deferred to use config
 
 class KawaiiReactionsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -25,6 +27,8 @@ class KawaiiReactionsCog(commands.Cog):
         lines = await pull_history_lines(message.channel, limit=10)
 
         try:
+            ollama_url = config.read().get('OLLAMA_BASE_URL', 'http://localhost:11434/v1/')
+            llm = OpenAI(base_url=ollama_url, api_key="ollama")
             response = llm.responses.create(
                 model='gemma3:1b',
                 input='Respond in a cute, kawaii way to these messages:\n' + '\n'.join(lines),
