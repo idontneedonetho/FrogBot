@@ -71,6 +71,23 @@ def replace_mentions(content, mentions):
         content = content.replace(f'<@!{user.id}>', f'@{user.display_name}')
     return content
 
-async def pull_history_lines(channel: disnake.abc.Messageable, limit: int = 25):
-    messages = list(reversed([m async for m in channel.history(limit=limit)]))
-    return [f"{m.author.display_name}: {replace_mentions(m.content, m.mentions)}" for m in messages if m.content]
+async def get_history_context(channel: disnake.abc.Messageable, token_limit: int = 8000) -> str:
+    lines = []
+    current_tokens = 0
+    
+    async for m in channel.history(limit=1000):
+        if not m.content:
+            continue
+            
+        line = f"{m.author.display_name}: {replace_mentions(m.content, m.mentions)}"
+        # Heuristic: 1 token ≈ 4 characters
+        tokens = len(line) // 4
+        
+        if current_tokens + tokens > token_limit:
+            break
+            
+        lines.append(line)
+        current_tokens += tokens
+        
+    # Return as single string with newest messages at the end
+    return "\n".join(reversed(lines))

@@ -1,43 +1,42 @@
 # modules.translate
 
 from disnake import Message, ApplicationCommandInteraction, ModalInteraction, MessageCommandInteraction, TextInputStyle, ui
-from modules.utils.commons import send_long_message, pull_history_lines
-from llama_index.core.output_parsers import PydanticOutputParser
-from llama_index.llms.google_genai import GoogleGenAI
-from pydantic import BaseModel, ValidationError
+from modules.utils.commons import send_long_message, get_history_context
 from typing import Dict, List, Set
 from modules.utils import database
 from asyncio import Queue, sleep
 from disnake.ext import commands
+from google.genai import types
+from google import genai
 from core import config
 import asyncio
 import logging
 import disnake
-
-class _TranslationSchema(BaseModel):
-    translations: Dict[str, str]
+import json
 
 class _Translator:
     def __init__(self) -> None:
         api_key = config.read().get("GOOGLE_API_KEY")
         if not api_key:
             raise RuntimeError("Google API key missing from configuration")
-        self._llm = GoogleGenAI(model_name="gemini-2.0-flash", api_key=api_key)
-        self._parser = PydanticOutputParser(_TranslationSchema)
-        self._fmt_instructions = self._parser.get_format_string()
+        self.client = genai.Client(api_key=api_key)
 
     async def translate(self, prompt: str) -> Dict[str, str]:
-        full_prompt = f"{prompt}\n\n{self._fmt_instructions}"
         try:
-            if hasattr(self._llm, "acomplete"):
-                response = await self._llm.acomplete(full_prompt)
-            else:
-                response = await asyncio.to_thread(self._llm.complete, full_prompt)
-            raw = getattr(response, "text", str(response))
-            parsed: _TranslationSchema = self._parser.parse(raw)
-            return parsed.translations
-        except ValidationError as ve:
-            logging.error("Translator JSON validation error: %s\nRaw: %s", ve, raw)
+            response = await self.client.aio.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    thinking_config=types.ThinkingConfig(thinking_level="low")
+                )
+            )
+            data = json.loads(response.text)
+            if "translations" in data:
+                return data["translations"]
+            return data
+        except json.JSONDecodeError as je:
+            logging.error("Translator JSON decode error: %s\nRaw: %s", je, response.text)
             raise
         except Exception:
             logging.exception("Translator unexpected error")
@@ -95,7 +94,7 @@ class TranslationCog(commands.Cog):
                 content = (
                     content.replace(f"<@{m.id}>", m.display_name).replace(f"<@!{m.id}>", m.display_name)
                 )
-        history = await pull_history_lines(msg_or_inter.channel, 7)
+        history = await get_history_context(msg_or_inter.channel, 4096)
         prompt = _build_prompt(history, target_langs, content)
         translations = await _translator.translate(prompt)
         return {
