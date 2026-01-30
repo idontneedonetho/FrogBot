@@ -26,9 +26,15 @@ class KawaiiReactionsCog(commands.Cog):
         try:
             ollama_url = config.read().get('OLLAMA_BASE_URL', 'http://localhost:11434/v1/')
             llm = OpenAI(base_url=ollama_url, api_key="ollama")
+            chat_context = "\n".join(lines)
             response = llm.responses.create(
-                model='gemma3:1b',
-                input='Respond to the latest message in a cute, kawaii way:\n' + '\n'.join(lines),
+                model='qwen2.5:1.5b',
+                temperature=1.0,
+                input=(
+                    'You are a kawaii bot. Keep it to one sentence.\n'
+                    f"Current Chat History:\n{chat_context}\n\n"
+                    "Task: Reply to the last message as a cute mascot."
+                )
             )
             return response.output_text
         except Exception as e:
