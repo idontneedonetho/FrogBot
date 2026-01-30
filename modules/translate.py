@@ -14,48 +14,11 @@ import logging
 import disnake
 import json
 
-class _Translator:
-    def __init__(self) -> None:
-        api_key = config.read().get("GOOGLE_API_KEY")
-        if not api_key:
-            raise RuntimeError("Google API key missing from configuration")
-        self.client = genai.Client(api_key=api_key)
-
-    async def translate(self, prompt: str) -> Dict[str, str]:
-        try:
-            response = await self.client.aio.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    thinking_config=types.ThinkingConfig(thinking_level="low")
-                )
-            )
-            data = json.loads(response.text)
-            if "translations" in data:
-                return data["translations"]
-            return data
-        except json.JSONDecodeError as je:
-            logging.error("Translator JSON decode error: %s\nRaw: %s", je, response.text)
-            raise
-        except Exception:
-            logging.exception("Translator unexpected error")
-            raise
-
-_translator = _Translator()
-
 def _format_language_name(lang: str) -> str:
     return " ".join(word.capitalize() for word in lang.split())
 
 def _build_prompt(history_lines: List[str], target_langs: Set[str], content: str) -> str:
-    system_rules = (
-        "You are a translation assistant. Your job is to:\n"
-        "1. Translate messages while maintaining context, nuance and accuracy\n"
-        "2. Never add commentary or additional messages\n"
-        "3. Always use full language names\n"
-        "4. Return translations ONLY as a valid JSON object containing a single key 'translations', which maps lowercase language names to translated text."
-    )
-    parts: List[str] = [system_rules]
+    parts: List[str] = []
     parts.extend(history_lines)
     targets = ", ".join(_format_language_name(t) for t in target_langs)
     parts.append(
@@ -96,12 +59,47 @@ class TranslationCog(commands.Cog):
                 )
         history = await get_history_context(msg_or_inter.channel, 4096)
         prompt = _build_prompt(history, target_langs, content)
-        translations = await _translator.translate(prompt)
-        return {
-            lang.lower(): text
-            for lang, text in translations.items()
-            if text.strip() and text.strip() != content.strip()
-        }
+        system_instruction = (
+            "You are a translation assistant. Your job is to:\n"
+            "1. Translate messages while maintaining context, nuance and accuracy\n"
+            "2. Never add commentary or additional messages\n"
+            "3. Always use full language names\n"
+            "4. Return translations ONLY as a valid JSON object containing a single key 'translations', which maps lowercase language names to translated text."
+        )
+        try:
+            api_key = config.read().get("GOOGLE_API_KEY")
+            if not api_key:
+                logging.error("Google API key missing")
+                return {}
+            client = genai.Client(api_key=api_key)
+            response = await client.aio.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                    system_instruction=system_instruction
+                )
+            )
+            try:
+                translations = json.loads(response.text)
+            except json.JSONDecodeError:
+                text = response.text.strip()
+                if text.startswith("```json"):
+                    text = text[7:-3].strip()
+                elif text.startswith("```"):
+                     text = text[3:-3].strip()
+                translations = json.loads(text)
+            if "translations" in translations:
+                translations = translations["translations"]
+            return {
+                lang.lower(): text
+                for lang, text in translations.items()
+                if text.strip() and text.strip() != content.strip()
+            }
+        except Exception:
+            logging.exception("Translation failed")
+            return {}
 
     async def _worker(self):
         while True:
