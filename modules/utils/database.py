@@ -8,8 +8,11 @@ import disnake
 import asyncio
 import logging
 import time
+import httpx
 
 DATABASE_FILE = config.read().get('DATABASE_FILE')
+SYNC_SECRET = config.read().get('FROGPILOT_SYNC_SECRET')
+FROGPILOT_URL = "https://www.frogpilot.com"
 
 _connection_pool = []
 MAX_POOL_SIZE = 5
@@ -128,16 +131,36 @@ async def db_access_with_retry(sql_operation, args=(), max_attempts=5, delay=1):
                 raise
             await asyncio.sleep(delay)
 
+async def sync_points_to_frogpilot(user_id: int, points: int):
+    """Sync point totals to FrogPilot.com."""
+    if not SYNC_SECRET:
+        return
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.post(
+                f"{FROGPILOT_URL}/api/pond/sync-points",
+                json={"userId": str(user_id), "points": points},
+                headers={"Authorization": f"Bearer {SYNC_SECRET}"},
+                timeout=5.0
+            )
+            if res.status_code != 200:
+                logging.error(f"Sync failed (HTTP {res.status_code}): {res.text}")
+    except Exception as e:
+        logging.error(f"Failed to sync points to FrogPilot: {e}")
+
 async def initialize_points_database(user):
     rows = await db_access_with_retry('SELECT points FROM user_points WHERE user_id = ?', (user.id,))
     if not rows:
         await db_access_with_retry('INSERT INTO user_points (user_id, points) VALUES (?, ?)', (user.id, 0))
+        await sync_points_to_frogpilot(user.id, 0)
         return 0
     return rows[0][0]
 
 async def update_points(user_id, points):
     try:
         await db_access_with_retry('UPDATE user_points SET points = ? WHERE user_id = ?', (points, user_id))
+        asyncio.create_task(sync_points_to_frogpilot(user_id, points))
         return True
     except Exception as e:
         logging.error(f"Failed to update points: {e}")
@@ -148,6 +171,10 @@ async def get_user_points(user_id):
     if rows:
         return rows[0][0]
     return 0
+
+async def get_all_users_points():
+    rows = await db_access_with_retry('SELECT user_id, points FROM user_points')
+    return {user_id: points for user_id, points in rows}
 
 async def log_checkmark_message_id(message_id, channel_id, timestamp):
     try:
@@ -210,8 +237,8 @@ async def schedule_message(channel_id: int, author_id: int, content: str, schedu
     async with aiosqlite.connect(DATABASE_FILE) as conn:
         async with conn.cursor() as cursor:
             await cursor.execute(
-                '''INSERT INTO scheduled_messages 
-                   (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data) 
+                '''INSERT INTO scheduled_messages
+                   (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
                 (channel_id, author_id, content, scheduled_time, timezone, is_whiteboard, whiteboard_data)
             )
@@ -272,7 +299,7 @@ async def update_scheduled_message(id: int, content: str = None, scheduled_time:
         updates.append('whiteboard_data = ?')
         params.append(whiteboard_data)
     if not updates:
-        return False    
+        return False
     params.append(id)
     try:
         await db_access_with_retry(
@@ -288,8 +315,8 @@ async def log_wiki_search_event(user_id: int, query_text: str, event_type: str, 
     try:
         current_timestamp = int(time.time())
         await db_access_with_retry(
-            '''INSERT INTO wiki_search_log 
-               (user_id, query_text, event_timestamp, event_type, queue_length, details) 
+            '''INSERT INTO wiki_search_log
+               (user_id, query_text, event_timestamp, event_type, queue_length, details)
                VALUES (?, ?, ?, ?, ?, ?)''',
             (user_id, query_text, current_timestamp, event_type, queue_length, details)
         )
@@ -303,8 +330,8 @@ async def add_to_wiki_queue(user_id: int, guild_id: int, channel_id: int, query_
         conn = await get_connection()
         async with conn.cursor() as cursor:
             await cursor.execute(
-                """INSERT INTO wiki_search_queue 
-                   (user_id, guild_id, channel_id, query_text, request_timestamp, message_id, status) 
+                """INSERT INTO wiki_search_queue
+                   (user_id, guild_id, channel_id, query_text, request_timestamp, message_id, status)
                    VALUES (?, ?, ?, ?, ?, ?, 'queued')""",
                 (user_id, guild_id, channel_id, query_text, current_timestamp, message_id)
             )
@@ -401,7 +428,7 @@ async def add_known_theme(theme_key: str, theme_name: str, author_name: str):
 async def get_known_themes() -> list:
     rows = await db_access_with_retry('SELECT theme_key FROM known_themes')
     return [row[0] for row in rows] if rows else []
-    
+
 async def get_wiki_request_by_id(request_id: int) -> Optional[Dict]:
     conn = await get_connection()
     try:
@@ -439,7 +466,7 @@ class ThreadCleanupManager:
                 channel = self.bot.get_channel(channel_id)
                 if not channel:
                     await db_access_with_retry(
-                        'DELETE FROM checkmark_logs WHERE message_id = ?', 
+                        'DELETE FROM checkmark_logs WHERE message_id = ?',
                         (message_id,)
                     )
                     stats['checkmarks'] += 1
@@ -447,7 +474,7 @@ class ThreadCleanupManager:
                 elapsed_time = current_time - timestamp
                 if elapsed_time > (7 * 24 * 60 * 60):
                     await db_access_with_retry(
-                        'DELETE FROM checkmark_logs WHERE message_id = ?', 
+                        'DELETE FROM checkmark_logs WHERE message_id = ?',
                         (message_id,)
                     )
                     if isinstance(channel, disnake.Thread):
@@ -490,7 +517,7 @@ class DatabaseCog(commands.Cog):
         await initialize_database()
         self._cleanup_task = asyncio.create_task(self.periodic_cleanup())
         logging.debug("Database initialized and cleanup task started.")
-    
+
     def cog_unload(self):
         if self._cleanup_task:
             self._cleanup_task.cancel()

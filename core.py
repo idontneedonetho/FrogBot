@@ -24,19 +24,20 @@ class Config:
         'DISCORD_TOKEN': ('Enter your Discord bot token: ', True),
         'DATABASE_FILE': ('Enter your database filename (optional): ', False),
         'GITHUB_TOKEN': ('Enter your GitHub personal access token (optional): ', False),
-        'GOOGLE_API_KEY': ('Enter your Google AI API key (optional): ', False)
+        'GOOGLE_API_KEY': ('Enter your Google AI API key (optional): ', False),
+        'FROGPILOT_SYNC_SECRET': ('Enter your FrogPilot sync secret (optional): ', False)
     }
 
     def __init__(self, filename: Path = CONFIG['CONFIG_FILE']):
         self._config_path = Path(filename)
-        
-    def read(self) -> dict[str, Any]: 
+
+    def read(self) -> dict[str, Any]:
         return yaml.safe_load(self._config_path.read_text()) if self._config_path.exists() else {}
-    
+
     def write(self, config: dict[str, Any]) -> None:
         self._config_path.write_text(yaml.safe_dump(config))
 
-    def update(self, key: str, value: Any): 
+    def update(self, key: str, value: Any):
         self.write({**self.read(), key: value})
 
     def setup_config(self):
@@ -82,7 +83,7 @@ class GitManager:
         except Exception as e:
             logging.error(f"Error getting current branch: {e}")
             return "beta"
-        
+
     @staticmethod
     def get_version() -> str:
         try:
@@ -154,14 +155,14 @@ class BotManager:
             config_data = config.read()
             if (channel_id := config_data.get('restart_channel_id')) and (message_id := config_data.get('restart_message_id')):
                 if channel := self.client.get_channel(int(channel_id)):
-                    try: 
+                    try:
                         message = await channel.fetch_message(int(message_id))
                         await message.edit(content="I'm back online!")
-                    except disnake.NotFound: 
+                    except disnake.NotFound:
                         await channel.send("I'm back online!")
             config.update('restart_channel_id', '')
             config.update('restart_message_id', '')
-        except Exception as e: 
+        except Exception as e:
             logging.error(f"Error handling restart message: {e}")
 
 def is_admin_or_privileged(user_id: Optional[int] = None, rank_id: Optional[int] = None):
@@ -193,12 +194,12 @@ class ModuleLoader:
             cogs_path.mkdir(parents=True)
             (cogs_path / "__init__.py").touch()
         for file_path in cogs_path.rglob("*.py"):
-            if file_path.stem == "__init__": 
+            if file_path.stem == "__init__":
                 continue
             relative_parts = file_path.relative_to(cogs_dir).parts
             module_name = (
-                f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}" 
-                if len(relative_parts) > 1 
+                f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}"
+                if len(relative_parts) > 1
                 else f"modules.{file_path.stem}"
             )
             module_key = '.'.join(module_name.split('.')[1:])
@@ -235,12 +236,12 @@ class ModuleLoader:
     @classmethod
     def load_all_modules(cls, client: commands.Bot, cogs_dir: Path = CONFIG['COGS_DIR']) -> None:
         for file_path in Path(cogs_dir).rglob("*.py"):
-            if file_path.stem == "__init__": 
+            if file_path.stem == "__init__":
                 continue
             relative_parts = file_path.relative_to(cogs_dir).parts
             module_name = (
-                f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}" 
-                if len(relative_parts) > 1 
+                f"modules.{'.'.join(relative_parts[:-1])}.{file_path.stem}"
+                if len(relative_parts) > 1
                 else f"modules.{file_path.stem}"
             )
             cls.load_single_module(client, file_path, module_name)
@@ -348,7 +349,7 @@ class BranchSelect(disnake.ui.Select):
             disnake.SelectOption(
                 label=branch,
                 default=(branch == "beta")
-            ) 
+            )
             for branch in branches
         ]
         super().__init__(
@@ -498,7 +499,7 @@ class ControlPanelView(disnake.ui.View):
 
 @client.slash_command(name="control_panel", description="Open the bot's control panel")
 @is_admin_or_privileged(user_id=CONFIG['ADMIN_USER_ID'])
-async def control_panel(ctx): 
+async def control_panel(ctx):
     await ctx.send(f"🤖 {client.user.display_name} Control Panel", view=ControlPanelView(), ephemeral=True)
 
 @client.command(name="resync", description="Force re-sync all commands by reloading modules.")
@@ -525,16 +526,16 @@ def main():
     try:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         config.setup_config()
-        if not (token := config.read().get('DISCORD_TOKEN')): 
+        if not (token := config.read().get('DISCORD_TOKEN')):
             raise ValueError("Discord token not found in config")
-        if db_file := config.read().get('DATABASE_FILE'): 
+        if db_file := config.read().get('DATABASE_FILE'):
             Path(db_file).touch(exist_ok=True)
         ModuleLoader.load_all_modules(client)
         client.run(token)
-    except KeyboardInterrupt: 
+    except KeyboardInterrupt:
         print("\nSetup cancelled. Please run the bot again to complete setup.")
         sys.exit(1)
-    except Exception as e: 
+    except Exception as e:
         print(f"Failed to start bot: {e}")
         sys.exit(1)
 
