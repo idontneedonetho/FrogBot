@@ -11,7 +11,7 @@ import time
 import httpx
 
 DATABASE_FILE = config.read().get('DATABASE_FILE')
-SYNC_SECRET = config.read().get('FROGPILOT_SYNC_SECRET')
+SYNC_SECRET = config.read().get('FROGBOT_SYNC_SECRET')
 FROGPILOT_URL = "https://www.frogpilot.com"
 
 _connection_pool = []

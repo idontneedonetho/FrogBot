@@ -25,7 +25,7 @@ class Config:
         'DATABASE_FILE': ('Enter your database filename (optional): ', False),
         'GITHUB_TOKEN': ('Enter your GitHub personal access token (optional): ', False),
         'GOOGLE_API_KEY': ('Enter your Google AI API key (optional): ', False),
-        'FROGPILOT_SYNC_SECRET': ('Enter your FrogPilot sync secret (optional): ', False)
+        'FROGBOT_SYNC_SECRET': ('Enter your FrogPilot sync secret (optional): ', False)
     }
 
     def __init__(self, filename: Path = CONFIG['CONFIG_FILE']):
